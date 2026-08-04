@@ -147,16 +147,28 @@
       <div class="sub">Standardmäßig aus: jeder Abgang zählt als Verkauf, jeder Zugang als Kauf zum verzeichneten Preis — passend für tatsächliche Verkäufe/Rückkäufe. Nur aktivieren, wenn wirklich Wertpapiere unverändert von einem Depot ins andere gewandert sind.</div>
     </div>
     <div class="card">
-      <h2>Konten zusammenfassen <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Merge accounts</span></h2>
-      <label style="display:flex; align-items:center; gap:8px; font-size:13.5px; margin-bottom:10px;">
-        <input type="checkbox" id="group-broker-toggle" checked>
-        Unterkonten desselben Brokers (gleiche Währung) zu einer Kostenbasis zusammenfassen
-      </label>
-      <div class="sub">Für z. B. mehrere aufgelöste TBSZ-Unterkonten, die beim selben Broker zusammengeführt wurden. Gruppiert nach Broker + Kontowährung (nicht nach Broker allein, damit USD und EUR getrennt bleiben). Diese Zusammenfassung selbst würde ich trotzdem von deinem Steuerberater bestätigen lassen — grenzüberschreitende TBSZ-Fälle sind kein Standardfall.</div>
+      <h2>Konten zusammenführen <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Merge accounts (manual, with a date)</span></h2>
+      <div class="sub">Für einzelne, tatsächlich geschlossene/zusammengeführte Konten (z. B. aufgelöste TBSZ-Unterkonten). Wähle genau welche Konten und ab welchem Datum — kein pauschales "alles vom selben Broker". / For specific accounts that were actually closed/merged. Choose exactly which accounts and from which date — not a blanket "everything from the same broker".</div>
+      <div id="combine-rules-list" style="margin-top:10px;"></div>
+      <div class="row" style="margin-top:12px; align-items:flex-end;">
+        <div style="flex:2;">
+          <label>Konten auswählen (Mehrfachauswahl) / Select accounts (multi-select)</label>
+          <select id="combine-accounts-select" multiple size="5" style="width:100%;"></select>
+        </div>
+        <div style="max-width:170px;">
+          <label>Ab Datum / From date</label>
+          <input type="date" id="combine-from-date">
+        </div>
+        <div style="flex:1;">
+          <label>Label (optional)</label>
+          <input type="text" id="combine-label" placeholder="z. B. KBC TBSZ zusammengeführt">
+        </div>
+        <div><button class="ghost small" id="add-combine-rule-btn" type="button">+ Regel hinzufügen</button></div>
+      </div>
     </div>
     <div class="card" id="stepup-values-card" style="display:none;">
       <h2>Gemeiner Wert am Zuzugsdatum <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Fair market value on arrival date</span></h2>
-      <div class="sub">Für jede Position, die du zu diesem Zeitpunkt gehalten hast. Vorgeschlagene Werte (letzter bekannter Transaktionspreis vor dem Zuzug) sind nur ein Ausgangspunkt — bitte durch den tatsächlichen Kurswert an diesem Tag ersetzen (z. B. von deinem Broker oder einer Finanzseite).</div>
+      <div class="sub">Für jede Position, die du zu diesem Zeitpunkt gehalten hast. Vorgeschlagene Werte (letzter bekannter Transaktionspreis vor dem Zuzug) sind nur ein Ausgangspunkt — bitte durch den tatsächlichen Kurswert an diesem Tag ersetzen (z. B. von deinem Broker oder einer Finanzseite). Der Knopf "↻ Kurs von Yahoo Finance versuchen" ist ein Automatisierungsversuch (nicht garantiert — siehe Hinweis unten).</div>
       <div id="stepup-values-table"></div>
     </div>
     <div style="text-align:right;"><button id="apply-settings-btn">Anwenden & neu berechnen</button></div>
@@ -167,6 +179,9 @@
       Für welche Symbole willst du die OeKB-Meldedaten (ausschüttungsgleiche Erträge) später zuordnen? Trag hier die ISIN ein — bei Symbolen, die dich nur für Kostenbasis/Gewinne interessieren, kannst du die ISIN leer lassen.
       <p style="margin:10px 0 0; font-style:italic; color:#3d6b5e;">Which symbols do you want to later match to OeKB reporting data (deemed distributed income)? Enter the ISIN here; for symbols you only care about for cost basis or gains, you can leave the ISIN blank.</p>
     </div>
+    <div style="text-align:right; margin-bottom:10px;">
+      <button class="ghost small" id="autofill-isin-btn" type="button">↻ Bekannte ISINs automatisch eintragen / Auto-fill known ISINs</button>
+    </div>
     <div class="card"><div id="mapping-table"></div></div>
   </div>
 
@@ -174,8 +189,10 @@
     <div id="results-content"></div>
   </div>
 
-  <div class="save-row" style="margin-top:18px; display:flex; gap:10px;">
+  <div class="save-row" style="margin-top:18px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
     <button class="ghost small" id="export-btn">⭳ Ergebnis als JSON exportieren</button>
+    <span id="depot-save-status" style="font-size:12px; color:var(--muted); font-family:'IBM Plex Mono', monospace;">—</span>
+    <span style="font-size:11px; color:var(--muted);">(Daten bleiben nur in diesem Browser/Gerät gespeichert — für ein tragbares Backup weiterhin JSON exportieren / data stays only in this browser/device — export JSON for a portable backup)</span>
   </div>
 </div>
 
@@ -187,13 +204,28 @@
 (function(){
   'use strict';
 
+  // Verified Symbol -> ISIN mappings (looked up and cross-checked against fund provider pages,
+  // justETF, and cbonds). Auto-fills the ISIN column so most symbols need no manual typing.
+  // Note: VNQ and VEA are plain US-domiciled funds, not UCITS — OeKB almost certainly has no
+  // Meldefonds data for them. Included here only for cost-basis tracking, not tax reporting.
+  const KNOWN_ISIN_MAP = {
+    'VWCE.DE': 'IE00BK5BQT80', 'VAGF.F': 'IE00BG47KH54', 'EIMI.UK': 'IE00BKM4GZ66',
+    'EMIM.AS': 'IE00BKM4GZ66', 'IMEA.L': 'IE00B4K48X80', 'SPYE.F': 'IE00BKWQ0Q14',
+    'CSUS.SW': 'IE00B52SFT06', 'CSPX.UK': 'IE00B5BMR087', 'EUNL.DE': 'IE00B4L5Y983',
+    'IWDA.UK': 'IE00B4L5Y983', 'WSML.UK': 'IE00BF4RFH31', 'IUSN.DE': 'IE00BF4RFH31',
+    'IUAA.L': 'IE00BYXYYM63', 'CPXJ.UK': 'IE00B52MJY50', 'GAGH.PA': 'LU1708330318',
+    'EPRU.AS': 'LU1437018838', 'EPRA.PA': 'LU1437018838', 'CUSS.UK': 'IE00B3VWM098',
+    'WDSC.UK': 'IE00BCBJG560', 'HPRD.UK': 'IE00B5L01S80', 'AGGH.SW': 'IE00BDBRDM35',
+    'AGGU.L': 'IE00BZ043R46', 'VNQ': 'US9229085538', 'VEA': 'US9219438580'
+  };
+
   let state = {
     transactions: [],
     accounts: {},
     symbolMap: {},
     results: null,
     stepUpDate: null,
-    groupByBroker: true,
+    combineRules: [], // {id, accounts:[...], fromDate:'YYYY-MM-DD', label}
     transferMatchMode: false,
     stepUpValues: {} // groupKey|symbol -> FMV per unit (EUR/account-currency)
   };
@@ -216,10 +248,101 @@
 
   let manualCounter = 0;
 
+  // ---------- Persistence (real browser localStorage — this is a hosted website, not a
+  // Claude.ai artifact preview, so this works normally and persists between visits) ----------
+  const DEPOT_LOCAL_KEY = 'depot-kostenbasis-data-v1';
+
+  function persistDepotState(){
+    try{
+      const toSave = {
+        transactions: state.transactions.map(t => Object.assign({}, t, { date: t.date ? t.date.toISOString() : null })),
+        accounts: state.accounts, symbolMap: state.symbolMap, stepUpDate: state.stepUpDate,
+        combineRules: state.combineRules, transferMatchMode: state.transferMatchMode, stepUpValues: state.stepUpValues
+      };
+      localStorage.setItem(DEPOT_LOCAL_KEY, JSON.stringify(toSave));
+      setDepotSaveStatus('Gespeichert · ' + new Date().toLocaleTimeString('de-AT'));
+    }catch(e){
+      setDepotSaveStatus('Automatisches Speichern nicht verfügbar in diesem Browser.');
+    }
+  }
+
+  function loadDepotState(){
+    try{
+      const raw = localStorage.getItem(DEPOT_LOCAL_KEY);
+      if (!raw) return false;
+      const saved = JSON.parse(raw);
+      state.transactions = (saved.transactions||[]).map(t => Object.assign({}, t, { date: t.date ? new Date(t.date) : null }));
+      state.accounts = saved.accounts || {};
+      state.symbolMap = saved.symbolMap || {};
+      state.stepUpDate = saved.stepUpDate || null;
+      state.combineRules = saved.combineRules || [];
+      state.transferMatchMode = saved.transferMatchMode || false;
+      state.stepUpValues = saved.stepUpValues || {};
+      return true;
+    }catch(e){ return false; }
+  }
+
+  function setDepotSaveStatus(msg){
+    const el = document.getElementById('depot-save-status');
+    if (el) el.textContent = msg;
+  }
+
   function renderKnownAccountsDatalist(){
     const dl = document.getElementById('known-accounts-list');
     dl.innerHTML = Object.keys(state.accounts).map(a=>`<option value="${a}">`).join('');
   }
+
+  function renderCombineRulesUI(){
+    const select = document.getElementById('combine-accounts-select');
+    if (select){
+      const prevSelected = new Set(Array.from(select.selectedOptions||[]).map(o=>o.value));
+      select.innerHTML = Object.keys(state.accounts).sort().map(a=>
+        `<option value="${a}" ${prevSelected.has(a)?'selected':''}>${a}</option>`
+      ).join('');
+    }
+    const list = document.getElementById('combine-rules-list');
+    if (list){
+      if (state.combineRules.length === 0){
+        list.innerHTML = '<div style="font-size:12.5px; color:var(--muted);">Noch keine Regeln. / No rules yet.</div>';
+      } else {
+        list.innerHTML = state.combineRules.map(r=>`
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border:1px solid var(--hairline); border-radius:4px; margin-bottom:6px; font-size:13px;">
+            <div>
+              <b>${r.label || ('Regel ' + r.id)}</b><br>
+              <span style="color:var(--muted); font-size:12px;">${r.accounts.join(' + ')} — ab ${r.fromDate}</span>
+            </div>
+            <button class="danger small" type="button" data-del-rule="${r.id}">✕</button>
+          </div>
+        `).join('');
+        list.querySelectorAll('[data-del-rule]').forEach(btn=>{
+          btn.addEventListener('click', ()=>{
+            state.combineRules = state.combineRules.filter(r=>r.id!==btn.dataset.delRule);
+            renderCombineRulesUI();
+            if (state.transactions.length) runEngine(); else persistDepotState();
+          });
+        });
+      }
+    }
+  }
+
+  document.getElementById('add-combine-rule-btn').addEventListener('click', ()=>{
+    const select = document.getElementById('combine-accounts-select');
+    const accounts = Array.from(select.selectedOptions).map(o=>o.value);
+    const fromDate = document.getElementById('combine-from-date').value;
+    const label = document.getElementById('combine-label').value.trim();
+    if (accounts.length < 2){
+      alert('Bitte mindestens zwei Konten auswählen. / Please select at least two accounts.');
+      return;
+    }
+    if (!fromDate){
+      alert('Bitte ein Datum angeben, ab dem die Konten zusammengeführt werden sollen. / Please give a date from which the accounts should be merged.');
+      return;
+    }
+    state.combineRules.push({ id: 'rule' + Date.now() + Math.random().toString(36).slice(2,6), accounts, fromDate, label });
+    document.getElementById('combine-label').value = '';
+    renderCombineRulesUI();
+    if (state.transactions.length) runEngine(); else persistDepotState();
+  });
 
   function renderManualEntriesTable(){
     const el = document.getElementById('manual-entries-table');
@@ -277,10 +400,11 @@
 
     ['man-date','man-symbol','man-qty','man-price'].forEach(id=>document.getElementById(id).value='');
     renderKnownAccountsDatalist();
+    renderCombineRulesUI();
     renderManualEntriesTable();
 
     const symbols = Object.keys(state.symbolMap);
-    if (!symbols.includes(symbol)) state.symbolMap[symbol] = '';
+    if (!symbols.includes(symbol)) state.symbolMap[symbol] = KNOWN_ISIN_MAP[symbol] || '';
     renderMappingTable();
     runEngine();
   });
@@ -373,13 +497,14 @@
         state.transactions = transactions.concat(manualExisting);
         state.accounts = Object.assign({}, accounts, state.accounts); // keep any manually-added account defs too
 
-        // seed symbol map
+        // seed symbol map (auto-filling known ISINs where we have them)
         const symbols = Array.from(new Set(transactions.map(t=>t.symbol).filter(s=>s && s!=='* Cash')));
-        symbols.forEach(s => { if (!(s in state.symbolMap)) state.symbolMap[s] = ''; });
+        symbols.forEach(s => { if (!(s in state.symbolMap) || !state.symbolMap[s]) state.symbolMap[s] = KNOWN_ISIN_MAP[s] || state.symbolMap[s] || ''; });
 
         renderImportSummary(transSheetName, accSheetName, transactions, accounts, symbols);
         renderMappingTable();
         renderKnownAccountsDatalist();
+    renderCombineRulesUI();
         renderManualEntriesTable();
         runEngine();
       } catch(err){
@@ -432,19 +557,12 @@
     el.querySelectorAll('.isin-input').forEach(inp=>{
       inp.addEventListener('input', ()=>{
         state.symbolMap[inp.dataset.symbol] = inp.value.trim().toUpperCase();
+        persistDepotState();
       });
     });
   }
 
   // ---------- Engine ----------
-  function groupKeyFor(account){
-    const meta = state.accounts[account] || {};
-    if (state.groupByBroker && meta.portfolio){
-      return meta.portfolio + '|' + (meta.currency||'EUR');
-    }
-    return account;
-  }
-
   function runEngine(){
     const transactions = state.transactions.slice()
       .filter(t => t.date)
@@ -456,11 +574,12 @@
       });
 
     const stepUpDate = state.stepUpDate ? new Date(state.stepUpDate+'T00:00:00Z') : null;
-    const positions = {};      // groupKey|symbol -> {groupKey, symbol, currency, qty, totalCost}
+    const positions = {};      // groupKey|symbol -> {groupKey, symbol, currency, qty, totalCost, history}
     const pendingOut = [];     // only used if transferMatchMode is on
     const realized = [];
     const notes = [];
     const stepUpCandidates = {}; // groupKey|symbol -> {qtyAtStepUp, lastKnownPrice}
+    const activatedRules = new Set();
 
     function getPos(groupKey, symbol, currency){
       const key = groupKey+'|'+symbol;
@@ -468,9 +587,46 @@
       return positions[key];
     }
 
+    // The first time a combine-rule's date threshold is crossed for one of its accounts, pool
+    // every symbol those accounts currently hold into one merged position — carrying the combined
+    // cost basis forward, not resetting it. Only that specific rule's named accounts are touched;
+    // every other account keeps tracking its own cost basis completely independently.
+    function ensureRuleActivated(rule){
+      if (activatedRules.has(rule.id)) return;
+      activatedRules.add(rule.id);
+      const symbolsTouched = new Set();
+      Object.keys(positions).forEach(key=>{
+        if (rule.accounts.includes(positions[key].groupKey)) symbolsTouched.add(positions[key].symbol);
+      });
+      const combinedGroupKey = 'RULE:'+rule.id;
+      symbolsTouched.forEach(symbol=>{
+        let qty=0, cost=0, currency=null, history=[];
+        rule.accounts.forEach(acc=>{
+          const key = acc+'|'+symbol;
+          const p = positions[key];
+          if (p){
+            qty += p.qty; cost += p.totalCost; currency = currency || p.currency;
+            history = history.concat(p.history);
+            p.qty = 0; p.totalCost = 0; // balance moved into the merged position
+          }
+        });
+        positions[combinedGroupKey+'|'+symbol] = { groupKey: combinedGroupKey, symbol, currency: currency||'EUR', qty, totalCost: cost, history };
+      });
+    }
+
+    function groupKeyFor(account, dateObj){
+      for (const rule of state.combineRules){
+        if (rule.accounts.includes(account) && dateObj && dateObj.getTime() >= new Date(rule.fromDate+'T00:00:00Z').getTime()){
+          ensureRuleActivated(rule);
+          return 'RULE:' + rule.id;
+        }
+      }
+      return account;
+    }
+
     for (const t of transactions){
       if (!t.symbol || t.symbol === '* Cash') continue;
-      const groupKey = groupKeyFor(t.account);
+      const groupKey = groupKeyFor(t.account, t.date);
       const currency = (state.accounts[t.account]||{}).currency || 'EUR';
       const pos = getPos(groupKey, t.symbol, currency);
       const type = t.transType;
@@ -524,10 +680,14 @@
       } else if (type==='Split'){
         pos.qty += t.qty;
       } else if (type==='SymbolTransferOut' || type==='SymbolTransferOutAsSale'){
-        if (state.transferMatchMode){
+        const withinActiveCombineRule = groupKey.startsWith('RULE:');
+        if (withinActiveCombineRule || state.transferMatchMode){
+          // Carry the exact cost basis forward via pairing (computed now, while qty/cost are
+          // still intact) rather than reducing then later re-deriving an average from a
+          // position that may sit at zero between the Out and In legs of the same closure.
           const avg = pos.qty>0 ? pos.totalCost/pos.qty : 0;
           const carried = t.qty * avg;
-          pendingOut.push({symbol:t.symbol, qty:t.qty, date:t.date, fromGroupKey:groupKey, fromAccount:t.account, carried, matched:false, price:t.price, currency:pos.currency});
+          pendingOut.push({symbol:t.symbol, qty:t.qty, date:t.date, fromGroupKey:groupKey, fromAccount:t.account, carried, matched:false, price:t.price, currency:pos.currency, forceMatch:withinActiveCombineRule});
           pos.qty -= t.qty;
           pos.totalCost -= carried;
         } else {
@@ -539,7 +699,8 @@
           pos.totalCost -= costBasisUsed;
         }
       } else if (type==='SymbolTransferIn'){
-        if (state.transferMatchMode){
+        const withinActiveCombineRule = groupKey.startsWith('RULE:');
+        if (withinActiveCombineRule || state.transferMatchMode){
           const match = pendingOut.find(p => !p.matched && p.symbol===t.symbol && Math.abs(p.qty - t.qty) < 0.0005 && daysBetween(p.date, t.date) <= 5);
           if (match){
             match.matched = true;
@@ -560,11 +721,19 @@
       pos.history.push({date: t.date, qty: pos.qty});
     }
 
-    if (state.transferMatchMode){
-      pendingOut.filter(p=>!p.matched).forEach(p=>{
+    pendingOut.filter(p=>!p.matched).forEach(p=>{
+      if (p.forceMatch){
+        // A combine-rule covers this account, but no matching In was found for this specific
+        // Out — restore the balance to where it came from rather than silently losing it or
+        // inventing a taxable sale, and flag it so it can be checked against the real records.
+        const pos = getPos(p.fromGroupKey, p.symbol, p.currency);
+        pos.qty += p.qty;
+        pos.totalCost += p.carried;
+        notes.push(`Zusammenführung ${p.symbol} (${p.fromAccount}, ${p.date.toISOString().slice(0,10)}): kein passender Gegenbuchungs-Zugang gefunden — Bestand vorsichtshalber nicht verschoben, bitte Kontoauszüge prüfen.`);
+      } else if (state.transferMatchMode){
         realized.push({date:p.date, account:p.fromAccount, groupKey:p.fromGroupKey, symbol:p.symbol, qty:p.qty, proceeds:p.qty*p.price, costBasis:p.carried, gain:(p.qty*p.price)-p.carried, currency:p.currency, kind:'Übertrag ohne Gegenbuchung (als Verkauf gewertet)'});
-      });
-    }
+      }
+    });
 
     // Positions with pre-history that were never touched after step-up date still need the basis applied
     if (stepUpDate){
@@ -585,6 +754,7 @@
     state.results = { positions, realized, notes, stepUpCandidates };
     renderStepUpValuesTable();
     renderResults();
+    persistDepotState();
   }
 
   function renderStepUpValuesTable(){
@@ -596,25 +766,92 @@
     card.style.display='block';
     el.innerHTML = `
       <table>
-        <thead><tr><th>Gruppe</th><th>Symbol</th><th>Menge am Zuzugsdatum</th><th>Vorschlag (letzter Preis)</th><th>Gemeiner Wert/Stück (eintragen)</th></tr></thead>
+        <thead><tr><th>Gruppe</th><th>Symbol</th><th>Menge am Zuzugsdatum</th><th>Vorschlag (letzter Preis)</th><th>Gemeiner Wert/Stück (eintragen)</th><th></th></tr></thead>
         <tbody>
           ${cands.map(([key,v])=>{
             const [groupKey,symbol] = key.split('|');
             return `
-            <tr>
+            <tr data-stepup-key="${key}">
               <td>${groupKey}</td>
               <td class="num">${symbol}</td>
               <td class="num">${fmt(v.qtyAtStepUp)}</td>
               <td class="num" style="color:var(--muted);">${fmt(v.lastKnownPrice)}</td>
               <td><input type="number" step="0.0001" class="stepup-input" data-key="${key}" value="${state.stepUpValues[key]||''}" placeholder="${fmt(v.lastKnownPrice)}"></td>
-            </tr>`;
+              <td><button class="ghost small" type="button" data-fetch-price="${key}" data-symbol="${symbol}">↻ Yahoo Finance versuchen</button></td>
+            </tr>
+            <tr class="yahoo-status-row" data-status-for="${key}"><td colspan="6" style="font-size:11.5px; color:var(--muted); border-bottom:1px solid var(--hairline);"></td></tr>`;
           }).join('')}
         </tbody>
       </table>
+      <div style="font-size:11px; color:var(--muted); margin-top:6px;">Experimentell: Yahoo Finance bietet keine offizielle, garantierte Schnittstelle an — das kann jederzeit aufhören zu funktionieren. Bei Fehlschlag bitte den Kurs manuell nachsehen. / Experimental: Yahoo Finance has no official, guaranteed interface — this can stop working at any time. On failure, please look up the price manually.</div>
     `;
     el.querySelectorAll('.stepup-input').forEach(inp=>{
-      inp.addEventListener('input', ()=>{ state.stepUpValues[inp.dataset.key] = inp.value; });
+      inp.addEventListener('input', ()=>{ state.stepUpValues[inp.dataset.key] = inp.value; persistDepotState(); });
     });
+    el.querySelectorAll('[data-fetch-price]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const key = btn.dataset.fetchPrice;
+        const symbol = btn.dataset.symbol;
+        const statusCell = el.querySelector(`tr[data-status-for="${key}"] td`);
+        btn.disabled = true; btn.textContent = 'Lade …';
+        const result = await fetchYahooPrice(symbol, state.stepUpDate);
+        btn.disabled = false; btn.textContent = '↻ Yahoo Finance versuchen';
+        if (result.ok){
+          const input = el.querySelector(`.stepup-input[data-key="${key}"]`);
+          input.value = result.price;
+          state.stepUpValues[key] = result.price;
+          persistDepotState();
+          statusCell.style.color = 'var(--teal)';
+          statusCell.textContent = `Kurs vom ${result.dateUsed} übernommen (Yahoo-Ticker ${result.ticker}) — bitte trotzdem stichprobenartig prüfen.`;
+        } else {
+          statusCell.style.color = 'var(--brick)';
+          statusCell.textContent = result.msg;
+        }
+      });
+    });
+  }
+
+  // Reverse-lookup: ISIN -> Yahoo ticker, from the same verified mapping used for ISIN auto-fill
+  const ISIN_TO_YAHOO_TICKER = Object.fromEntries(Object.entries(KNOWN_ISIN_MAP).map(([sym,isin])=>[isin,sym]));
+
+  async function fetchYahooPrice(symbolOrKey, dateStr){
+    // symbolOrKey here is the Portfolio-Slicer symbol; try it directly as a Yahoo ticker first
+    // (most Portfolio Slicer symbols already are Yahoo-style tickers), then fall back to the
+    // ISIN mapping in case the direct symbol doesn't resolve.
+    const candidates = [symbolOrKey];
+    const isin = state.symbolMap[symbolOrKey];
+    if (isin && ISIN_TO_YAHOO_TICKER[isin] && ISIN_TO_YAHOO_TICKER[isin] !== symbolOrKey) candidates.push(ISIN_TO_YAHOO_TICKER[isin]);
+
+    const target = new Date(dateStr+'T00:00:00Z');
+    const period1 = Math.floor(target.getTime()/1000) - 7*86400; // small window around the date
+    const period2 = Math.floor(target.getTime()/1000) + 2*86400;
+
+    for (const ticker of candidates){
+      const directUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${period1}&period2=${period2}&interval=1d`;
+      const proxiedUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`;
+      for (const url of [directUrl, proxiedUrl]){
+        try{
+          const res = await fetch(url);
+          if (!res.ok) throw new Error('HTTP '+res.status);
+          const data = await res.json();
+          const result = data && data.chart && data.chart.result && data.chart.result[0];
+          if (!result) throw new Error('Keine Daten');
+          const timestamps = result.timestamp || [];
+          const closes = result.indicators.quote[0].close || [];
+          if (!timestamps.length) throw new Error('Keine Kursdaten im Zeitraum');
+          // pick the closing price closest to (on or before) the target date
+          let bestIdx = -1;
+          for (let i=0;i<timestamps.length;i++){
+            if (timestamps[i]*1000 <= target.getTime() + 86400000 && closes[i] != null) bestIdx = i;
+          }
+          if (bestIdx === -1) bestIdx = closes.findIndex(c=>c!=null);
+          if (bestIdx === -1) throw new Error('Keine verwertbaren Kurse');
+          const usedDate = new Date(timestamps[bestIdx]*1000).toISOString().slice(0,10);
+          return { ok:true, price: closes[bestIdx], dateUsed: usedDate, ticker };
+        }catch(e){ /* try next candidate/url */ }
+      }
+    }
+    return { ok:false, msg: `Kein Kurs von Yahoo Finance abrufbar für "${symbolOrKey}" — bitte manuell auf finance.yahoo.com/quote/${encodeURIComponent(symbolOrKey)}/history nachsehen.` };
   }
 
   function renderResults(){
@@ -629,9 +866,9 @@
     const posTable = `
       <div class="card">
         <h2>Aktuelle Bestände <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Current holdings</span></h2>
-        <div class="sub">Gleitender Durchschnittspreis je ${state.groupByBroker?'Broker (zusammengefasst)':'Depot'}, in Kontowährung.</div>
+        <div class="sub">Gleitender Durchschnittspreis je Depot (bzw. zusammengeführter Gruppe, falls eine Regel aktiv ist), in Kontowährung.</div>
         <table>
-          <thead><tr><th>${state.groupByBroker?'Broker':'Konto'}</th><th>Symbol</th><th>ISIN</th><th>Menge</th><th>Ø-Preis/Stück</th><th>Kostenbasis</th><th>Whg.</th></tr></thead>
+          <thead><tr><th>Konto/Gruppe</th><th>Symbol</th><th>ISIN</th><th>Menge</th><th>Ø-Preis/Stück</th><th>Kostenbasis</th><th>Whg.</th></tr></thead>
           <tbody>
             ${posRows.map(p=>`
               <tr>
@@ -707,6 +944,20 @@
     });
   });
 
+  document.getElementById('autofill-isin-btn').addEventListener('click', ()=>{
+    let filled = 0;
+    Object.keys(state.symbolMap).forEach(sym=>{
+      if (!state.symbolMap[sym] && KNOWN_ISIN_MAP[sym]){
+        state.symbolMap[sym] = KNOWN_ISIN_MAP[sym];
+        filled++;
+      }
+    });
+    renderMappingTable();
+    renderResults();
+    persistDepotState();
+    alert(filled ? `${filled} ISIN(s) automatisch eingetragen.` : 'Keine offenen Symbole gefunden, die automatisch zugeordnet werden konnten.');
+  });
+
   document.getElementById('export-btn').addEventListener('click', ()=>{
     if (!state.results){ alert('Bitte zuerst eine Datei importieren.'); return; }
     const { positions, realized } = state.results;
@@ -714,7 +965,7 @@
       generatedAt: new Date().toISOString(),
       symbolMap: state.symbolMap,
       stepUpDate: state.stepUpDate,
-      groupByBroker: state.groupByBroker,
+      combineRules: state.combineRules,
       positions: Object.values(positions).filter(p=>p.history.length>0).map(p=>({
         group:p.groupKey, symbol:p.symbol, isin: state.symbolMap[p.symbol]||null,
         qty:p.qty, avgCostPerUnit: p.qty>0 ? p.totalCost/p.qty : 0, totalCost:p.totalCost, currency:p.currency,
@@ -736,9 +987,27 @@
   document.getElementById('apply-settings-btn').addEventListener('click', ()=>{
     state.stepUpDate = document.getElementById('stepup-date').value || null;
     state.transferMatchMode = document.getElementById('transfer-match-toggle').checked;
-    state.groupByBroker = document.getElementById('group-broker-toggle').checked;
-    if (state.transactions.length) runEngine();
+    if (state.transactions.length) runEngine(); else persistDepotState();
   });
+
+  // ---------- Init: restore any previously saved data in this browser ----------
+  (function initRestore(){
+    if (loadDepotState()){
+      document.getElementById('stepup-date').value = state.stepUpDate || '';
+      document.getElementById('transfer-match-toggle').checked = !!state.transferMatchMode;
+      renderKnownAccountsDatalist();
+      renderCombineRulesUI();
+      renderManualEntriesTable();
+      renderMappingTable();
+      if (state.transactions.length){
+        renderImportSummary('(gespeicherte Daten)', null, state.transactions.filter(t=>!t.manual), state.accounts, Object.keys(state.symbolMap));
+        runEngine();
+      }
+      setDepotSaveStatus('Wiederhergestellt aus diesem Browser.');
+    } else {
+      renderCombineRulesUI();
+    }
+  })();
 
 })();
 </script>

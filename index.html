@@ -360,36 +360,51 @@
   function num(v){ const n = parseFloat(String(v).replace(',','.')); return isNaN(n) ? 0 : n; }
 
   // ---------- Persistence ----------
+  // Uses real browser localStorage as the primary mechanism — this is a genuinely hosted
+  // website (e.g. GitHub Pages), not a Claude.ai artifact preview, so localStorage works
+  // normally and persists between visits on the same browser/device. window.storage (only
+  // present inside Claude.ai's own artifact preview) is tried as a secondary path so this
+  // file still behaves reasonably if opened there too.
+  const LOCAL_KEY = 'meldefonds-data-v1';
+
   async function loadState(){
+    try{
+      const raw = localStorage.getItem(LOCAL_KEY);
+      if (raw){
+        state = Object.assign(state, JSON.parse(raw));
+        setSaveStatus('Geladen ✓ (aus diesem Browser)');
+        return;
+      }
+    }catch(e){ /* localStorage unavailable (e.g. private browsing) — fall through */ }
     try{
       if (window.storage && window.storage.get){
         const res = await window.storage.get('meldefonds-data', false);
         if (res && res.value){
-          const parsed = JSON.parse(res.value);
-          state = Object.assign(state, parsed);
+          state = Object.assign(state, JSON.parse(res.value));
           setSaveStatus('Geladen ✓');
           return;
         }
       }
-      setSaveStatus('Keine gespeicherten Daten — Sicherung laden oder neu beginnen.');
-    }catch(e){
-      setSaveStatus('Automatisches Speichern nicht verfügbar — bitte Sicherung nutzen.');
-    }
+    }catch(e){ /* ignore */ }
+    setSaveStatus('Keine gespeicherten Daten — Sicherung laden oder neu beginnen.');
   }
 
   function persistState(){
     clearTimeout(saveTimer);
     saveTimer = setTimeout(async ()=>{
+      let savedLocally = false;
+      try{
+        localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
+        savedLocally = true;
+      }catch(e){ /* e.g. private browsing with storage disabled, or quota exceeded */ }
       try{
         if (window.storage && window.storage.set){
-          const ok = await window.storage.set('meldefonds-data', JSON.stringify(state), false);
-          setSaveStatus(ok ? ('Gespeichert · ' + new Date().toLocaleTimeString('de-AT')) : 'Speichern fehlgeschlagen — Sicherung laden empfohlen.');
-        } else {
-          setSaveStatus('Automatisches Speichern nicht verfügbar — bitte Sicherung herunterladen.');
+          await window.storage.set('meldefonds-data', JSON.stringify(state), false);
         }
-      }catch(e){
-        setSaveStatus('Automatisches Speichern nicht verfügbar — bitte Sicherung herunterladen.');
-      }
+      }catch(e){ /* ignore — localStorage is the primary path now */ }
+      setSaveStatus(savedLocally
+        ? ('Gespeichert · ' + new Date().toLocaleTimeString('de-AT'))
+        : 'Automatisches Speichern nicht verfügbar in diesem Browser — bitte Sicherung herunterladen.');
     }, 700);
   }
 
@@ -478,7 +493,18 @@
     '2026-01-16': { USD: 1/1.1617, GBP: 1/0.86700, CHF: 1/0.9313, JPY: 1/183.67, CAD: 1/1.6135, AUD: 1/1.7344, SEK: 1/10.7190, NOK: 1/11.7203, DKK: 1/7.4712 }
   };
 
-  // ---------- FX rates (Frankfurter.app, ECB-sourced, free & CORS-enabled) ----------
+  // ---------- FX rates (ECB-sourced). Tries several routes since some environments/CDNs
+  // block the direct API call — falls through direct call, alternate host, then a public
+  // CORS proxy, before finally asking for manual entry. ----------
+  async function tryFetchRate(url){
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    const rate = data && data.rates && data.rates.EUR;
+    if (!rate) throw new Error('Kein Kurs in Antwort');
+    return { rate, date: data.date };
+  }
+
   async function fetchFxRate(entry){
     if (!entry.currency || entry.currency === 'EUR') return {ok:true};
     if (!entry.rateDate){ return {ok:false, msg:'Bitte zuerst ein Kurs-Datum eintragen.'}; }
@@ -488,19 +514,24 @@
       entry.fxRateDateUsed = entry.rateDate;
       return {ok:true, dateUsed: entry.rateDate};
     }
-    try{
-      const url = `https://api.frankfurter.app/${entry.rateDate}?from=${encodeURIComponent(entry.currency)}&to=EUR`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('HTTP '+res.status);
-      const data = await res.json();
-      const rate = data && data.rates && data.rates.EUR;
-      if (!rate) throw new Error('Kein Kurs in Antwort');
-      entry.fxRate = rate;
-      entry.fxRateDateUsed = data.date; // Frankfurter falls back to nearest earlier business day
-      return {ok:true, dateUsed: data.date};
-    }catch(e){
-      return {ok:false, msg:'Kurs konnte nicht automatisch abgerufen werden (keine Internetverbindung? CORS?). Bitte manuell auf frankfurter.app/'+entry.rateDate+'?from='+entry.currency+'&to=EUR nachsehen und eintragen.'};
+
+    const base = `${entry.rateDate}?from=${encodeURIComponent(entry.currency)}&to=EUR`;
+    const attempts = [
+      `https://api.frankfurter.app/${base}`,
+      `https://api.frankfurter.dev/v1/${base}`,
+      `https://corsproxy.io/?url=${encodeURIComponent('https://api.frankfurter.app/'+base)}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent('https://api.frankfurter.app/'+base)}`
+    ];
+
+    for (const url of attempts){
+      try{
+        const { rate, date } = await tryFetchRate(url);
+        entry.fxRate = rate;
+        entry.fxRateDateUsed = date;
+        return {ok:true, dateUsed: date};
+      }catch(e){ /* try next */ }
     }
+    return {ok:false, msg:'Kurs konnte nicht automatisch abgerufen werden (keine Internetverbindung? CORS?). Bitte manuell auf frankfurter.app/'+entry.rateDate+'?from='+entry.currency+'&to=EUR nachsehen und eintragen.'};
   }
 
   // ---------- Tabs ----------
@@ -1093,7 +1124,13 @@
           const fundId = isinToFundId[isin];
           if (!fundId) return; // fund wasn't in parsed.funds and doesn't exist locally either
           const year = parseInt(pe.year,10);
-          let existing = state.entries.find(en => en.fundId===fundId && en.year===year);
+          // Match by fundId + rateDate (the true unique identifier of a specific OeKB filing), NOT
+          // by fundId + year — a fund can file twice in one calendar year (e.g. a catch-up filing)
+          // and file none in another; matching by year alone would silently overwrite one filing
+          // with the other instead of keeping both so they can be summed for that tax year.
+          let existing = pe.rateDate
+            ? state.entries.find(en => en.fundId===fundId && en.rateDate===pe.rateDate)
+            : state.entries.find(en => en.fundId===fundId && en.year===year && !en.rateDate);
           if (!existing){
             existing = { id: uid(), fundId, year, currency:'EUR', rateDate:'', fxRate:1, fxRateDateUsed:'', agePerUnit:0, quellensteuerPerUnit:0, korrekturPerUnit:0, units:0 };
             state.entries.push(existing);
@@ -1101,6 +1138,7 @@
           } else {
             entriesUpdated++;
           }
+          existing.year = year; // keep year in sync with this filing's own rateDate-derived year
           if (pe.currency) existing.currency = pe.currency;
           if (pe.rateDate) existing.rateDate = pe.rateDate;
           if (pe.agePerUnit !== null && pe.agePerUnit !== undefined) existing.agePerUnit = pe.agePerUnit;
