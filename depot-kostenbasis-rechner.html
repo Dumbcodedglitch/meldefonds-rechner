@@ -350,7 +350,7 @@
     if (manual.length === 0){ el.innerHTML = ''; return; }
     el.innerHTML = `
       <table>
-        <thead><tr><th>Datum</th><th>Konto</th><th>Art</th><th>Symbol</th><th>Menge</th><th>Preis</th><th></th></tr></thead>
+        <thead><tr><th>Datum / Date</th><th>Konto / Account</th><th>Art / Type</th><th>Symbol</th><th>Menge / Qty</th><th>Preis / Price</th><th></th></tr></thead>
         <tbody>
           ${manual.map(t=>`
             <tr>
@@ -522,7 +522,7 @@
     const maxD = dates.length ? new Date(Math.max(...dates)) : null;
     el.innerHTML = `
       <div class="card">
-        <h2>Import erfolgreich ✓</h2>
+        <h2>Import erfolgreich ✓ <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Import successful</span></h2>
         <div class="sub">Sheet "${transSheet}"${accSheet ? ' · Sheet "'+accSheet+'"' : ' · kein Accounts-Sheet gefunden (Währung default EUR)'}</div>
         <div class="figures" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
           <div><div class="num" style="font-size:22px;">${transactions.length}</div><div style="color:var(--muted); font-size:12px;">Transaktionen</div></div>
@@ -656,7 +656,7 @@
         pos.qty = cand.qtyAtStepUp;
         pos.totalCost = cand.qtyAtStepUp * (fmv !== undefined && fmv !== null && fmv !== '' ? num(fmv) : cand.lastKnownPrice);
         if (fmv === undefined || fmv === null || fmv === '' ) {
-          notes.push(`${t.symbol} (${groupKey}): kein gemeiner Wert zum Zuzugsdatum eingetragen — vorläufig letzter bekannter Preis (${fmt(cand.lastKnownPrice)}) verwendet. Bitte in "2 Einstellungen" korrigieren.`);
+          notes.push(`${t.symbol} (${groupKey}): kein gemeiner Wert zum Zuzugsdatum eingetragen — vorläufig letzter bekannter Preis (${fmt(cand.lastKnownPrice)}) verwendet. Bitte in "2 Einstellungen" korrigieren. / No fair market value entered for the arrival date — using last known price as a placeholder for now. Please fix in "2 Settings".`);
         }
         cand._applied = true;
       } else if (stepUpDate && !stepUpCandidates[skey]){
@@ -746,7 +746,7 @@
         pos.qty = cand.qtyAtStepUp;
         pos.totalCost = cand.qtyAtStepUp * (fmv !== undefined && fmv !== null && fmv !== '' ? num(fmv) : cand.lastKnownPrice);
         if ((fmv === undefined || fmv === null || fmv === '') && Math.abs(cand.qtyAtStepUp) > 0.0001){
-          notes.push(`${symbol} (${groupKey}): kein gemeiner Wert zum Zuzugsdatum eingetragen — vorläufig letzter bekannter Preis verwendet. Bitte in "2 Einstellungen" korrigieren.`);
+          notes.push(`${symbol} (${groupKey}): kein gemeiner Wert zum Zuzugsdatum eingetragen — vorläufig letzter bekannter Preis verwendet. Bitte in "2 Einstellungen" korrigieren. / No fair market value entered for the arrival date — using last known price as a placeholder. Please fix in "2 Settings".`);
         }
       });
     }
@@ -766,7 +766,7 @@
     card.style.display='block';
     el.innerHTML = `
       <table>
-        <thead><tr><th>Gruppe</th><th>Symbol</th><th>Menge am Zuzugsdatum</th><th>Vorschlag (letzter Preis)</th><th>Gemeiner Wert/Stück (eintragen)</th><th></th></tr></thead>
+        <thead><tr><th>Gruppe / Group</th><th>Symbol</th><th>Menge am Zuzugsdatum / Qty on arrival date</th><th>Vorschlag / Suggestion (last price)</th><th>Gemeiner Wert/Stück / Fair value per unit</th><th></th></tr></thead>
         <tbody>
           ${cands.map(([key,v])=>{
             const [groupKey,symbol] = key.split('|');
@@ -784,6 +784,10 @@
         </tbody>
       </table>
       <div style="font-size:11px; color:var(--muted); margin-top:6px;">Experimentell: Yahoo Finance bietet keine offizielle, garantierte Schnittstelle an — das kann jederzeit aufhören zu funktionieren. Bei Fehlschlag bitte den Kurs manuell nachsehen. / Experimental: Yahoo Finance has no official, guaranteed interface — this can stop working at any time. On failure, please look up the price manually.</div>
+      <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="ghost small" id="accept-all-suggested-btn" type="button">✓ Alle Vorschläge übernehmen (letzter bekannter Preis) / Accept all suggestions (last known price)</button>
+      </div>
+      <div style="font-size:11px; color:var(--muted); margin-top:4px;">Schnellstart: übernimmt überall den "letzten bekannten Preis" als Platzhalter, damit du sofort ein Ergebnis siehst — geh danach in Ruhe die wichtigsten/größten Positionen einzeln durch und ersetze sie durch echte Kurswerte. / Quick start: fills every row with the "last known price" placeholder so you get a result immediately — then go back and replace the biggest/most important positions with real values at your own pace.</div>
     `;
     el.querySelectorAll('.stepup-input').forEach(inp=>{
       inp.addEventListener('input', ()=>{ state.stepUpValues[inp.dataset.key] = inp.value; persistDepotState(); });
@@ -809,6 +813,21 @@
         }
       });
     });
+    const acceptAllBtn = document.getElementById('accept-all-suggested-btn');
+    if (acceptAllBtn){
+      acceptAllBtn.addEventListener('click', ()=>{
+        let filled = 0;
+        cands.forEach(([key,v])=>{
+          if (!state.stepUpValues[key]){
+            state.stepUpValues[key] = v.lastKnownPrice;
+            filled++;
+          }
+        });
+        persistDepotState();
+        runEngine();
+        alert(`${filled} Platzhalter-Preis(e) übernommen. Denk daran, die wichtigsten Positionen später durch echte Kurswerte zu ersetzen. / ${filled} placeholder price(s) accepted. Remember to replace the most important positions with real values later.`);
+      });
+    }
   }
 
   // Reverse-lookup: ISIN -> Yahoo ticker, from the same verified mapping used for ISIN auto-fill
@@ -868,7 +887,7 @@
         <h2>Aktuelle Bestände <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Current holdings</span></h2>
         <div class="sub">Gleitender Durchschnittspreis je Depot (bzw. zusammengeführter Gruppe, falls eine Regel aktiv ist), in Kontowährung.</div>
         <table>
-          <thead><tr><th>Konto/Gruppe</th><th>Symbol</th><th>ISIN</th><th>Menge</th><th>Ø-Preis/Stück</th><th>Kostenbasis</th><th>Whg.</th></tr></thead>
+          <thead><tr><th>Konto/Gruppe / Account-Group</th><th>Symbol</th><th>ISIN</th><th>Menge / Qty</th><th>Ø-Preis/Stück / Avg price per unit</th><th>Kostenbasis / Cost basis</th><th>Whg. / Ccy</th></tr></thead>
           <tbody>
             ${posRows.map(p=>`
               <tr>
@@ -901,9 +920,9 @@
       const totalGain = rows.reduce((s,r)=>s+r.gain,0);
       return `
       <div class="card">
-        <h2>${y} <span class="badge">${rows.length} Ereignis(se)</span></h2>
+        <h2>${y} <span class="badge">${rows.length} Ereignis(se) / event(s)</span></h2>
         <table>
-          <thead><tr><th>Datum</th><th>Konto</th><th>Symbol</th><th>Menge</th><th>Erlös</th><th>Kostenbasis</th><th>Gewinn/Verlust</th><th>Art</th></tr></thead>
+          <thead><tr><th>Datum / Date</th><th>Konto / Account</th><th>Symbol</th><th>Menge / Qty</th><th>Erlös / Proceeds</th><th>Kostenbasis / Cost basis</th><th>Gewinn/Verlust / Gain-Loss</th><th>Art / Type</th></tr></thead>
           <tbody>
             ${rows.map(r=>`
               <tr>
@@ -930,7 +949,7 @@
         <b>Wichtig:</b> ${unmatchedCount} der unten gelisteten Ereignisse sind Abgänge, zu denen keine passende Depot-interne Gegenbuchung gefunden wurde (Übertragungs-Zuordnung ist aktiviert) — sie werden vorsichtshalber als Verkauf gewertet. Bitte stichprobenartig gegen deine echten Kontoauszüge prüfen.
       </div>
     ` : '';
-    const notesBox = notes.length ? `<div class="warn-box"><b>Bitte prüfen:</b><ul style="margin:8px 0 0; padding-left:18px;">${notes.map(n=>`<li>${n}</li>`).join('')}</ul></div>` : '';
+    const notesBox = notes.length ? `<div class="warn-box"><b>Bitte prüfen / Please check:</b><ul style="margin:8px 0 0; padding-left:18px;">${notes.map(n=>`<li>${n}</li>`).join('')}</ul></div>` : '';
 
     el.innerHTML = caveatBox + notesBox + posTable + realizedTable;
   }

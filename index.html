@@ -208,6 +208,13 @@
   </div>
 </div>
 
+<div id="emergency-toolbar" style="background:#3A2A1A; border-bottom:2px solid #C9A227; padding:8px 24px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+  <span style="color:#E8DCC4; font-size:11px; font-family:'IBM Plex Mono', monospace;">Werkzeuge / Tools:</span>
+  <button id="dedupe-btn" style="font-size:12px; padding:5px 10px; background:#5A4326; color:#F7F4EC; border:1px solid #8B6F2E; border-radius:4px; cursor:pointer;">🧹 Doppelte Fonds zusammenführen / Merge duplicate funds</button>
+  <button id="undo-btn" style="font-size:12px; padding:5px 10px; background:#5A4326; color:#F7F4EC; border:1px solid #8B6F2E; border-radius:4px; cursor:pointer;" disabled>↩ Letzte Änderung rückgängig / Undo last change</button>
+  <button id="hard-reset-btn" style="font-size:12px; padding:5px 10px; background:#6E2E22; color:#F7F4EC; border:1px solid #9C4A3C; border-radius:4px; cursor:pointer;">⚠ Alles zurücksetzen / Reset everything</button>
+</div>
+
 <div class="wrap">
   <div class="tabs">
     <div class="tab active" data-tab="funds"><span class="n">1</span>Fonds <span style="opacity:.6;">/ Funds</span></div>
@@ -236,7 +243,7 @@
           <input type="text" id="new-name" placeholder="z. B. Vanguard FTSE All-World (Acc)">
         </div>
         <div style="flex:0;">
-          <button id="add-fund-btn">Fonds hinzufügen</button>
+          <button id="add-fund-btn">Fonds hinzufügen / Add fund</button>
         </div>
       </div>
     </div>
@@ -358,6 +365,75 @@
     return n.toLocaleString('de-AT', {minimumFractionDigits:2, maximumFractionDigits:2});
   }
   function num(v){ const n = parseFloat(String(v).replace(',','.')); return isNaN(n) ? 0 : n; }
+
+  // ---------- Emergency toolbar (deliberately placed early, kept independent of the normal
+  // render functions below, so these always work even if something else on the page is broken
+  // by bad imported data) ----------
+  const UNDO_KEY = 'meldefonds-data-v1-undo';
+
+  function snapshotForUndo(){
+    try{
+      localStorage.setItem(UNDO_KEY, localStorage.getItem(LOCAL_KEY) || JSON.stringify(state));
+      const btn = document.getElementById('undo-btn');
+      if (btn) btn.disabled = false;
+    }catch(e){ /* ignore */ }
+  }
+
+  document.getElementById('hard-reset-btn').addEventListener('click', ()=>{
+    if (!confirm('Wirklich ALLES löschen (alle Fonds, Meldedaten, Einkommen)? Das kann nicht rückgängig gemacht werden, außer du hast eine Sicherung. / Really delete EVERYTHING? This cannot be undone unless you have a backup file.')) return;
+    try{ snapshotForUndo(); }catch(e){}
+    try{ localStorage.removeItem(LOCAL_KEY); }catch(e){}
+    location.reload();
+  });
+
+  document.getElementById('undo-btn').addEventListener('click', ()=>{
+    try{
+      const prev = localStorage.getItem(UNDO_KEY);
+      if (!prev){ alert('Keine vorherige Version gefunden. / No previous version found.'); return; }
+      localStorage.setItem(LOCAL_KEY, prev);
+      location.reload();
+    }catch(e){
+      alert('Rückgängig machen fehlgeschlagen. / Undo failed.');
+    }
+  });
+
+  document.getElementById('dedupe-btn').addEventListener('click', ()=>{
+    try{
+      snapshotForUndo();
+      const seen = {}; // normalized isin -> kept fund id
+      const idRemap = {}; // duplicate fund id -> kept fund id
+      const keptFunds = [];
+      state.funds.forEach(f=>{
+        const key = (f.isin||'').trim().toUpperCase();
+        if (!key){ keptFunds.push(f); return; }
+        if (seen[key] === undefined){
+          seen[key] = f.id;
+          keptFunds.push(f);
+        } else {
+          idRemap[f.id] = seen[key]; // this fund is a duplicate — remap its entries, drop the fund record
+        }
+      });
+      state.funds = keptFunds;
+      let remappedCount = 0;
+      state.entries.forEach(e=>{
+        if (idRemap[e.fundId] !== undefined){ e.fundId = idRemap[e.fundId]; remappedCount++; }
+      });
+      // De-duplicate entries that now collide on fundId+rateDate after remapping (keep one, prefer the one with a non-empty rateDate)
+      const byKey = {};
+      const dedupedEntries = [];
+      state.entries.forEach(e=>{
+        const key = e.fundId + '|' + (e.rateDate || ('year:'+e.year));
+        if (!byKey[key]){ byKey[key] = e; dedupedEntries.push(e); }
+      });
+      const removedEntries = state.entries.length - dedupedEntries.length;
+      state.entries = dedupedEntries;
+      try{ localStorage.setItem(LOCAL_KEY, JSON.stringify(state)); }catch(e){}
+      alert(`Zusammengeführt: ${Object.keys(idRemap).length} doppelte(r) Fonds entfernt, ${removedEntries} doppelte Meldejahre bereinigt. / Merged: ${Object.keys(idRemap).length} duplicate fund(s) removed, ${removedEntries} duplicate filing(s) cleaned up.`);
+      location.reload();
+    }catch(e){
+      alert('Zusammenführen fehlgeschlagen — bitte Screenshot schicken. / Merge failed — please send a screenshot.\n\n' + e.message);
+    }
+  });
 
   // ---------- Persistence ----------
   // Uses real browser localStorage as the primary mechanism — this is a genuinely hosted
@@ -574,8 +650,8 @@
           <span style="margin-left:10px; font-weight:600;">${f.name}</span>
         </div>
         <div class="fund-actions">
-          <a href="https://my.oekb.at/kapitalmarkt-services/kms-output/fonds-info/sd/af/f" target="_blank" rel="noopener"><button class="ghost small" type="button">Auf OeKB suchen ↗</button></a>
-          <button class="danger small" type="button" data-del-fund="${f.id}">Entfernen</button>
+          <a href="https://my.oekb.at/kapitalmarkt-services/kms-output/fonds-info/sd/af/f" target="_blank" rel="noopener"><button class="ghost small" type="button">Auf OeKB suchen / Search on OeKB ↗</button></a>
+          <button class="danger small" type="button" data-del-fund="${f.id}">Entfernen / Remove</button>
         </div>
       </div>
     `).join('');
@@ -611,18 +687,18 @@
       <div class="fund-block">
         <div class="fund-head" data-toggle="${f.id}">
           <div><span class="isin">${f.isin}</span><span class="name">${f.name}</span></div>
-          <div style="color:var(--muted); font-size:12px;">${rows.length} Meldejahr(e) ${isOpen ? '▾' : '▸'}</div>
+          <div style="color:var(--muted); font-size:12px;">${rows.length} Meldejahr(e) / filing year(s) ${isOpen ? '▾' : '▸'}</div>
         </div>
         <div class="fund-body ${isOpen ? 'open' : ''}" id="body-${f.id}">
           <table>
             <thead><tr>
-              <th style="width:70px;">Jahr</th>
-              <th style="width:80px;">Währung</th>
-              <th>AgE / Anteil</th>
-              <th>Anrechenb. Quellensteuer / Anteil</th>
-              <th>Korrektur Anschaffung / Anteil</th>
-              <th>Anteile</th>
-              <th style="width:110px;">Stpfl. Betrag (€)</th>
+              <th style="width:70px;">Jahr / Year</th>
+              <th style="width:80px;">Whg. / Ccy</th>
+              <th>AgE / Unit</th>
+              <th>Anr. Quellensteuer / Credit tax per unit</th>
+              <th>Korrektur Anschaffung / Cost-basis adj. per unit</th>
+              <th>Anteile / Units</th>
+              <th style="width:110px;">Stpfl. Betrag / Taxable (€)</th>
               <th></th>
             </tr></thead>
             <tbody>
@@ -668,7 +744,7 @@
             </tbody>
           </table>
           <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
-            <button class="ghost small" type="button" data-add-entry="${f.id}">+ Meldejahr hinzufügen</button>
+            <button class="ghost small" type="button" data-add-entry="${f.id}">+ Meldejahr hinzufügen / Add filing year</button>
             <span class="num" style="font-size:12px; color:var(--muted);">Kumulierte Anschaffungskosten-Korrektur: ${fmt(fundCostBasisCumulative(f.id))} €</span>
           </div>
         </div>
@@ -799,7 +875,7 @@
     }).join('');
     return `
       <table style="margin-top:8px;">
-        <thead><tr><th>Bezeichnung</th><th>Datum</th><th>Whg.</th><th>Betrag</th><th>≈ EUR</th><th></th></tr></thead>
+        <thead><tr><th>Bezeichnung / Description</th><th>Datum / Date</th><th>Whg. / Ccy</th><th>Betrag / Amount</th><th>≈ EUR</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <button class="ghost small" type="button" data-add-item="${year}|${category}" style="margin-top:6px;">+ Position hinzufügen / Add item</button>
@@ -1004,7 +1080,7 @@
         <h2>Kumulierte Anschaffungskosten-Korrektur je Fonds <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Cumulative cost-basis adjustment per fund</span></h2>
         <div class="sub">Zur Information für die Gewinnermittlung, sobald du Anteile verkaufst — addiere diesen Betrag zu deinen ursprünglichen Anschaffungskosten.</div>
         <table class="basis-table">
-          <thead><tr><th>ISIN</th><th>Name</th><th>Kumulierte Korrektur</th></tr></thead>
+          <thead><tr><th>ISIN</th><th>Name</th><th>Kumulierte Korrektur / Cumulative adj.</th></tr></thead>
           <tbody>${basisRows}</tbody>
         </table>
       </div>
@@ -1029,7 +1105,7 @@
     const brackets = state.tariffs[year];
     const tbl = document.getElementById('tariff-table');
     tbl.innerHTML = `
-      <thead><tr><th>Bis Einkommen (€) — leer = unbegrenzt</th><th style="width:140px;">Grenzsteuersatz (%)</th></tr></thead>
+      <thead><tr><th>Bis Einkommen / Up to income (€) — leer/blank = unlimited</th><th style="width:140px;">Grenzsteuersatz / Rate (%)</th></tr></thead>
       <tbody>
         ${brackets.map((b,i)=>`
           <tr data-idx="${i}">
@@ -1083,6 +1159,7 @@
       try{
         const parsed = JSON.parse(reader.result);
         if (!parsed.funds || !parsed.entries) throw new Error('invalid');
+        snapshotForUndo();
         state = Object.assign({funds:[],entries:[],income:{},tariffs:JSON.parse(JSON.stringify(DEFAULT_TARIFFS)),openFund:null}, parsed);
         onChange();
         renderFunds(); renderEntries(); renderIncome(); renderResults(); renderTariff();
@@ -1105,6 +1182,7 @@
       try{
         const parsed = JSON.parse(reader.result);
         if (!Array.isArray(parsed.funds) || !Array.isArray(parsed.entries)) throw new Error('invalid');
+        snapshotForUndo();
         let fundsAdded = 0, fundsMatched = 0, entriesAdded = 0, entriesUpdated = 0;
         const isinToFundId = {};
         state.funds.forEach(f => { isinToFundId[f.isin.toUpperCase()] = f.id; });
@@ -1169,6 +1247,7 @@
       try{
         const parsed = JSON.parse(reader.result);
         if (!Array.isArray(parsed.positions) || !Array.isArray(parsed.realizedGains)) throw new Error('invalid');
+        snapshotForUndo();
 
         const isinToFundId = {};
         state.funds.forEach(f => { isinToFundId[f.isin.toUpperCase()] = f.id; });
@@ -1256,6 +1335,12 @@
   // ---------- Init ----------
   (async function init(){
     await loadState();
+    try{
+      if (localStorage.getItem(UNDO_KEY)){
+        const btn = document.getElementById('undo-btn');
+        if (btn) btn.disabled = false;
+      }
+    }catch(e){}
     renderFunds();
     renderEntries();
     renderIncome();
