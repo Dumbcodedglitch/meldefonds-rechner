@@ -1,0 +1,843 @@
+{
+  "generatedAt": "2026-08-04T11:29:27.348Z",
+  "funds": [
+    {
+      "isin": "IE00BK5BQT80",
+      "name": "OeKB Kundenportal"
+    },
+    {
+      "isin": "IE00BYXYYM63",
+      "name": "OeKB Kundenportal"
+    },
+    {
+      "isin": "IE00BG47KH54",
+      "name": "OeKB Kundenportal"
+    },
+    {
+      "isin": "IE00BZ043R46",
+      "name": "OeKB Kundenportal"
+    },
+    {
+      "isin": "IE00BDBRDM35",
+      "name": "OeKB Kundenportal"
+    },
+    {
+      "isin": "LU1437018838",
+      "name": "OeKB Kundenportal"
+    },
+    {
+      "isin": "IE00BKM4GZ66",
+      "name": "OeKB Kundenportal"
+    },
+    {
+      "isin": "IE00BF4RFH31",
+      "name": "OeKB Kundenportal"
+    },
+    {
+      "isin": "IE00B4K48X80",
+      "name": "OeKB Kundenportal"
+    },
+    {
+      "isin": "IE00B52SFT06",
+      "name": "OeKB Kundenportal"
+    },
+    {
+      "isin": "IE00B5BMR087",
+      "name": "OeKB Kundenportal"
+    },
+    {
+      "isin": "IE00B4L5Y983",
+      "name": "OeKB Kundenportal"
+    },
+    {
+      "isin": "IE00BKWQ0Q14",
+      "name": "OeKB Kundenportal"
+    }
+  ],
+  "entries": [
+    {
+      "isin": "IE00BK5BQT80",
+      "year": 2026,
+      "currency": "USD",
+      "rateDate": "2026-01-16",
+      "agePerUnit": 1.5965,
+      "quellensteuerPerUnit": 0.1559,
+      "korrekturPerUnit": 1.2962
+    },
+    {
+      "isin": "IE00BK5BQT80",
+      "year": 2025,
+      "currency": "USD",
+      "rateDate": "2025-01-15",
+      "agePerUnit": 2.0861,
+      "quellensteuerPerUnit": 0.1918,
+      "korrekturPerUnit": 1.8377
+    },
+    {
+      "isin": "IE00BK5BQT80",
+      "year": 2024,
+      "currency": "USD",
+      "rateDate": "2024-01-18",
+      "agePerUnit": 1.1676,
+      "quellensteuerPerUnit": 0.1139,
+      "korrekturPerUnit": 0.9226
+    },
+    {
+      "isin": "IE00BK5BQT80",
+      "year": 2023,
+      "currency": "USD",
+      "rateDate": "2023-01-26",
+      "agePerUnit": 1.4369,
+      "quellensteuerPerUnit": 0.1394,
+      "korrekturPerUnit": 1.2334
+    },
+    {
+      "isin": "IE00BK5BQT80",
+      "year": 2022,
+      "currency": "USD",
+      "rateDate": "2022-01-17",
+      "agePerUnit": 0.513,
+      "quellensteuerPerUnit": 0.0582,
+      "korrekturPerUnit": 0.3358
+    },
+    {
+      "isin": "IE00BK5BQT80",
+      "year": 2021,
+      "currency": "USD",
+      "rateDate": "2021-01-13",
+      "agePerUnit": 1.0515,
+      "quellensteuerPerUnit": 0.1193,
+      "korrekturPerUnit": 0.8897
+    },
+    {
+      "isin": "IE00BYXYYM63",
+      "year": 2026,
+      "currency": "USD",
+      "rateDate": "2026-04-16",
+      "agePerUnit": 0.1733,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.1733
+    },
+    {
+      "isin": "IE00BYXYYM63",
+      "year": 2025,
+      "currency": "USD",
+      "rateDate": "2025-04-11",
+      "agePerUnit": 0.1838,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.1838
+    },
+    {
+      "isin": "IE00BYXYYM63",
+      "year": 2024,
+      "currency": "USD",
+      "rateDate": "2024-04-10",
+      "agePerUnit": 0.0682,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.0682
+    },
+    {
+      "isin": "IE00BYXYYM63",
+      "year": 2023,
+      "currency": "USD",
+      "rateDate": "2023-04-25",
+      "agePerUnit": 0,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0
+    },
+    {
+      "isin": "IE00BYXYYM63",
+      "year": 2022,
+      "currency": "USD",
+      "rateDate": "2022-04-11",
+      "agePerUnit": 0.1056,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.1056
+    },
+    {
+      "isin": "IE00BYXYYM63",
+      "year": 2021,
+      "currency": "USD",
+      "rateDate": "2021-04-06",
+      "agePerUnit": 0.1508,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.1508
+    },
+    {
+      "isin": "IE00BYXYYM63",
+      "year": 2020,
+      "currency": "USD",
+      "rateDate": "2020-03-24",
+      "agePerUnit": 0.1688,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.1688
+    },
+    {
+      "isin": "IE00BG47KH54",
+      "year": 2026,
+      "currency": "EUR",
+      "rateDate": "2026-01-16",
+      "agePerUnit": 1.2331,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 1.2331
+    },
+    {
+      "isin": "IE00BG47KH54",
+      "year": 2025,
+      "currency": "EUR",
+      "rateDate": "2025-01-15",
+      "agePerUnit": 0,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0
+    },
+    {
+      "isin": "IE00BG47KH54",
+      "year": 2024,
+      "currency": "EUR",
+      "rateDate": "2024-01-18",
+      "agePerUnit": 0,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0
+    },
+    {
+      "isin": "IE00BG47KH54",
+      "year": 2023,
+      "currency": "EUR",
+      "rateDate": "2023-01-26",
+      "agePerUnit": 0,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0
+    },
+    {
+      "isin": "IE00BG47KH54",
+      "year": 2022,
+      "currency": "EUR",
+      "rateDate": "2022-01-17",
+      "agePerUnit": 0.5506,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.5506
+    },
+    {
+      "isin": "IE00BG47KH54",
+      "year": 2021,
+      "currency": "EUR",
+      "rateDate": "2021-01-13",
+      "agePerUnit": 0.1462,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.1462
+    },
+    {
+      "isin": "IE00BZ043R46",
+      "year": 2025,
+      "currency": "USD",
+      "rateDate": "2025-12-18",
+      "agePerUnit": 0.1065,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.1065
+    },
+    {
+      "isin": "IE00BZ043R46",
+      "year": 2025,
+      "currency": "USD",
+      "rateDate": "2025-01-09",
+      "agePerUnit": 0.072,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.072
+    },
+    {
+      "isin": "IE00BZ043R46",
+      "year": 2023,
+      "currency": "USD",
+      "rateDate": "2023-12-18",
+      "agePerUnit": 0.016,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.016
+    },
+    {
+      "isin": "IE00BZ043R46",
+      "year": 2022,
+      "currency": "USD",
+      "rateDate": "2022-12-01",
+      "agePerUnit": 0.0305,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.0305
+    },
+    {
+      "isin": "IE00BZ043R46",
+      "year": 2021,
+      "currency": "USD",
+      "rateDate": "2021-12-01",
+      "agePerUnit": 0.1068,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.1068
+    },
+    {
+      "isin": "IE00BZ043R46",
+      "year": 2020,
+      "currency": "USD",
+      "rateDate": "2020-12-10",
+      "agePerUnit": 0.0952,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.0952
+    },
+    {
+      "isin": "IE00BZ043R46",
+      "year": 2020,
+      "currency": "USD",
+      "rateDate": "2020-01-09",
+      "agePerUnit": 0.0602,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.0602
+    },
+    {
+      "isin": "IE00BDBRDM35",
+      "year": 2025,
+      "currency": "EUR",
+      "rateDate": "2025-12-18",
+      "agePerUnit": 0.0792,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.0792
+    },
+    {
+      "isin": "IE00BDBRDM35",
+      "year": 2025,
+      "currency": "EUR",
+      "rateDate": "2025-01-09",
+      "agePerUnit": 0.064,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.064
+    },
+    {
+      "isin": "IE00BDBRDM35",
+      "year": 2023,
+      "currency": "EUR",
+      "rateDate": "2023-12-18",
+      "agePerUnit": 0.0115,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.0115
+    },
+    {
+      "isin": "IE00BDBRDM35",
+      "year": 2022,
+      "currency": "EUR",
+      "rateDate": "2022-12-01",
+      "agePerUnit": 0.0285,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.0285
+    },
+    {
+      "isin": "IE00BDBRDM35",
+      "year": 2021,
+      "currency": "EUR",
+      "rateDate": "2021-12-01",
+      "agePerUnit": 0.0994,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.0994
+    },
+    {
+      "isin": "IE00BDBRDM35",
+      "year": 2020,
+      "currency": "EUR",
+      "rateDate": "2020-12-10",
+      "agePerUnit": 0.0903,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.0903
+    },
+    {
+      "isin": "IE00BDBRDM35",
+      "year": 2020,
+      "currency": "EUR",
+      "rateDate": "2020-01-09",
+      "agePerUnit": 0.0637,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 0.0637
+    },
+    {
+      "isin": "LU1437018838",
+      "year": 2026,
+      "currency": "EUR",
+      "rateDate": "2026-04-30",
+      "agePerUnit": 7.2995,
+      "quellensteuerPerUnit": 0.0165,
+      "korrekturPerUnit": 7.2351
+    },
+    {
+      "isin": "LU1437018838",
+      "year": 2024,
+      "currency": "EUR",
+      "rateDate": "2024-12-11",
+      "agePerUnit": 8.0001,
+      "quellensteuerPerUnit": 0.0008,
+      "korrekturPerUnit": 7.8776
+    },
+    {
+      "isin": "LU1437018838",
+      "year": 2024,
+      "currency": "EUR",
+      "rateDate": "2024-04-30",
+      "agePerUnit": 6.339,
+      "quellensteuerPerUnit": 0.0096,
+      "korrekturPerUnit": 6.2481
+    },
+    {
+      "isin": "LU1437018838",
+      "year": 2023,
+      "currency": "EUR",
+      "rateDate": "2023-03-30",
+      "agePerUnit": 4.0028,
+      "quellensteuerPerUnit": 0.2178,
+      "korrekturPerUnit": 3.6199
+    },
+    {
+      "isin": "LU1437018838",
+      "year": 2022,
+      "currency": "EUR",
+      "rateDate": "2022-04-19",
+      "agePerUnit": 2.4227,
+      "quellensteuerPerUnit": 0.1972,
+      "korrekturPerUnit": 2.0098
+    },
+    {
+      "isin": "LU1437018838",
+      "year": 2021,
+      "currency": "EUR",
+      "rateDate": "2021-03-29",
+      "agePerUnit": 0,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": -0.2705
+    },
+    {
+      "isin": "LU1437018838",
+      "year": 2020,
+      "currency": "EUR",
+      "rateDate": "2020-04-16",
+      "agePerUnit": 2.9558,
+      "quellensteuerPerUnit": 0.252,
+      "korrekturPerUnit": 2.5771
+    },
+    {
+      "isin": "IE00BKM4GZ66",
+      "year": 2025,
+      "currency": "USD",
+      "rateDate": "2025-08-08",
+      "agePerUnit": 0.3304,
+      "quellensteuerPerUnit": 0.0304,
+      "korrekturPerUnit": 0.2275
+    },
+    {
+      "isin": "IE00BKM4GZ66",
+      "year": 2024,
+      "currency": "USD",
+      "rateDate": "2024-08-06",
+      "agePerUnit": 0.2739,
+      "quellensteuerPerUnit": 0.0265,
+      "korrekturPerUnit": 0.1665
+    },
+    {
+      "isin": "IE00BKM4GZ66",
+      "year": 2023,
+      "currency": "USD",
+      "rateDate": "2023-08-17",
+      "agePerUnit": 0.8649,
+      "quellensteuerPerUnit": 0.0723,
+      "korrekturPerUnit": 0.7609
+    },
+    {
+      "isin": "IE00BKM4GZ66",
+      "year": 2022,
+      "currency": "USD",
+      "rateDate": "2022-09-02",
+      "agePerUnit": 0.8821,
+      "quellensteuerPerUnit": 0.0543,
+      "korrekturPerUnit": 0.7845
+    },
+    {
+      "isin": "IE00BKM4GZ66",
+      "year": 2021,
+      "currency": "USD",
+      "rateDate": "2021-08-06",
+      "agePerUnit": 0.1823,
+      "quellensteuerPerUnit": 0.0151,
+      "korrekturPerUnit": 0.0982
+    },
+    {
+      "isin": "IE00BKM4GZ66",
+      "year": 2020,
+      "currency": "USD",
+      "rateDate": "2020-09-24",
+      "agePerUnit": 0.6539,
+      "quellensteuerPerUnit": 0.0474,
+      "korrekturPerUnit": 0.5653
+    },
+    {
+      "isin": "IE00BF4RFH31",
+      "year": 2025,
+      "currency": "USD",
+      "rateDate": "2025-12-18",
+      "agePerUnit": 0.2398,
+      "quellensteuerPerUnit": 0.0108,
+      "korrekturPerUnit": 0.2238
+    },
+    {
+      "isin": "IE00BF4RFH31",
+      "year": 2025,
+      "currency": "USD",
+      "rateDate": "2025-01-09",
+      "agePerUnit": 0.1639,
+      "quellensteuerPerUnit": 0.0123,
+      "korrekturPerUnit": 0.1491
+    },
+    {
+      "isin": "IE00BF4RFH31",
+      "year": 2023,
+      "currency": "USD",
+      "rateDate": "2023-12-18",
+      "agePerUnit": 0.1546,
+      "quellensteuerPerUnit": 0.0121,
+      "korrekturPerUnit": 0.1409
+    },
+    {
+      "isin": "IE00BF4RFH31",
+      "year": 2022,
+      "currency": "USD",
+      "rateDate": "2022-12-01",
+      "agePerUnit": 0.6652,
+      "quellensteuerPerUnit": 0.0117,
+      "korrekturPerUnit": 0.6524
+    },
+    {
+      "isin": "IE00BF4RFH31",
+      "year": 2021,
+      "currency": "USD",
+      "rateDate": "2021-12-01",
+      "agePerUnit": 0.2779,
+      "quellensteuerPerUnit": 0.0088,
+      "korrekturPerUnit": 0.2689
+    },
+    {
+      "isin": "IE00BF4RFH31",
+      "year": 2020,
+      "currency": "USD",
+      "rateDate": "2020-12-10",
+      "agePerUnit": 0.095,
+      "quellensteuerPerUnit": 0.0087,
+      "korrekturPerUnit": 0.0856
+    },
+    {
+      "isin": "IE00BF4RFH31",
+      "year": 2020,
+      "currency": "USD",
+      "rateDate": "2020-01-09",
+      "agePerUnit": 0.1335,
+      "quellensteuerPerUnit": 0.0081,
+      "korrekturPerUnit": 0.1253
+    },
+    {
+      "isin": "IE00B4K48X80",
+      "year": 2025,
+      "currency": "EUR",
+      "rateDate": "2025-12-18",
+      "agePerUnit": 2.6799,
+      "quellensteuerPerUnit": 0.1279,
+      "korrekturPerUnit": 2.5036
+    },
+    {
+      "isin": "IE00B4K48X80",
+      "year": 2025,
+      "currency": "EUR",
+      "rateDate": "2025-01-09",
+      "agePerUnit": 2.4812,
+      "quellensteuerPerUnit": 0.13,
+      "korrekturPerUnit": 2.3086
+    },
+    {
+      "isin": "IE00B4K48X80",
+      "year": 2023,
+      "currency": "EUR",
+      "rateDate": "2023-12-18",
+      "agePerUnit": 2.634,
+      "quellensteuerPerUnit": 0.1239,
+      "korrekturPerUnit": 2.4678
+    },
+    {
+      "isin": "IE00B4K48X80",
+      "year": 2022,
+      "currency": "EUR",
+      "rateDate": "2022-12-01",
+      "agePerUnit": 2.9539,
+      "quellensteuerPerUnit": 0.1051,
+      "korrekturPerUnit": 2.8084
+    },
+    {
+      "isin": "IE00B4K48X80",
+      "year": 2021,
+      "currency": "EUR",
+      "rateDate": "2021-12-01",
+      "agePerUnit": 1.5845,
+      "quellensteuerPerUnit": 0.0758,
+      "korrekturPerUnit": 1.4778
+    },
+    {
+      "isin": "IE00B4K48X80",
+      "year": 2020,
+      "currency": "EUR",
+      "rateDate": "2020-12-10",
+      "agePerUnit": 0.8613,
+      "quellensteuerPerUnit": 0.0602,
+      "korrekturPerUnit": 0.7541
+    },
+    {
+      "isin": "IE00B4K48X80",
+      "year": 2020,
+      "currency": "EUR",
+      "rateDate": "2020-01-09",
+      "agePerUnit": 1.872,
+      "quellensteuerPerUnit": 0.0931,
+      "korrekturPerUnit": 1.7502
+    },
+    {
+      "isin": "IE00B52SFT06",
+      "year": 2026,
+      "currency": "USD",
+      "rateDate": "2026-01-12",
+      "agePerUnit": 19.9848,
+      "quellensteuerPerUnit": 0.9528,
+      "korrekturPerUnit": 18.9602
+    },
+    {
+      "isin": "IE00B52SFT06",
+      "year": 2025,
+      "currency": "USD",
+      "rateDate": "2025-01-20",
+      "agePerUnit": 18.2169,
+      "quellensteuerPerUnit": 0.7109,
+      "korrekturPerUnit": 17.5059
+    },
+    {
+      "isin": "IE00B52SFT06",
+      "year": 2024,
+      "currency": "USD",
+      "rateDate": "2024-01-16",
+      "agePerUnit": 22.6324,
+      "quellensteuerPerUnit": 0.8771,
+      "korrekturPerUnit": 21.6318
+    },
+    {
+      "isin": "IE00B52SFT06",
+      "year": 2023,
+      "currency": "USD",
+      "rateDate": "2023-01-10",
+      "agePerUnit": 49.3633,
+      "quellensteuerPerUnit": 0.7304,
+      "korrekturPerUnit": 48.1209
+    },
+    {
+      "isin": "IE00B52SFT06",
+      "year": 2022,
+      "currency": "USD",
+      "rateDate": "2022-01-12",
+      "agePerUnit": 21.2401,
+      "quellensteuerPerUnit": 0.6406,
+      "korrekturPerUnit": 20.5072
+    },
+    {
+      "isin": "IE00B52SFT06",
+      "year": 2021,
+      "currency": "USD",
+      "rateDate": "2021-01-12",
+      "agePerUnit": 14.9904,
+      "quellensteuerPerUnit": 0.7117,
+      "korrekturPerUnit": 13.997
+    },
+    {
+      "isin": "IE00B52SFT06",
+      "year": 2020,
+      "currency": "USD",
+      "rateDate": "2020-01-09",
+      "agePerUnit": 12.3014,
+      "quellensteuerPerUnit": 0.5924,
+      "korrekturPerUnit": 11.5718
+    },
+    {
+      "isin": "IE00B5BMR087",
+      "year": 2026,
+      "currency": "USD",
+      "rateDate": "2026-01-12",
+      "agePerUnit": 15.8507,
+      "quellensteuerPerUnit": 1.0345,
+      "korrekturPerUnit": 14.7476
+    },
+    {
+      "isin": "IE00B5BMR087",
+      "year": 2025,
+      "currency": "USD",
+      "rateDate": "2025-01-20",
+      "agePerUnit": 13.603,
+      "quellensteuerPerUnit": 1.0006,
+      "korrekturPerUnit": 12.6023
+    },
+    {
+      "isin": "IE00B5BMR087",
+      "year": 2024,
+      "currency": "USD",
+      "rateDate": "2024-01-16",
+      "agePerUnit": 13.5178,
+      "quellensteuerPerUnit": 0.9948,
+      "korrekturPerUnit": 12.5158
+    },
+    {
+      "isin": "IE00B5BMR087",
+      "year": 2023,
+      "currency": "USD",
+      "rateDate": "2023-01-10",
+      "agePerUnit": 15.9701,
+      "quellensteuerPerUnit": 0.851,
+      "korrekturPerUnit": 15.1191
+    },
+    {
+      "isin": "IE00B5BMR087",
+      "year": 2022,
+      "currency": "USD",
+      "rateDate": "2022-01-12",
+      "agePerUnit": 21.1653,
+      "quellensteuerPerUnit": 0.8269,
+      "korrekturPerUnit": 20.3233
+    },
+    {
+      "isin": "IE00B5BMR087",
+      "year": 2021,
+      "currency": "USD",
+      "rateDate": "2021-01-12",
+      "agePerUnit": 13.0181,
+      "quellensteuerPerUnit": 0.8475,
+      "korrekturPerUnit": 12.1336
+    },
+    {
+      "isin": "IE00B5BMR087",
+      "year": 2020,
+      "currency": "USD",
+      "rateDate": "2020-01-09",
+      "agePerUnit": 11.3708,
+      "quellensteuerPerUnit": 0.7657,
+      "korrekturPerUnit": 10.5838
+    },
+    {
+      "isin": "IE00B4L5Y983",
+      "year": 2025,
+      "currency": "USD",
+      "rateDate": "2025-12-18",
+      "agePerUnit": 1.3188,
+      "quellensteuerPerUnit": 0.1326,
+      "korrekturPerUnit": 1.102
+    },
+    {
+      "isin": "IE00B4L5Y983",
+      "year": 2025,
+      "currency": "USD",
+      "rateDate": "2025-01-09",
+      "agePerUnit": 1.7486,
+      "quellensteuerPerUnit": 0.1759,
+      "korrekturPerUnit": 1.5461
+    },
+    {
+      "isin": "IE00B4L5Y983",
+      "year": 2023,
+      "currency": "USD",
+      "rateDate": "2023-12-18",
+      "agePerUnit": 1.3263,
+      "quellensteuerPerUnit": 0.1424,
+      "korrekturPerUnit": 1.1364
+    },
+    {
+      "isin": "IE00B4L5Y983",
+      "year": 2022,
+      "currency": "USD",
+      "rateDate": "2022-12-01",
+      "agePerUnit": 2.2454,
+      "quellensteuerPerUnit": 0.1591,
+      "korrekturPerUnit": 2.0691
+    },
+    {
+      "isin": "IE00B4L5Y983",
+      "year": 2021,
+      "currency": "USD",
+      "rateDate": "2021-12-01",
+      "agePerUnit": 1.4312,
+      "quellensteuerPerUnit": 0.1345,
+      "korrekturPerUnit": 1.2816
+    },
+    {
+      "isin": "IE00B4L5Y983",
+      "year": 2020,
+      "currency": "USD",
+      "rateDate": "2020-12-10",
+      "agePerUnit": 0.9479,
+      "quellensteuerPerUnit": 0.1163,
+      "korrekturPerUnit": 0.7894
+    },
+    {
+      "isin": "IE00B4L5Y983",
+      "year": 2020,
+      "currency": "USD",
+      "rateDate": "2020-01-09",
+      "agePerUnit": 1.4965,
+      "quellensteuerPerUnit": 0.1396,
+      "korrekturPerUnit": 1.3425
+    },
+    {
+      "isin": "IE00BKWQ0Q14",
+      "year": 2025,
+      "currency": "EUR",
+      "rateDate": "2025-10-27",
+      "agePerUnit": 15.8897,
+      "quellensteuerPerUnit": 0.4882,
+      "korrekturPerUnit": 15.2118
+    },
+    {
+      "isin": "IE00BKWQ0Q14",
+      "year": 2024,
+      "currency": "EUR",
+      "rateDate": "2024-10-01",
+      "agePerUnit": 20.2541,
+      "quellensteuerPerUnit": 0.4741,
+      "korrekturPerUnit": 19.5069
+    },
+    {
+      "isin": "IE00BKWQ0Q14",
+      "year": 2023,
+      "currency": "EUR",
+      "rateDate": "2023-09-29",
+      "agePerUnit": 21.3575,
+      "quellensteuerPerUnit": 0.5005,
+      "korrekturPerUnit": 20.4782
+    },
+    {
+      "isin": "IE00BKWQ0Q14",
+      "year": 2022,
+      "currency": "EUR",
+      "rateDate": "2022-10-20",
+      "agePerUnit": 10.4504,
+      "quellensteuerPerUnit": 0.3444,
+      "korrekturPerUnit": 9.8939
+    },
+    {
+      "isin": "IE00BKWQ0Q14",
+      "year": 2021,
+      "currency": "EUR",
+      "rateDate": "2021-10-07",
+      "agePerUnit": 6.982,
+      "quellensteuerPerUnit": 0,
+      "korrekturPerUnit": 6.9954
+    },
+    {
+      "isin": "IE00BKWQ0Q14",
+      "year": 2020,
+      "currency": "EUR",
+      "rateDate": "2020-10-13",
+      "agePerUnit": 8.9964,
+      "quellensteuerPerUnit": 0.4045,
+      "korrekturPerUnit": 8.3777
+    }
+  ],
+  "errors": []
+}
