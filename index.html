@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meldefonds-Rechner · Ausschüttungsgleiche Erträge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1A2B29;
+    --paper:#EEF1EC;
+    --surface:#FFFFFF;
+    --brass:#8B6F2E;
+    --brass-deep:#6E5722;
+    --teal:#2F6F62;
+    --teal-bg:#E4EEEA;
+    --brick:#9C4A3C;
+    --brick-bg:#F5E6E2;
+    --hairline:#CBC4B3;
+    --muted:#69726A;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:15px;
+    line-height:1.5;
+    padding-bottom:60px;
+  }
+  h1,h2,h3{font-family:'Source Serif 4', serif; font-weight:600; margin:0;}
+  .mono{font-family:'IBM Plex Mono', monospace;}
+  .num{font-family:'IBM Plex Mono', monospace; font-variant-numeric:tabular-nums;}
+
+  /* ---- Masthead ---- */
+  .masthead{
+    background:var(--ink);
+    color:var(--paper);
+    padding:28px 24px 22px;
+    border-bottom:4px solid var(--brass);
+  }
+  .masthead-inner{max-width:960px; margin:0 auto;}
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:#C9A227;
+    margin-bottom:6px;
+  }
+  .masthead h1{font-size:28px; color:#F7F4EC;}
+  .masthead p{margin:6px 0 0; color:#B9C2BC; font-size:14px; max-width:640px;}
+
+  /* ---- Layout ---- */
+  .wrap{max-width:960px; margin:0 auto; padding:0 24px;}
+  .tabs{
+    display:flex; gap:4px; margin-top:22px; border-bottom:1px solid var(--hairline);
+    flex-wrap:wrap;
+  }
+  .tab{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    letter-spacing:.03em;
+    padding:10px 16px;
+    cursor:pointer;
+    color:var(--muted);
+    border-bottom:2px solid transparent;
+    user-select:none;
+  }
+  .tab.active{color:var(--ink); border-bottom-color:var(--brass); font-weight:600;}
+  .tab .n{
+    display:inline-block; width:16px; height:16px; border-radius:50%;
+    background:var(--hairline); color:var(--surface); text-align:center;
+    font-size:10px; line-height:16px; margin-right:6px;
+  }
+  .tab.active .n{background:var(--brass);}
+
+  .panel{display:none; padding:26px 0 10px;}
+  .panel.active{display:block;}
+
+  .card{
+    background:var(--surface);
+    border:1px solid var(--hairline);
+    border-radius:6px;
+    padding:18px 20px;
+    margin-bottom:16px;
+  }
+  .card h2{font-size:17px; margin-bottom:4px;}
+  .card .sub{color:var(--muted); font-size:13px; margin-bottom:14px;}
+
+  label{display:block; font-size:12px; color:var(--muted); margin-bottom:4px; font-weight:500;}
+  input[type=text], input[type=number], select{
+    width:100%;
+    padding:8px 10px;
+    border:1px solid var(--hairline);
+    border-radius:4px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13.5px;
+    background:#FCFBF8;
+    color:var(--ink);
+  }
+  input[type=text]{font-family:'IBM Plex Sans', sans-serif;}
+  input:focus, select:focus{outline:2px solid var(--brass); outline-offset:1px; border-color:var(--brass);}
+
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;}
+  .row > div{flex:1; min-width:120px;}
+
+  button{
+    font-family:'IBM Plex Sans', sans-serif;
+    font-weight:600;
+    font-size:13px;
+    border:1px solid var(--ink);
+    background:var(--ink);
+    color:var(--paper);
+    padding:9px 16px;
+    border-radius:4px;
+    cursor:pointer;
+  }
+  button:hover{background:var(--brass-deep); border-color:var(--brass-deep);}
+  button.ghost{
+    background:transparent; color:var(--ink); border-color:var(--hairline);
+  }
+  button.ghost:hover{background:var(--paper); color:var(--ink); border-color:var(--ink);}
+  button.small{padding:5px 10px; font-size:12px;}
+  button.danger{background:var(--surface); color:var(--brick); border-color:var(--brick-bg);}
+  button.danger:hover{background:var(--brick-bg); border-color:var(--brick);}
+
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th{
+    text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em;
+    color:var(--muted); font-weight:600; padding:6px 8px; border-bottom:1px solid var(--hairline);
+  }
+  td{padding:6px 8px; border-bottom:1px solid #EEEAE0; vertical-align:middle;}
+  td input{padding:6px 8px; font-size:13px;}
+  tr:last-child td{border-bottom:none;}
+
+  .fund-block{border:1px solid var(--hairline); border-radius:6px; margin-bottom:14px; overflow:hidden;}
+  .fund-head{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:12px 16px; background:#F6F4EE; cursor:pointer;
+  }
+  .fund-head .isin{font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--brass-deep); font-weight:600;}
+  .fund-head .name{font-weight:600; margin-left:10px;}
+  .fund-body{padding:14px 16px; display:none;}
+  .fund-body.open{display:block;}
+  .fund-actions{display:flex; gap:8px; align-items:center;}
+
+  .empty{
+    text-align:center; padding:30px 10px; color:var(--muted); font-size:13.5px;
+  }
+
+  .help-box{
+    background:var(--teal-bg); border:1px solid #C7DAD2; border-radius:6px; padding:14px 16px;
+    font-size:13px; color:#1F4A3F; margin-bottom:16px;
+  }
+  .help-box b{color:var(--teal);}
+  .help-box ul{margin:8px 0 0; padding-left:18px;}
+  .help-box li{margin-bottom:4px;}
+
+  /* ---- Results / stamp ---- */
+  .year-card{border:1px solid var(--hairline); border-radius:6px; padding:18px 20px; margin-bottom:16px; position:relative; background:var(--surface);}
+  .year-card h3{font-size:19px; margin-bottom:14px;}
+  .figures{display:grid; grid-template-columns:1fr 1fr; gap:8px 20px; margin-bottom:10px;}
+  .figure-row{display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px dashed #E7E1D2; font-size:13.5px;}
+  .figure-row .lbl{color:var(--muted);}
+  .figure-row .val{font-family:'IBM Plex Mono', monospace;}
+  .figure-row.total .val, .figure-row.total .lbl{font-weight:600; color:var(--ink);}
+
+  .stamp{
+    position:absolute; top:18px; right:20px;
+    border:2px solid var(--brass); color:var(--brass-deep);
+    border-radius:8px; padding:8px 14px; transform:rotate(-6deg);
+    font-family:'IBM Plex Mono', monospace; font-size:11.5px; font-weight:600;
+    text-align:center; letter-spacing:.03em; background:rgba(139,111,46,0.05);
+  }
+  .stamp.teal{border-color:var(--teal); color:var(--teal); background:rgba(47,111,98,0.06);}
+  .stamp .big{display:block; font-size:14px; margin-top:2px;}
+
+  .grand-total{
+    background:var(--ink); color:var(--paper); border-radius:6px; padding:20px 22px; margin-top:6px;
+  }
+  .grand-total .lbl{color:#B9C2BC; font-size:12px; text-transform:uppercase; letter-spacing:.06em;}
+  .grand-total .val{font-family:'IBM Plex Mono', monospace; font-size:26px; color:#F7F4EC; margin-top:4px;}
+
+  .footer-note{
+    max-width:960px; margin:30px auto 0; padding:0 24px; color:var(--muted); font-size:12px; line-height:1.6;
+  }
+  .save-row{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:18px;}
+  .save-status{font-size:12px; color:var(--muted); font-family:'IBM Plex Mono', monospace;}
+
+  .basis-table td, .basis-table th{font-size:12.5px;}
+
+  @media (max-width:640px){
+    .figures{grid-template-columns:1fr;}
+    .stamp{position:static; transform:none; display:inline-block; margin-bottom:10px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div class="masthead-inner">
+    <div class="eyebrow">Österreich · Ausschüttungsgleiche Erträge</div>
+    <h1>Meldefonds-Rechner <span style="font-size:14px; font-weight:400; color:#B9C2BC;">/ Reporting Fund Tax Calculator</span></h1>
+    <p>Erfasst die OeKB-Meldedaten deiner thesaurierenden Fonds und vergleicht die 27,5&nbsp;% KESt mit der Regelbesteuerungsoption zu deinem progressiven Tarif.<br><i>Collects OeKB reporting data for your accumulating funds and compares the 27.5% flat capital-gains tax (KESt) against opting into your progressive income-tax rate (Regelbesteuerungsoption).</i></p>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="tabs">
+    <div class="tab active" data-tab="funds"><span class="n">1</span>Fonds <span style="opacity:.6;">/ Funds</span></div>
+    <div class="tab" data-tab="entries"><span class="n">2</span>Meldedaten <span style="opacity:.6;">/ Reporting data</span></div>
+    <div class="tab" data-tab="income"><span class="n">3</span>Einkommen <span style="opacity:.6;">/ Income</span></div>
+    <div class="tab" data-tab="results"><span class="n">4</span>Ergebnis <span style="opacity:.6;">/ Result</span></div>
+    <div class="tab" data-tab="tariff"><span class="n">⚙</span>Tarif <span style="opacity:.6;">/ Tax brackets</span></div>
+  </div>
+
+  <!-- TAB 1: FUNDS -->
+  <div class="panel active" id="panel-funds">
+    <div class="help-box">
+      <b>So findest du deine Fonds auf OeKB:</b> Öffne <a href="https://my.oekb.at/kapitalmarkt-services/kms-output/fonds-info/sd/af/f" target="_blank" rel="noopener">my.oekb.at – Fonds-Info</a> und gib links im Suchfeld die ISIN ein. Trag hier ISIN und Name deiner Fonds ein — die Meldedaten selbst kommen im nächsten Schritt.
+      <p style="margin:10px 0 0; font-style:italic; color:var(--muted);">How to find your funds on OeKB: open my.oekb.at – Fonds-Info and enter the ISIN in the search box on the left. Add the ISIN and a name here — the actual reporting data comes in the next step.</p>
+    </div>
+    <div class="card">
+      <h2>Fonds hinzufügen <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Add fund</span></h2>
+      <div class="sub">ISIN und ein Name, den du wiedererkennst.</div>
+      <div class="row">
+        <div>
+          <label for="new-isin">ISIN</label>
+          <input type="text" id="new-isin" placeholder="z. B. IE00B3RBWM25" maxlength="12">
+        </div>
+        <div>
+          <label for="new-name">Name</label>
+          <input type="text" id="new-name" placeholder="z. B. Vanguard FTSE All-World (Acc)">
+        </div>
+        <div style="flex:0;">
+          <button id="add-fund-btn">Fonds hinzufügen</button>
+        </div>
+      </div>
+    </div>
+    <div id="funds-list"></div>
+  </div>
+
+  <!-- TAB 2: ENTRIES -->
+  <div class="panel" id="panel-entries">
+    <div class="help-box">
+      <b>Was du auf der OeKB-Fondsseite abliest:</b> Die Seite zeigt zwei Spalten — <b>„Privatanleger mit Option"</b> und <b>„Privatanleger ohne Option"</b>. Da du über einen ausländischen Broker hältst, gilt für dich die Spalte <b>„ohne Option"</b> (Kennzahl 937 bzw. 998 auf der Steuererklärung) — nicht die erste Spalte.
+      <ul>
+        <li><b>Ausschüttungsgleiche Erträge 27,5% (Kennzahlen 936/937)</b> pro Anteil — der Betrag, der jährlich als fiktiv ausgeschüttet gilt und zu versteuern ist.</li>
+        <li><b>Anzurechnende ausländische (Quellen-)Steuer (Kennzahl 984/998)</b> pro Anteil — wird auf deine österreichische Steuer angerechnet.</li>
+        <li><b>Die Anschaffungskosten des Fondsanteils sind zu korrigieren um</b> pro Anteil — erhöht/verringert deine Anschaffungskosten für den späteren Verkauf (rein informativ, siehe unten).</li>
+      </ul>
+      Achtung: die Seite zeigt auch eine „Anzahl Anteile zum Zuflusszeitpunkt" — das ist die <b>Gesamtzahl aller Anteile des Fonds</b>, nicht deine persönliche Anzahl. Für das Feld „Anteile" unten trägst du ein, wie viele Anteile <b>du selbst</b> laut deinem Depotauszug zum Meldestichtag gehalten hast.
+      <p style="margin:10px 0 0; font-style:italic; color:var(--muted);">What to read off the OeKB fund page: it shows two columns — "Privatanleger mit Option" and "Privatanleger ohne Option." Since you hold via a foreign broker, the "ohne Option" column applies to you (tax-return line 937/998), not the first one. "Ausschüttungsgleiche Erträge" is the deemed-distributed income per unit that's taxable each year; "Anzurechnende ausländische (Quellen-)Steuer" is the foreign tax credit per unit; "Die Anschaffungskosten... sind zu korrigieren um" adjusts your cost basis for a future sale (informational, see below). Note: "Anzahl Anteile zum Zuflusszeitpunkt" is the fund's total units outstanding, not your personal holding — the "Anteile" field below is for how many units <b>you</b> held per your own broker statement.</p>
+    </div>
+    <div style="margin-bottom:14px; display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap;">
+      <label class="ghost small" style="display:inline-block; padding:5px 10px; border:1px solid var(--hairline); border-radius:4px; cursor:pointer; font-weight:600;">
+        ⭱ Daten vom Auto-Abruf-Script importieren
+        <input type="file" id="import-script-input" accept="application/json" style="display:none;">
+      </label>
+      <label class="ghost small" style="display:inline-block; padding:5px 10px; border:1px solid var(--hairline); border-radius:4px; cursor:pointer; font-weight:600;">
+        ⭱ Daten vom Depot-Kostenbasis-Rechner importieren
+        <input type="file" id="import-depot-input" accept="application/json" style="display:none;">
+      </label>
+      <button class="ghost small" id="fetch-all-fx-btn">↻ Alle fehlenden EZB-Kurse abrufen</button>
+    </div>
+    <div id="entries-list"></div>
+  </div>
+
+  <!-- TAB 3: INCOME -->
+  <div class="panel" id="panel-income">
+    <div class="help-box">
+      Für die Regelbesteuerungsoption zählt dein <b>gesamtes</b> Einkommen des jeweiligen Jahres. Trag hier dein sonstiges Einkommen (falls vorhanden) sowie etwaige weitere Kapitalerträge ein (z. B. realisierte Kursgewinne oder Ausschüttungen anderer Fonds), die ebenfalls der Regelbesteuerungsoption unterliegen würden.
+      <p style="margin:10px 0 0; font-style:italic; color:var(--muted);">The Regelbesteuerungsoption (opting into progressive tax rates) looks at your <b>total</b> income for the year. Enter any other (non-capital) income here, plus any further capital income (e.g. realized gains, other funds' distributions) that would also fall under this option.</p>
+    </div>
+    <div class="warn-box">
+      <b>Wichtig bei Zinsen — zwei verschiedene Steuersätze:</b> Bankzinsen/E-Geld-Konten (z. B. Trade Republic, Wise) fallen unter <b>25&nbsp;%</b> (§ 27 Abs. 2 Z 2 EStG), Anleihen-/Wertpapierkupons (z. B. deine ungarischen Staatsanleihen) unter die normalen <b>27,5&nbsp;%</b>. Trage sie daher in unterschiedliche Felder ein!
+      <ul style="margin:8px 0 0; padding-left:18px;">
+        <li><b>Trade Republic:</b> zahlt EZB-Zinssatz und behält oft automatisch Steuer ein — trag den Bruttobetrag bei "Zinsen aus Geldeinlagen" und die einbehaltene Steuer beim Feld daneben ein. Bei Regelbesteuerung (z. B. wenig sonstiges Einkommen) kommt oft mehr zurück, als du zahlen müsstest — das Tool zeigt dir das als "erstattungsfähig" im Ergebnis.</li>
+        <li><b>Wise:</b> zahlt idR ohne automatischen Steuerabzug — trag den vollen erhaltenen Betrag ein, einbehaltene Steuer bleibt bei 0.</li>
+        <li><b>Ungarische Staatsanleihen (HUF-Kupons):</b> gehören zur 27,5%-Kategorie ("sonstige Kapitalerträge"), nicht zu den Bankzinsen. Rechne die HUF-Beträge selbst in EUR um (der EZB-Kurs-Mechanismus dieses Tools ist aktuell nur für die Fonds-Meldedaten gebaut — für Zinsen musst du derzeit selbst umrechnen, z. B. via <a href="https://www.frankfurter.app" target="_blank" rel="noopener">frankfurter.app</a>).</li>
+      </ul>
+      <p style="margin:10px 0 0; font-style:italic; color:#6E2E22;">Important on interest — two different rates: bank/e-money accounts (e.g. Trade Republic, Wise) fall under 25%; bond/security coupons (e.g. your Hungarian government bonds) fall under the regular 27.5%. Enter them in the separate fields accordingly. Trade Republic often auto-withholds tax — enter the gross amount plus what was withheld, and the tool will flag any refund due. Wise usually withholds nothing — enter the full amount received. HUF bond coupons belong in the 27.5% field; convert HUF to EUR yourself for now (e.g. via frankfurter.app) — the automatic rate-lookup here currently only covers fund reporting dates.</p>
+    </div>
+    <div id="income-list"></div>
+  </div>
+
+  <!-- TAB 4: RESULTS -->
+  <div class="panel" id="panel-results">
+    <div id="results-list"></div>
+  </div>
+
+  <!-- TAB 5: TARIFF -->
+  <div class="panel" id="panel-tariff">
+    <div class="card">
+      <h2>Steuertarif-Tabellen <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Tax bracket tables</span></h2>
+      <div class="sub">Offizielle Werte des BMF (usp.gv.at) für 2022–2026 sind vorausgefüllt. Passe sie an, falls sich ein Jahr ändert, oder füge ein neues Jahr hinzu.</div>
+      <div class="row" style="margin-bottom:14px;">
+        <div style="max-width:160px;">
+          <label for="tariff-year-select">Jahr wählen</label>
+          <select id="tariff-year-select"></select>
+        </div>
+        <div style="flex:0;">
+          <button class="ghost small" id="add-tariff-year-btn">+ Neues Jahr</button>
+        </div>
+      </div>
+      <table id="tariff-table"></table>
+    </div>
+  </div>
+
+  <div class="save-row">
+    <button class="ghost small" id="export-btn">⭳ Sicherung herunterladen (JSON)</button>
+    <label class="ghost small" style="display:inline-block; padding:5px 10px; border:1px solid var(--hairline); border-radius:4px; cursor:pointer; font-weight:600;">
+      ⭱ Sicherung laden
+      <input type="file" id="import-input" accept="application/json" style="display:none;">
+    </label>
+    <span class="save-status" id="save-status">—</span>
+  </div>
+</div>
+
+<div class="footer-note">
+  Dieses Werkzeug bildet die Regelbesteuerungsoption vereinfacht ab (Grenzsteuerbetrachtung: progressive Steuer auf Gesamteinkommen minus progressive Steuer auf sonstiges Einkommen, verglichen mit 27,5&nbsp;% KESt). Es ersetzt keine steuerliche Beratung — insbesondere bei zusätzlichen Einkunftsarten, AIF-Fonds-Besonderheiten oder größeren Beträgen empfiehlt sich eine Prüfung durch eine Steuerberaterin/einen Steuerberater oder direkt in FinanzOnline. Daten werden nur lokal in diesem Fenster/Konto gespeichert.
+  <p style="margin-top:8px; font-style:italic;">English: this tool models the Regelbesteuerungsoption in simplified form (marginal approach: progressive tax on total income minus progressive tax on other income, compared against the flat 27.5% KESt). It's not a substitute for professional tax advice — especially for additional income types, AIF-fund specifics, or larger amounts, have a Steuerberater(in) or FinanzOnline check it. Data is only stored locally in this window/account.</p>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Official BMF tariff tables (usp.gv.at, Stand 1.1.2026) ----------
+  const DEFAULT_TARIFFS = {
+    2022: [ {upTo:11000, rate:0}, {upTo:18000, rate:0.20}, {upTo:31000, rate:0.325}, {upTo:60000, rate:0.42}, {upTo:90000, rate:0.48}, {upTo:1000000, rate:0.50}, {upTo:null, rate:0.55} ],
+    2023: [ {upTo:11693, rate:0}, {upTo:19134, rate:0.20}, {upTo:32075, rate:0.30}, {upTo:62080, rate:0.41}, {upTo:93120, rate:0.48}, {upTo:1000000, rate:0.50}, {upTo:null, rate:0.55} ],
+    2024: [ {upTo:12816, rate:0}, {upTo:20818, rate:0.20}, {upTo:34513, rate:0.30}, {upTo:66612, rate:0.40}, {upTo:99266, rate:0.48}, {upTo:1000000, rate:0.50}, {upTo:null, rate:0.55} ],
+    2025: [ {upTo:13308, rate:0}, {upTo:21617, rate:0.20}, {upTo:35836, rate:0.30}, {upTo:69166, rate:0.40}, {upTo:103072, rate:0.48}, {upTo:1000000, rate:0.50}, {upTo:null, rate:0.55} ],
+    2026: [ {upTo:13539, rate:0}, {upTo:21992, rate:0.20}, {upTo:36458, rate:0.30}, {upTo:70365, rate:0.40}, {upTo:104859, rate:0.48}, {upTo:1000000, rate:0.50}, {upTo:null, rate:0.55} ],
+  };
+  const KEST_RATE = 0.275;
+  const DEPOSIT_RATE = 0.25; // special 25% rate for bank/e-money deposit interest (§ 27 Abs. 2 Z 2 EStG) — not 27.5%
+
+  // ---------- State ----------
+  let state = {
+    funds: [],       // {id, isin, name}
+    entries: [],     // {id, fundId, year, agePerUnit, quellensteuerPerUnit, korrekturPerUnit, units}
+    income: {},      // year -> {other, otherCapital}
+    incomeItems: [], // {id, year, category:'deposit'|'capital', label, rateDate, currency, amount, fxRate, fxRateDateUsed}
+    tariffs: JSON.parse(JSON.stringify(DEFAULT_TARIFFS)),
+    openFund: null,
+  };
+
+  let saveTimer = null;
+
+  function uid(){ return Math.random().toString(36).slice(2,10); }
+  function fmt(n){
+    if (isNaN(n)) n = 0;
+    return n.toLocaleString('de-AT', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+  function num(v){ const n = parseFloat(String(v).replace(',','.')); return isNaN(n) ? 0 : n; }
+
+  // ---------- Persistence ----------
+  async function loadState(){
+    try{
+      if (window.storage && window.storage.get){
+        const res = await window.storage.get('meldefonds-data', false);
+        if (res && res.value){
+          const parsed = JSON.parse(res.value);
+          state = Object.assign(state, parsed);
+          setSaveStatus('Geladen ✓');
+          return;
+        }
+      }
+      setSaveStatus('Keine gespeicherten Daten — Sicherung laden oder neu beginnen.');
+    }catch(e){
+      setSaveStatus('Automatisches Speichern nicht verfügbar — bitte Sicherung nutzen.');
+    }
+  }
+
+  function persistState(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async ()=>{
+      try{
+        if (window.storage && window.storage.set){
+          const ok = await window.storage.set('meldefonds-data', JSON.stringify(state), false);
+          setSaveStatus(ok ? ('Gespeichert · ' + new Date().toLocaleTimeString('de-AT')) : 'Speichern fehlgeschlagen — Sicherung laden empfohlen.');
+        } else {
+          setSaveStatus('Automatisches Speichern nicht verfügbar — bitte Sicherung herunterladen.');
+        }
+      }catch(e){
+        setSaveStatus('Automatisches Speichern nicht verfügbar — bitte Sicherung herunterladen.');
+      }
+    }, 700);
+  }
+
+  function setSaveStatus(msg){
+    const el = document.getElementById('save-status');
+    if (el) el.textContent = msg;
+  }
+
+  function onChange(){ persistState(); }
+
+  // ---------- Tax math ----------
+  function progressiveTax(income, brackets){
+    if (income <= 0) return 0;
+    let tax = 0, lastCap = 0;
+    for (const b of brackets){
+      const cap = (b.upTo === null) ? Infinity : b.upTo;
+      if (income > lastCap){
+        const taxable = Math.min(income, cap) - lastCap;
+        tax += taxable * b.rate;
+        lastCap = cap;
+      } else break;
+    }
+    return tax;
+  }
+
+  function getYearsFromEntries(){
+    const set = new Set();
+    state.entries.forEach(e => set.add(e.year));
+    Object.keys(state.income).forEach(y => set.add(parseInt(y,10)));
+    return Array.from(set).sort();
+  }
+
+  // 1 unit of entry.currency = fxRate EUR. EUR is always rate 1.
+  function fxOf(e){
+    return (e.currency && e.currency !== 'EUR') ? (num(e.fxRate) || 0) : 1;
+  }
+
+  function computeYear(year){
+    const brackets = state.tariffs[year] || DEFAULT_TARIFFS[2026];
+    const yearEntries = state.entries.filter(e => e.year === year);
+    let ageTotal = 0, creditTotal = 0;
+    yearEntries.forEach(e=>{
+      const fx = fxOf(e);
+      ageTotal += num(e.agePerUnit) * num(e.units) * fx;
+      creditTotal += num(e.quellensteuerPerUnit) * num(e.units) * fx;
+    });
+    const inc = state.income[year] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0};
+    const otherIncome = num(inc.other);
+    const yearItems = state.incomeItems.filter(it => it.year === year);
+    const itemsDeposit = yearItems.filter(it=>it.category==='deposit').reduce((s,it)=> s + num(it.amount)*fxOf(it), 0);
+    const itemsCapital = yearItems.filter(it=>it.category==='capital').reduce((s,it)=> s + num(it.amount)*fxOf(it), 0);
+    const otherCapital = num(inc.otherCapital) + itemsCapital;           // 27.5%-category: realized gains, bond/security coupons, etc.
+    const depositInterest = num(inc.depositInterest) + itemsDeposit;       // 25%-category: bank/e-money deposit interest (§27 Abs 2 Z 2 EStG)
+    creditTotal += num(inc.depositInterestWithheld);         // tax already withheld (e.g. Trade Republic) is creditable too
+
+    const capitalIncome275 = ageTotal + otherCapital;
+    const capitalIncome = capitalIncome275 + depositInterest; // combined, for the progressive-rate comparison
+
+    const flatTax = capitalIncome275 * KEST_RATE + depositInterest * DEPOSIT_RATE;
+    const taxWith = progressiveTax(otherIncome + capitalIncome, brackets);
+    const taxWithout = progressiveTax(otherIncome, brackets);
+    const progTax = Math.max(taxWith - taxWithout, 0);
+
+    const winnerIsProgressive = progTax < flatTax;
+    const chosenTax = Math.min(progTax, flatTax);
+    const creditApplied = Math.min(creditTotal, chosenTax);
+    const netTax = Math.max(chosenTax - creditApplied, 0);
+    const refundable = Math.max(creditTotal - chosenTax, 0);
+
+    return {
+      year, ageTotal, creditTotal, otherIncome, otherCapital, depositInterest, capitalIncome,
+      flatTax, progTax, winnerIsProgressive, chosenTax, creditApplied, netTax, refundable
+    };
+  }
+
+  function fundCostBasisCumulative(fundId){
+    return state.entries
+      .filter(e => e.fundId === fundId)
+      .reduce((sum,e)=> sum + num(e.korrekturPerUnit) * num(e.units) * fxOf(e), 0);
+  }
+
+  // Small embedded fallback for dates confirmed directly against ECB's own published rates
+  // (used when the live fetch fails, e.g. due to file:// CORS restrictions). Format: 1 unit of
+  // currency = X EUR (inverse of ECB's "1 EUR = X currency" convention).
+  const SEED_RATES = {
+    '2026-01-16': { USD: 1/1.1617, GBP: 1/0.86700, CHF: 1/0.9313, JPY: 1/183.67, CAD: 1/1.6135, AUD: 1/1.7344, SEK: 1/10.7190, NOK: 1/11.7203, DKK: 1/7.4712 }
+  };
+
+  // ---------- FX rates (Frankfurter.app, ECB-sourced, free & CORS-enabled) ----------
+  async function fetchFxRate(entry){
+    if (!entry.currency || entry.currency === 'EUR') return {ok:true};
+    if (!entry.rateDate){ return {ok:false, msg:'Bitte zuerst ein Kurs-Datum eintragen.'}; }
+    const seed = SEED_RATES[entry.rateDate];
+    if (seed && seed[entry.currency] !== undefined){
+      entry.fxRate = seed[entry.currency];
+      entry.fxRateDateUsed = entry.rateDate;
+      return {ok:true, dateUsed: entry.rateDate};
+    }
+    try{
+      const url = `https://api.frankfurter.app/${entry.rateDate}?from=${encodeURIComponent(entry.currency)}&to=EUR`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP '+res.status);
+      const data = await res.json();
+      const rate = data && data.rates && data.rates.EUR;
+      if (!rate) throw new Error('Kein Kurs in Antwort');
+      entry.fxRate = rate;
+      entry.fxRateDateUsed = data.date; // Frankfurter falls back to nearest earlier business day
+      return {ok:true, dateUsed: data.date};
+    }catch(e){
+      return {ok:false, msg:'Kurs konnte nicht automatisch abgerufen werden (keine Internetverbindung? CORS?). Bitte manuell auf frankfurter.app/'+entry.rateDate+'?from='+entry.currency+'&to=EUR nachsehen und eintragen.'};
+    }
+  }
+
+  // ---------- Tabs ----------
+  document.querySelectorAll('.tab').forEach(tab=>{
+    tab.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('panel-'+tab.dataset.tab).classList.add('active');
+      if (tab.dataset.tab === 'results') renderResults();
+      if (tab.dataset.tab === 'income') renderIncome();
+      if (tab.dataset.tab === 'tariff') renderTariff();
+    });
+  });
+
+  // ---------- Funds ----------
+  document.getElementById('add-fund-btn').addEventListener('click', ()=>{
+    const isinEl = document.getElementById('new-isin');
+    const nameEl = document.getElementById('new-name');
+    const isin = isinEl.value.trim().toUpperCase();
+    const name = nameEl.value.trim();
+    if (!isin){ isinEl.focus(); return; }
+    state.funds.push({ id: uid(), isin, name: name || isin });
+    isinEl.value = ''; nameEl.value = '';
+    onChange();
+    renderFunds();
+    renderEntries();
+  });
+
+  function renderFunds(){
+    const list = document.getElementById('funds-list');
+    if (state.funds.length === 0){
+      list.innerHTML = '<div class="card"><div class="empty">Noch keine Fonds erfasst. Füge oben deinen ersten Fonds hinzu.</div></div>';
+      return;
+    }
+    list.innerHTML = state.funds.map(f => `
+      <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <span class="isin mono" style="color:var(--brass-deep); font-weight:600;">${f.isin}</span>
+          <span style="margin-left:10px; font-weight:600;">${f.name}</span>
+        </div>
+        <div class="fund-actions">
+          <a href="https://my.oekb.at/kapitalmarkt-services/kms-output/fonds-info/sd/af/f" target="_blank" rel="noopener"><button class="ghost small" type="button">Auf OeKB suchen ↗</button></a>
+          <button class="danger small" type="button" data-del-fund="${f.id}">Entfernen</button>
+        </div>
+      </div>
+    `).join('');
+    list.querySelectorAll('[data-del-fund]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.dataset.delFund;
+        if (!confirm('Diesen Fonds und alle zugehörigen Meldedaten wirklich entfernen?')) return;
+        state.funds = state.funds.filter(f=>f.id!==id);
+        state.entries = state.entries.filter(e=>e.fundId!==id);
+        onChange();
+        renderFunds(); renderEntries();
+      });
+    });
+  }
+
+  // ---------- Entries ----------
+  const FX_CURRENCIES = ['EUR','USD','GBP','CHF','JPY','CAD','AUD','SEK','NOK','DKK','HUF','Andere'];
+
+  function stpflText(e){
+    return fmt(num(e.agePerUnit) * num(e.units) * fxOf(e)) + ' €';
+  }
+
+  function renderEntries(){
+    const list = document.getElementById('entries-list');
+    if (state.funds.length === 0){
+      list.innerHTML = '<div class="card"><div class="empty">Erst unter „1 Fonds" einen Fonds anlegen.</div></div>';
+      return;
+    }
+    list.innerHTML = state.funds.map(f=>{
+      const rows = state.entries.filter(e=>e.fundId===f.id).sort((a,b)=>a.year-b.year);
+      const isOpen = state.openFund === f.id;
+      return `
+      <div class="fund-block">
+        <div class="fund-head" data-toggle="${f.id}">
+          <div><span class="isin">${f.isin}</span><span class="name">${f.name}</span></div>
+          <div style="color:var(--muted); font-size:12px;">${rows.length} Meldejahr(e) ${isOpen ? '▾' : '▸'}</div>
+        </div>
+        <div class="fund-body ${isOpen ? 'open' : ''}" id="body-${f.id}">
+          <table>
+            <thead><tr>
+              <th style="width:70px;">Jahr</th>
+              <th style="width:80px;">Währung</th>
+              <th>AgE / Anteil</th>
+              <th>Anrechenb. Quellensteuer / Anteil</th>
+              <th>Korrektur Anschaffung / Anteil</th>
+              <th>Anteile</th>
+              <th style="width:110px;">Stpfl. Betrag (€)</th>
+              <th></th>
+            </tr></thead>
+            <tbody>
+              ${rows.map(e=>{
+                const isForeign = e.currency && e.currency !== 'EUR';
+                return `
+                <tr data-entry="${e.id}">
+                  <td><input type="number" class="ent-year" value="${e.year}" style="width:64px;"></td>
+                  <td>
+                    <select class="ent-currency">
+                      ${FX_CURRENCIES.map(c=>`<option value="${c}" ${e.currency===c?'selected':''}>${c}</option>`).join('')}
+                    </select>
+                  </td>
+                  <td><input type="number" step="0.0001" class="ent-age" value="${e.agePerUnit}"></td>
+                  <td><input type="number" step="0.0001" class="ent-q" value="${e.quellensteuerPerUnit}"></td>
+                  <td><input type="number" step="0.0001" class="ent-k" value="${e.korrekturPerUnit}"></td>
+                  <td><input type="number" step="0.0001" class="ent-units" value="${e.units}"></td>
+                  <td class="num ent-stpfl">${stpflText(e)}</td>
+                  <td><button class="danger small" type="button" data-del-entry="${e.id}">✕</button></td>
+                </tr>
+                <tr class="fx-row" data-fx-for="${e.id}" style="${isForeign ? '' : 'display:none;'}">
+                  <td colspan="8" style="background:#FAF8F2;">
+                    <div class="row" style="align-items:flex-end; gap:14px;">
+                      <div style="max-width:170px;">
+                        <label>Meldedatum (Kursstichtag)</label>
+                        <input type="date" class="ent-ratedate" value="${e.rateDate||''}">
+                      </div>
+                      <div style="max-width:150px;">
+                        <label>Kurs (1 ${e.currency} = X €)</label>
+                        <input type="number" step="0.000001" class="ent-fxrate" value="${e.fxRate||''}">
+                      </div>
+                      <div style="flex:0;">
+                        <button class="ghost small" type="button" data-fetch-fx="${e.id}">↻ EZB-Kurs abrufen</button>
+                      </div>
+                      <div class="fx-status" style="font-size:12px; color:var(--muted); flex:1;">
+                        ${e.fxRateDateUsed ? ('Kurs vom ' + e.fxRateDateUsed + (e.fxRateDateUsed!==e.rateDate ? ' (nächster verfügbarer Handelstag)':'')) : 'Noch kein Kurs abgerufen.'}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+          <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
+            <button class="ghost small" type="button" data-add-entry="${f.id}">+ Meldejahr hinzufügen</button>
+            <span class="num" style="font-size:12px; color:var(--muted);">Kumulierte Anschaffungskosten-Korrektur: ${fmt(fundCostBasisCumulative(f.id))} €</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    list.querySelectorAll('[data-toggle]').forEach(h=>{
+      h.addEventListener('click', ()=>{
+        const id = h.dataset.toggle;
+        state.openFund = (state.openFund === id) ? null : id;
+        renderEntries();
+      });
+    });
+    list.querySelectorAll('[data-add-entry]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const fundId = btn.dataset.addEntry;
+        const existingYears = state.entries.filter(e=>e.fundId===fundId).map(e=>e.year);
+        const nextYear = existingYears.length ? Math.max(...existingYears)+1 : new Date().getFullYear();
+        state.entries.push({ id: uid(), fundId, year: nextYear, currency:'EUR', rateDate:'', fxRate:1, fxRateDateUsed:'', agePerUnit:0, quellensteuerPerUnit:0, korrekturPerUnit:0, units:0 });
+        state.openFund = fundId;
+        onChange();
+        renderEntries();
+      });
+    });
+    list.querySelectorAll('[data-del-entry]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        state.entries = state.entries.filter(e=>e.id!==btn.dataset.delEntry);
+        onChange();
+        renderEntries();
+      });
+    });
+    list.querySelectorAll('[data-fetch-fx]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const entry = state.entries.find(e=>e.id===btn.dataset.fetchFx);
+        btn.disabled = true; btn.textContent = 'Lade …';
+        const result = await fetchFxRate(entry);
+        btn.disabled = false; btn.textContent = '↻ EZB-Kurs abrufen';
+        const fxRow = list.querySelector(`tr.fx-row[data-fx-for="${entry.id}"]`);
+        const statusEl = fxRow.querySelector('.fx-status');
+        const rateInput = fxRow.querySelector('.ent-fxrate');
+        if (result.ok){
+          rateInput.value = entry.fxRate;
+          statusEl.textContent = 'Kurs vom ' + entry.fxRateDateUsed + (entry.fxRateDateUsed!==entry.rateDate ? ' (nächster verfügbarer Handelstag)':'');
+          statusEl.style.color = 'var(--teal)';
+        } else {
+          statusEl.textContent = result.msg;
+          statusEl.style.color = 'var(--brick)';
+        }
+        const mainRow = list.querySelector(`tr[data-entry="${entry.id}"]`);
+        mainRow.querySelector('.ent-stpfl').textContent = stpflText(entry);
+        onChange();
+      });
+    });
+    // live field updates (no full re-render, to keep focus)
+    list.querySelectorAll('tr[data-entry]').forEach(tr=>{
+      const id = tr.dataset.entry;
+      const entry = state.entries.find(e=>e.id===id);
+      const refreshStpfl = () => { tr.querySelector('.ent-stpfl').textContent = stpflText(entry); };
+      const bind = (cls, field, isInt) => {
+        const input = tr.querySelector('.'+cls);
+        input.addEventListener('input', ()=>{
+          entry[field] = isInt ? (parseInt(input.value,10)||0) : num(input.value);
+          refreshStpfl();
+          onChange();
+        });
+      };
+      bind('ent-year','year', true);
+      bind('ent-age','agePerUnit');
+      bind('ent-q','quellensteuerPerUnit');
+      bind('ent-k','korrekturPerUnit');
+      bind('ent-units','units');
+
+      const currencySel = tr.querySelector('.ent-currency');
+      currencySel.addEventListener('change', ()=>{
+        entry.currency = currencySel.value;
+        onChange();
+        renderEntries(); // structural: fx sub-row visibility changes
+      });
+    });
+    list.querySelectorAll('tr.fx-row').forEach(fxRow=>{
+      const entry = state.entries.find(e=>e.id===fxRow.dataset.fxFor);
+      if (!entry) return;
+      fxRow.querySelector('.ent-ratedate').addEventListener('input', (e)=>{
+        entry.rateDate = e.target.value;
+        onChange();
+      });
+      fxRow.querySelector('.ent-fxrate').addEventListener('input', (e)=>{
+        entry.fxRate = num(e.target.value);
+        const mainRow = list.querySelector(`tr[data-entry="${entry.id}"]`);
+        mainRow.querySelector('.ent-stpfl').textContent = stpflText(entry);
+        onChange();
+      });
+    });
+  }
+
+  // ---------- Income ----------
+  function itemsSubtotal(year, category){
+    return state.incomeItems.filter(it=>it.year===year && it.category===category)
+      .reduce((s,it)=> s + num(it.amount)*fxOf(it), 0);
+  }
+
+  function renderIncomeItemsTable(year, category){
+    const items = state.incomeItems.filter(it=>it.year===year && it.category===category);
+    const rows = items.map(it=>{
+      const isForeign = it.currency && it.currency !== 'EUR';
+      return `
+      <tr data-item="${it.id}">
+        <td><input type="text" class="item-label" value="${it.label||''}" placeholder="z. B. HUF-Anleihe Q1 / e.g. HUF bond Q1" style="width:170px;"></td>
+        <td><input type="date" class="item-date" value="${it.rateDate||''}" style="width:130px;"></td>
+        <td>
+          <select class="item-currency">
+            ${FX_CURRENCIES.map(c=>`<option value="${c}" ${it.currency===c?'selected':''}>${c}</option>`).join('')}
+          </select>
+        </td>
+        <td><input type="number" step="0.01" class="item-amount" value="${it.amount||0}" style="width:100px;"></td>
+        <td class="num">${fmt(num(it.amount)*fxOf(it))} €</td>
+        <td><button class="ghost small" type="button" data-del-item="${it.id}">✕</button></td>
+      </tr>
+      <tr class="fx-row" style="${isForeign ? '' : 'display:none;'}">
+        <td colspan="6" style="background:#FAF8F2;">
+          <div class="row" style="align-items:flex-end; gap:14px;">
+            <div style="max-width:150px;"><label>Kurs (1 ${it.currency} = X €)</label><input type="number" step="0.000001" class="item-fxrate" value="${it.fxRate||''}"></div>
+            <div style="flex:0;"><button class="ghost small" type="button" data-fetch-item-fx="${it.id}">↻ EZB-Kurs abrufen</button></div>
+            <div class="fx-status" style="font-size:12px; color:var(--muted); flex:1;">${it.fxRateDateUsed ? ('Kurs vom '+it.fxRateDateUsed) : 'Noch kein Kurs abgerufen.'}</div>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+    return `
+      <table style="margin-top:8px;">
+        <thead><tr><th>Bezeichnung</th><th>Datum</th><th>Whg.</th><th>Betrag</th><th>≈ EUR</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <button class="ghost small" type="button" data-add-item="${year}|${category}" style="margin-top:6px;">+ Position hinzufügen / Add item</button>
+    `;
+  }
+
+  function bindIncomeItemEvents(){
+    document.querySelectorAll('[data-add-item]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const [yearStr, category] = btn.dataset.addItem.split('|');
+        state.incomeItems.push({ id: uid(), year: parseInt(yearStr,10), category, label:'', rateDate:'', currency:'EUR', amount:0, fxRate:1, fxRateDateUsed:'' });
+        onChange();
+        renderIncome();
+      });
+    });
+    document.querySelectorAll('[data-del-item]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        state.incomeItems = state.incomeItems.filter(it=>it.id!==btn.dataset.delItem);
+        onChange();
+        renderIncome();
+      });
+    });
+    document.querySelectorAll('[data-fetch-item-fx]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const item = state.incomeItems.find(it=>it.id===btn.dataset.fetchItemFx);
+        btn.disabled = true; btn.textContent = 'Lade …';
+        const result = await fetchFxRate(item);
+        btn.disabled = false; btn.textContent = '↻ EZB-Kurs abrufen';
+        onChange();
+        renderIncome();
+        if (!result.ok){
+          const row = document.querySelector(`tr[data-item="${item.id}"]`);
+          if (row) row.nextElementSibling.querySelector('.fx-status').textContent = result.msg;
+        }
+      });
+    });
+    document.querySelectorAll('.item-label').forEach(inp=>{
+      const tr = inp.closest('tr'); const item = state.incomeItems.find(it=>it.id===tr.dataset.item);
+      inp.addEventListener('input', ()=>{ item.label = inp.value; onChange(); });
+    });
+    document.querySelectorAll('.item-date').forEach(inp=>{
+      const tr = inp.closest('tr'); const item = state.incomeItems.find(it=>it.id===tr.dataset.item);
+      inp.addEventListener('input', ()=>{ item.rateDate = inp.value; onChange(); });
+    });
+    document.querySelectorAll('.item-amount').forEach(inp=>{
+      const tr = inp.closest('tr'); const item = state.incomeItems.find(it=>it.id===tr.dataset.item);
+      inp.addEventListener('input', ()=>{
+        item.amount = num(inp.value);
+        tr.children[4].textContent = fmt(num(item.amount)*fxOf(item)) + ' €';
+        onChange();
+      });
+    });
+    document.querySelectorAll('.item-fxrate').forEach(inp=>{
+      const tr = inp.closest('tr').previousElementSibling; const item = state.incomeItems.find(it=>it.id===tr.dataset.item);
+      inp.addEventListener('input', ()=>{
+        item.fxRate = num(inp.value);
+        tr.children[4].textContent = fmt(num(item.amount)*fxOf(item)) + ' €';
+        onChange();
+      });
+    });
+    document.querySelectorAll('.item-currency').forEach(sel=>{
+      const tr = sel.closest('tr'); const item = state.incomeItems.find(it=>it.id===tr.dataset.item);
+      sel.addEventListener('change', ()=>{
+        item.currency = sel.value;
+        onChange();
+        renderIncome(); // structural: fx-row visibility changes
+      });
+    });
+  }
+
+  function renderIncome(){
+    const list = document.getElementById('income-list');
+    const years = getYearsFromEntries();
+    if (years.length === 0){
+      list.innerHTML = '<div class="card"><div class="empty">Erfasse zuerst Meldedaten unter „2 Meldedaten" — die betroffenen Jahre erscheinen dann automatisch hier.</div></div>';
+      return;
+    }
+    list.innerHTML = years.map(y=>{
+      const inc = state.income[y] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0};
+      return `
+      <div class="card">
+        <h2>${y}</h2>
+        <div class="row">
+          <div>
+            <label>Sonstiges Einkommen ohne Kapitalerträge (€) <span style="font-weight:400; color:var(--muted);">/ Other non-capital income</span></label>
+            <input type="number" step="1" class="inc-other" data-year="${y}" value="${inc.other||0}">
+          </div>
+        </div>
+
+        <h3 style="font-size:15px; margin-top:16px;">Kapitalerträge zu 27,5&nbsp;% <span style="font-weight:400; color:var(--muted); font-size:12.5px;">/ Capital income (27.5% category)</span></h3>
+        <div style="font-size:11px; color:var(--muted); margin-top:2px;">Realisierte Kursgewinne, Anleihen-/Wertpapier-Kupons (z. B. HUF-Staatsanleihen) — alles außer Bankzinsen. / Realized gains, bond/security coupons (e.g. HUF government bonds) — everything except bank interest.</div>
+        <div class="row" style="margin-top:8px;">
+          <div>
+            <label>Pauschalbetrag ohne Einzelposten (€) <span style="font-weight:400; color:var(--muted);">/ Lump sum (no itemized entries)</span></label>
+            <input type="number" step="1" class="inc-cap" data-year="${y}" value="${inc.otherCapital||0}">
+          </div>
+        </div>
+        ${renderIncomeItemsTable(y, 'capital')}
+        <div style="text-align:right; font-size:12.5px; color:var(--muted); margin-top:4px;">Einzelposten-Zwischensumme: ${fmt(itemsSubtotal(y,'capital'))} €</div>
+
+        <h3 style="font-size:15px; margin-top:20px;">Zinsen aus Geldeinlagen zu 25&nbsp;% <span style="font-weight:400; color:var(--muted); font-size:12.5px;">/ Bank/e-money deposit interest (25% rate, § 27 Abs. 2 Z 2 EStG)</span></h3>
+        <div style="font-size:11px; color:var(--muted); margin-top:2px;">Zinsen von Bankkonten, Sparkonten, oder E-Geld-Konten wie Trade Republic/Wise. Wichtig: 25&nbsp;%, nicht 27,5&nbsp;%! / Interest from bank/savings/e-money accounts like Trade Republic or Wise. Note: 25%, not 27.5%!</div>
+        <div class="row" style="margin-top:8px;">
+          <div>
+            <label>Pauschalbetrag ohne Einzelposten (€) <span style="font-weight:400; color:var(--muted);">/ Lump sum (no itemized entries)</span></label>
+            <input type="number" step="1" class="inc-dep" data-year="${y}" value="${inc.depositInterest||0}">
+          </div>
+          <div>
+            <label>Davon bereits einbehaltene Steuer (€) <span style="font-weight:400; color:var(--muted);">/ Tax already withheld on that interest</span></label>
+            <input type="number" step="1" class="inc-depwh" data-year="${y}" value="${inc.depositInterestWithheld||0}">
+            <div style="font-size:11px; color:var(--muted); margin-top:3px;">Z. B. wenn Trade Republic automatisch Steuer abgeführt hat — wird angerechnet. / e.g. if Trade Republic automatically withheld tax — this gets credited.</div>
+          </div>
+        </div>
+        ${renderIncomeItemsTable(y, 'deposit')}
+        <div style="text-align:right; font-size:12.5px; color:var(--muted); margin-top:4px;">Einzelposten-Zwischensumme: ${fmt(itemsSubtotal(y,'deposit'))} €</div>
+      </div>`;
+    }).join('');
+    list.querySelectorAll('.inc-other').forEach(inp=>{
+      inp.addEventListener('input', ()=>{
+        const y = parseInt(inp.dataset.year,10);
+        state.income[y] = state.income[y] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0};
+        state.income[y].other = num(inp.value);
+        onChange();
+      });
+    });
+    list.querySelectorAll('.inc-cap').forEach(inp=>{
+      inp.addEventListener('input', ()=>{
+        const y = parseInt(inp.dataset.year,10);
+        state.income[y] = state.income[y] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0};
+        state.income[y].otherCapital = num(inp.value);
+        onChange();
+      });
+    });
+    list.querySelectorAll('.inc-dep').forEach(inp=>{
+      inp.addEventListener('input', ()=>{
+        const y = parseInt(inp.dataset.year,10);
+        state.income[y] = state.income[y] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0};
+        state.income[y].depositInterest = num(inp.value);
+        onChange();
+      });
+    });
+    list.querySelectorAll('.inc-depwh').forEach(inp=>{
+      inp.addEventListener('input', ()=>{
+        const y = parseInt(inp.dataset.year,10);
+        state.income[y] = state.income[y] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0};
+        state.income[y].depositInterestWithheld = num(inp.value);
+        onChange();
+      });
+    });
+    bindIncomeItemEvents();
+  }
+
+  // ---------- Results ----------
+  function renderResults(){
+    const list = document.getElementById('results-list');
+    const years = getYearsFromEntries();
+    if (years.length === 0){
+      list.innerHTML = '<div class="card"><div class="empty">Noch keine Daten — erfasse zuerst Fonds und Meldedaten.</div></div>';
+      return;
+    }
+    let grandNet = 0, grandSavings = 0;
+    const yearCards = years.map(y=>{
+      const r = computeYear(y);
+      grandNet += r.netTax;
+      grandSavings += Math.max(r.flatTax - r.progTax, 0);
+      return `
+      <div class="year-card">
+        <div class="stamp ${r.winnerIsProgressive ? 'teal':''}">
+          ${r.winnerIsProgressive ? 'REGELBESTEUERUNG' : 'KEST 27,5 %'}
+          <span class="big">günstiger</span>
+        </div>
+        <h3>${y}</h3>
+        <div class="figures">
+          <div class="figure-row"><span class="lbl">Ausschüttungsgleiche Erträge (Summe)</span><span class="val">${fmt(r.ageTotal)} €</span></div>
+          <div class="figure-row"><span class="lbl">+ sonstige Kapitalerträge (27,5%)</span><span class="val">${fmt(r.otherCapital)} €</span></div>
+          <div class="figure-row"><span class="lbl">+ Zinsen aus Geldeinlagen (25%)</span><span class="val">${fmt(r.depositInterest)} €</span></div>
+          <div class="figure-row total"><span class="lbl">= steuerpflichtiges Kapitaleinkommen</span><span class="val">${fmt(r.capitalIncome)} €</span></div>
+          <div class="figure-row"><span class="lbl">Sonstiges Einkommen (Basis)</span><span class="val">${fmt(r.otherIncome)} €</span></div>
+        </div>
+        <div class="figures">
+          <div class="figure-row"><span class="lbl">KESt wären (27,5% / 25% je nach Kategorie)</span><span class="val">${fmt(r.flatTax)} €</span></div>
+          <div class="figure-row"><span class="lbl">Regelbesteuerung (Grenzsteuer) wären</span><span class="val">${fmt(r.progTax)} €</span></div>
+          <div class="figure-row"><span class="lbl">Anrechenbare Quellensteuer/einbehaltene Steuer</span><span class="val">− ${fmt(r.creditApplied)} €</span></div>
+          ${r.refundable > 0.005 ? `<div class="figure-row" style="color:var(--teal); font-weight:600;"><span class="lbl">→ davon erstattungsfähig (mehr einbehalten als geschuldet) / refundable</span><span class="val">${fmt(r.refundable)} €</span></div>` : ''}
+          <div class="figure-row total"><span class="lbl">Steuer nach Anrechnung</span><span class="val">${fmt(r.netTax)} €</span></div>
+        </div>
+      </div>`;
+    }).join('');
+
+    const basisRows = state.funds.map(f=>`
+      <tr><td>${f.isin}</td><td>${f.name}</td><td class="num">${fmt(fundCostBasisCumulative(f.id))} €</td></tr>
+    `).join('');
+
+    list.innerHTML = `
+      ${yearCards}
+      <div class="grand-total">
+        <div class="lbl">Gesamte Steuerlast über alle erfassten Jahre (nach Anrechnung)</div>
+        <div class="val">${fmt(grandNet)} €</div>
+        <div style="margin-top:8px; font-size:12.5px; color:#B9C2BC;">davon durch Regelbesteuerungsoption gespart (ggü. pauschal 27,5 % KESt): ${fmt(grandSavings)} €</div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <h2>Kumulierte Anschaffungskosten-Korrektur je Fonds <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Cumulative cost-basis adjustment per fund</span></h2>
+        <div class="sub">Zur Information für die Gewinnermittlung, sobald du Anteile verkaufst — addiere diesen Betrag zu deinen ursprünglichen Anschaffungskosten.</div>
+        <table class="basis-table">
+          <thead><tr><th>ISIN</th><th>Name</th><th>Kumulierte Korrektur</th></tr></thead>
+          <tbody>${basisRows}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  // ---------- Tariff editor ----------
+  function renderTariff(){
+    const sel = document.getElementById('tariff-year-select');
+    const years = Object.keys(state.tariffs).map(y=>parseInt(y,10)).sort();
+    sel.innerHTML = years.map(y=>`<option value="${y}">${y}</option>`).join('');
+    if (!sel.dataset.bound){
+      sel.addEventListener('change', renderTariffTable);
+      sel.dataset.bound = '1';
+    }
+    renderTariffTable();
+  }
+
+  function renderTariffTable(){
+    const sel = document.getElementById('tariff-year-select');
+    const year = parseInt(sel.value,10) || parseInt(sel.options[0]?.value,10);
+    const brackets = state.tariffs[year];
+    const tbl = document.getElementById('tariff-table');
+    tbl.innerHTML = `
+      <thead><tr><th>Bis Einkommen (€) — leer = unbegrenzt</th><th style="width:140px;">Grenzsteuersatz (%)</th></tr></thead>
+      <tbody>
+        ${brackets.map((b,i)=>`
+          <tr data-idx="${i}">
+            <td><input type="number" class="tf-upto" value="${b.upTo===null?'':b.upTo}" ${i===brackets.length-1?'disabled placeholder="unbegrenzt"':''}></td>
+            <td><input type="number" step="0.1" class="tf-rate" value="${(b.rate*100).toFixed(2)}"></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    `;
+    tbl.querySelectorAll('tr[data-idx]').forEach(tr=>{
+      const idx = parseInt(tr.dataset.idx,10);
+      tr.querySelector('.tf-upto').addEventListener('input', (e)=>{
+        const v = e.target.value.trim();
+        state.tariffs[year][idx].upTo = v === '' ? null : num(v);
+        onChange();
+      });
+      tr.querySelector('.tf-rate').addEventListener('input', (e)=>{
+        state.tariffs[year][idx].rate = num(e.target.value)/100;
+        onChange();
+      });
+    });
+  }
+
+  document.getElementById('add-tariff-year-btn').addEventListener('click', ()=>{
+    const y = prompt('Neues Jahr (z. B. 2027):');
+    const yr = parseInt(y,10);
+    if (!yr) return;
+    const years = Object.keys(state.tariffs).map(v=>parseInt(v,10)).sort();
+    const latest = years[years.length-1];
+    state.tariffs[yr] = JSON.parse(JSON.stringify(state.tariffs[latest]));
+    onChange();
+    renderTariff();
+  });
+
+  // ---------- Export / Import ----------
+  document.getElementById('export-btn').addEventListener('click', ()=>{
+    const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'meldefonds-sicherung-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('import-input').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const parsed = JSON.parse(reader.result);
+        if (!parsed.funds || !parsed.entries) throw new Error('invalid');
+        state = Object.assign({funds:[],entries:[],income:{},tariffs:JSON.parse(JSON.stringify(DEFAULT_TARIFFS)),openFund:null}, parsed);
+        onChange();
+        renderFunds(); renderEntries(); renderIncome(); renderResults(); renderTariff();
+        alert('Sicherung geladen.');
+      }catch(err){
+        alert('Diese Datei konnte nicht gelesen werden. Bitte eine gültige Sicherungsdatei wählen.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  // Merge-import for the OeKB Auto-Abruf userscript's output ({funds:[{isin,name}], entries:[{isin,year,...}]})
+  // Upserts by ISIN + year instead of overwriting the whole state, so existing data (units, other funds) is preserved.
+  document.getElementById('import-script-input').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const parsed = JSON.parse(reader.result);
+        if (!Array.isArray(parsed.funds) || !Array.isArray(parsed.entries)) throw new Error('invalid');
+        let fundsAdded = 0, fundsMatched = 0, entriesAdded = 0, entriesUpdated = 0;
+        const isinToFundId = {};
+        state.funds.forEach(f => { isinToFundId[f.isin.toUpperCase()] = f.id; });
+
+        parsed.funds.forEach(pf=>{
+          const isin = (pf.isin||'').toUpperCase();
+          if (!isin) return;
+          if (isinToFundId[isin]){ fundsMatched++; return; }
+          const id = uid();
+          state.funds.push({ id, isin, name: pf.name || isin });
+          isinToFundId[isin] = id;
+          fundsAdded++;
+        });
+
+        parsed.entries.forEach(pe=>{
+          const isin = (pe.isin||'').toUpperCase();
+          const fundId = isinToFundId[isin];
+          if (!fundId) return; // fund wasn't in parsed.funds and doesn't exist locally either
+          const year = parseInt(pe.year,10);
+          let existing = state.entries.find(en => en.fundId===fundId && en.year===year);
+          if (!existing){
+            existing = { id: uid(), fundId, year, currency:'EUR', rateDate:'', fxRate:1, fxRateDateUsed:'', agePerUnit:0, quellensteuerPerUnit:0, korrekturPerUnit:0, units:0 };
+            state.entries.push(existing);
+            entriesAdded++;
+          } else {
+            entriesUpdated++;
+          }
+          if (pe.currency) existing.currency = pe.currency;
+          if (pe.rateDate) existing.rateDate = pe.rateDate;
+          if (pe.agePerUnit !== null && pe.agePerUnit !== undefined) existing.agePerUnit = pe.agePerUnit;
+          if (pe.quellensteuerPerUnit !== null && pe.quellensteuerPerUnit !== undefined) existing.quellensteuerPerUnit = pe.quellensteuerPerUnit;
+          if (pe.korrekturPerUnit !== null && pe.korrekturPerUnit !== undefined) existing.korrekturPerUnit = pe.korrekturPerUnit;
+          // units and fxRate are intentionally left untouched — the script can't know your personal holding.
+        });
+
+        onChange();
+        renderFunds(); renderEntries(); renderIncome(); renderResults();
+        alert(`Import fertig: ${fundsAdded} neue Fonds, ${fundsMatched} bereits vorhanden · ${entriesAdded} neue Meldejahre, ${entriesUpdated} aktualisiert.\n\nWichtig: die Anzahl der Anteile (Anteile-Feld) kennt das Script nicht — bitte bei jedem neuen Meldejahr unter "2 Meldedaten" ergänzen.`);
+      }catch(err){
+        alert('Diese Datei konnte nicht gelesen werden. Bitte die JSON-Datei aus dem OeKB Auto-Abruf-Script wählen.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  // Import from the Depot-Kostenbasis-Rechner: auto-fills "Anteile" (units) per fund/year using the
+  // exported quantity-history (looked up by each entry's rateDate), and adds realized capital gains
+  // into "sonstige Kapitalerträge" per year (EUR-denominated gains only — see alert for the rest).
+  document.getElementById('import-depot-input').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const parsed = JSON.parse(reader.result);
+        if (!Array.isArray(parsed.positions) || !Array.isArray(parsed.realizedGains)) throw new Error('invalid');
+
+        const isinToFundId = {};
+        state.funds.forEach(f => { isinToFundId[f.isin.toUpperCase()] = f.id; });
+
+        function qtyAtDate(history, dateStr){
+          if (!history || !history.length || !dateStr) return null;
+          const target = new Date(dateStr+'T00:00:00Z');
+          let best = null;
+          for (const h of history){
+            const hd = new Date(h.date+'T00:00:00Z');
+            if (hd <= target && (best===null || hd > new Date(best.date+'T00:00:00Z'))) best = h;
+          }
+          return best ? best.qty : null;
+        }
+
+        let unitsFilled = 0, unitsSkippedNoIsin = 0;
+        parsed.positions.forEach(pos=>{
+          const isin = (pos.isin||'').toUpperCase();
+          if (!isin || !isinToFundId[isin]) { if(pos.isin) unitsSkippedNoIsin++; return; }
+          const fundId = isinToFundId[isin];
+          state.entries.filter(en=>en.fundId===fundId).forEach(entry=>{
+            const q = qtyAtDate(pos.history, entry.rateDate);
+            if (q !== null){ entry.units = q; unitsFilled++; }
+          });
+        });
+
+        const eurGainsByYear = {};
+        const skippedCurrencies = new Set();
+        parsed.realizedGains.forEach(rg=>{
+          if (rg.currency === 'EUR'){
+            eurGainsByYear[rg.year] = (eurGainsByYear[rg.year]||0) + rg.gain;
+          } else {
+            skippedCurrencies.add(rg.currency);
+          }
+        });
+        Object.keys(eurGainsByYear).forEach(year=>{
+          const y = parseInt(year,10);
+          state.income[y] = state.income[y] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0};
+          state.income[y].otherCapital = num(state.income[y].otherCapital) + eurGainsByYear[year];
+        });
+
+        onChange();
+        renderEntries(); renderIncome(); renderResults();
+        let msg = `Import fertig: Anteile in ${unitsFilled} Meldejahr(en) automatisch befüllt.`;
+        if (Object.keys(eurGainsByYear).length){
+          msg += `\nRealisierte EUR-Gewinne zu "sonstige Kapitalerträge" hinzugefügt: ${Object.keys(eurGainsByYear).map(y=>y+': '+fmt(eurGainsByYear[y])+' €').join(', ')}.`;
+        }
+        if (skippedCurrencies.size){
+          msg += `\n\nNicht automatisch hinzugefügt (Fremdwährung, noch keine Umrechnung): ${Array.from(skippedCurrencies).join(', ')} — bitte diese Gewinne manuell in EUR umrechnen und unter "3 Einkommen" ergänzen.`;
+        }
+        if (unitsSkippedNoIsin){
+          msg += `\n\n${unitsSkippedNoIsin} Position(en) im Depot-Tool hatten keine passende ISIN bei den hier erfassten Fonds — dafür wurden keine Anteile übernommen.`;
+        }
+        alert(msg);
+      }catch(err){
+        alert('Diese Datei konnte nicht gelesen werden. Bitte die JSON-Datei aus dem Depot-Kostenbasis-Rechner wählen.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  document.getElementById('fetch-all-fx-btn').addEventListener('click', async (e)=>{
+    const btn = e.target;
+    const targets = state.entries.filter(en => en.currency && en.currency !== 'EUR' && en.rateDate);
+    if (targets.length === 0){
+      alert('Keine Fremdwährungs-Einträge mit Meldedatum gefunden. Trag zuerst Währung und Meldedatum bei den betreffenden Jahren ein.');
+      return;
+    }
+    btn.disabled = true;
+    let ok = 0, fail = 0;
+    for (const entry of targets){
+      btn.textContent = `Lade Kurse … (${ok+fail+1}/${targets.length})`;
+      const result = await fetchFxRate(entry);
+      if (result.ok) ok++; else fail++;
+      await new Promise(r=>setTimeout(r, 120));
+    }
+    btn.disabled = false;
+    btn.textContent = '↻ Alle fehlenden EZB-Kurse abrufen';
+    onChange();
+    renderEntries();
+    alert(`Fertig: ${ok} Kurs(e) abgerufen${fail ? ', ' + fail + ' fehlgeschlagen (bitte manuell prüfen)' : ''}.`);
+  });
+
+  // ---------- Init ----------
+  (async function init(){
+    await loadState();
+    renderFunds();
+    renderEntries();
+    renderIncome();
+    renderResults();
+    renderTariff();
+  })();
+
+})();
+</script>
+</body>
+</html>

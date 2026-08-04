@@ -1,0 +1,12 @@
+{
+  "name": "meldefonds-oekb-scraper",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scheduled scraper for OeKB Meldefonds tax data, feeding the Meldefonds-Rechner.",
+  "scripts": {
+    "scrape": "node scripts/scrape-oekb.js data/isins.txt data/oekb-data.json 2020"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

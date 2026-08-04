@@ -1,0 +1,4 @@
+# One ISIN per line. Lines starting with # are ignored.
+# Replace these with your actual funds.
+IE00BK5BQT80
+IE00B3RBWM25

@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Depot-Kostenbasis-Rechner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#1A2B29; --paper:#EEF1EC; --surface:#FFFFFF;
+    --brass:#8B6F2E; --brass-deep:#6E5722; --teal:#2F6F62; --teal-bg:#E4EEEA;
+    --brick:#9C4A3C; --brick-bg:#F5E6E2; --hairline:#CBC4B3; --muted:#69726A;
+  }
+  *{box-sizing:border-box;}
+  body{background:var(--paper); color:var(--ink); font-family:'IBM Plex Sans', sans-serif; font-size:15px; line-height:1.5; margin:0; padding-bottom:60px;}
+  h1,h2,h3{font-family:'Source Serif 4', serif; font-weight:600; margin:0;}
+  .num{font-family:'IBM Plex Mono', monospace; font-variant-numeric:tabular-nums;}
+  .masthead{background:var(--ink); color:var(--paper); padding:28px 24px 22px; border-bottom:4px solid var(--brass);}
+  .masthead-inner{max-width:1000px; margin:0 auto;}
+  .eyebrow{font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#C9A227; margin-bottom:6px;}
+  .masthead h1{font-size:26px; color:#F7F4EC;}
+  .masthead p{margin:6px 0 0; color:#B9C2BC; font-size:14px; max-width:680px;}
+  .wrap{max-width:1000px; margin:0 auto; padding:0 24px;}
+  .tabs{display:flex; gap:4px; margin-top:22px; border-bottom:1px solid var(--hairline); flex-wrap:wrap;}
+  .tab{font-family:'IBM Plex Mono', monospace; font-size:12.5px; padding:10px 16px; cursor:pointer; color:var(--muted); border-bottom:2px solid transparent;}
+  .tab.active{color:var(--ink); border-bottom-color:var(--brass); font-weight:600;}
+  .panel{display:none; padding:26px 0 10px;}
+  .panel.active{display:block;}
+  .card{background:var(--surface); border:1px solid var(--hairline); border-radius:6px; padding:18px 20px; margin-bottom:16px;}
+  .card h2{font-size:17px; margin-bottom:4px;}
+  .card .sub{color:var(--muted); font-size:13px; margin-bottom:14px;}
+  .help-box{background:var(--teal-bg); border:1px solid #C7DAD2; border-radius:6px; padding:14px 16px; font-size:13px; color:#1F4A3F; margin-bottom:16px;}
+  .help-box b{color:var(--teal);}
+  .warn-box{background:var(--brick-bg); border:1px solid #E3C3BA; border-radius:6px; padding:14px 16px; font-size:13px; color:#6E2E22; margin-bottom:16px;}
+  button{font-family:'IBM Plex Sans', sans-serif; font-weight:600; font-size:13px; border:1px solid var(--ink); background:var(--ink); color:var(--paper); padding:9px 16px; border-radius:4px; cursor:pointer;}
+  button.ghost{background:transparent; color:var(--ink); border-color:var(--hairline);}
+  button.small{padding:5px 10px; font-size:12px;}
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:600; padding:6px 8px; border-bottom:1px solid var(--hairline);}
+  td{padding:6px 8px; border-bottom:1px solid #EEEAE0; vertical-align:middle;}
+  td input{width:110px; padding:5px 7px; font-family:'IBM Plex Mono', monospace; font-size:12.5px; border:1px solid var(--hairline); border-radius:4px;}
+  .drop{border:2px dashed var(--hairline); border-radius:8px; padding:30px; text-align:center; color:var(--muted); cursor:pointer;}
+  .drop.drag{border-color:var(--brass); background:#FBF8F0;}
+  .pos{color:var(--teal); font-weight:600;}
+  .neg{color:var(--brick); font-weight:600;}
+  .empty{text-align:center; padding:30px 10px; color:var(--muted); font-size:13.5px;}
+  .badge{display:inline-block; font-size:10.5px; padding:2px 7px; border-radius:10px; background:#EDE7D6; color:var(--brass-deep); font-weight:600; margin-left:6px;}
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div class="masthead-inner">
+    <div class="eyebrow">Österreich · Wertpapier-Kostenbasis</div>
+    <h1>Depot-Kostenbasis-Rechner <span style="font-size:13px; font-weight:400; color:#B9C2BC;">/ Portfolio Cost-Basis Calculator</span></h1>
+    <p>Liest deine Portfolio-Slicer-Transaktionen ein und berechnet den gleitenden Durchschnittspreis je Depot — inklusive realisierter Gewinne/Verluste, Step-Up bei Zuzug, und optionaler Zusammenfassung von Unterkonten.<br><i>Reads your Portfolio Slicer transactions and computes the moving average cost basis per depot — including realized gains/losses, the Austrian residency step-up, and optional merging of sub-accounts.</i></p>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="tabs">
+    <div class="tab active" data-tab="import"><span class="num">1</span> Import</div>
+    <div class="tab" data-tab="settings"><span class="num">2</span> Einstellungen <span style="opacity:.6;">/ Settings</span></div>
+    <div class="tab" data-tab="mapping"><span class="num">3</span> ISIN-Zuordnung <span style="opacity:.6;">/ ISIN mapping</span></div>
+    <div class="tab" data-tab="results"><span class="num">4</span> Ergebnis <span style="opacity:.6;">/ Result</span></div>
+  </div>
+
+  <div class="panel active" id="panel-import">
+    <div class="help-box">
+      Lade deine Portfolio-Slicer-Datei (.xlsx) hoch. Die Sheets <b>„Transactions"</b> und <b>„Accounts"</b> werden automatisch erkannt — auch wenn sich die Zeilenanzahl seit deinem letzten Export geändert hat.
+      <p style="margin:10px 0 0; font-style:italic; color:#3d6b5e;">Upload your Portfolio Slicer file (.xlsx). The "Transactions" and "Accounts" sheets are auto-detected, even if the row count has changed since your last export.</p>
+    </div>
+    <div class="card">
+      <div class="drop" id="dropzone">
+        📂 Datei hierher ziehen oder klicken zum Auswählen
+        <input type="file" id="file-input" accept=".xlsx" style="display:none;">
+      </div>
+    </div>
+    <div id="import-summary"></div>
+
+    <div class="card">
+      <h2>Manuell hinzufügen <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Add manually</span></h2>
+      <div class="sub">Für Käufe/Verkäufe außerhalb von Portfolio Slicer, oder wenn du keine Excel-Datei nutzt. / For buys/sells outside Portfolio Slicer, or if you don't use a spreadsheet at all.</div>
+      <div class="row" style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-bottom:10px;">
+        <div style="flex:1; min-width:130px;">
+          <label style="font-size:11px; color:var(--muted);">Konto / Account</label>
+          <input type="text" id="man-account" placeholder="z. B. TradeRepublic-EUR" list="known-accounts-list">
+          <datalist id="known-accounts-list"></datalist>
+        </div>
+        <div style="width:110px;">
+          <label style="font-size:11px; color:var(--muted);">Whg. / Ccy</label>
+          <select id="man-currency"><option>EUR</option><option>USD</option><option>GBP</option><option>CHF</option><option>HUF</option><option>Other</option></select>
+        </div>
+        <div style="width:110px;">
+          <label style="font-size:11px; color:var(--muted);">Broker (Gruppe)</label>
+          <input type="text" id="man-portfolio" placeholder="z. B. TradeRepublic">
+        </div>
+        <div style="width:140px;">
+          <label style="font-size:11px; color:var(--muted);">Datum / Date</label>
+          <input type="date" id="man-date">
+        </div>
+        <div style="width:150px;">
+          <label style="font-size:11px; color:var(--muted);">Art / Type</label>
+          <select id="man-type">
+            <option value="Buy">Kauf / Buy</option>
+            <option value="Sell">Verkauf / Sell</option>
+            <option value="SymbolTransferIn">Zugang (Übertrag) / Transfer in</option>
+            <option value="SymbolTransferOut">Abgang (Übertrag) / Transfer out</option>
+          </select>
+        </div>
+        <div style="width:130px;">
+          <label style="font-size:11px; color:var(--muted);">Symbol/ISIN</label>
+          <input type="text" id="man-symbol" placeholder="VWCE.DE">
+        </div>
+        <div style="width:100px;">
+          <label style="font-size:11px; color:var(--muted);">Menge / Qty</label>
+          <input type="number" step="0.0001" id="man-qty">
+        </div>
+        <div style="width:110px;">
+          <label style="font-size:11px; color:var(--muted);">Preis/Stk. / Price</label>
+          <input type="number" step="0.0001" id="man-price">
+        </div>
+        <div><button id="man-add-btn">+ Hinzufügen / Add</button></div>
+      </div>
+      <div id="manual-entries-table"></div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-settings">
+    <div class="help-box">
+      <b>Step-Up bei Zuzug (§ 27 Abs. 6 Z 1 lit e EStG 1988):</b> Für alle Positionen, die du an deinem Zuzugsdatum bereits gehalten hast, wird die Kostenbasis auf den <b>gemeinen Wert (Verkehrswert)</b> zu diesem Datum "aufgewertet" — Wertsteigerungen davor sind für Österreich nicht steuerpflichtig. Transaktionen vor dem Zuzug fließen nur in die Mengenermittlung ein, nicht in die Kostenbasis.
+      <p style="margin:10px 0 0; font-style:italic; color:#3d6b5e;">Step-up on becoming an Austrian tax resident (Section 27 para. 6 no. 1 lit e Income Tax Act): for any position you already held on your arrival date, the cost basis is stepped up to fair market value (gemeiner Wert) on that date, so gains from before then are not taxable in Austria. Transactions before arrival only affect quantity tracking, not cost basis.</p>
+    </div>
+    <div class="card">
+      <h2>Zuzugsdatum <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Date you became an Austrian tax resident</span></h2>
+      <input type="date" id="stepup-date" style="max-width:200px;">
+      <div class="sub" style="margin-top:6px;">Für jede zu diesem Datum gehaltene Position brauchst du im nächsten Schritt den gemeinen Wert pro Stück.</div>
+    </div>
+    <div class="card">
+      <h2>Depotübertragungen <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Depot transfers</span></h2>
+      <label style="display:flex; align-items:center; gap:8px; font-size:13.5px; margin-bottom:10px;">
+        <input type="checkbox" id="transfer-match-toggle">
+        Es gab (oder wird geben) echte Depotübertragungen zwischen Konten, die keine Verkäufe waren — Zuordnung anhand Symbol+Menge+Datum aktivieren
+      </label>
+      <div class="sub">Standardmäßig aus: jeder Abgang zählt als Verkauf, jeder Zugang als Kauf zum verzeichneten Preis — passend für tatsächliche Verkäufe/Rückkäufe. Nur aktivieren, wenn wirklich Wertpapiere unverändert von einem Depot ins andere gewandert sind.</div>
+    </div>
+    <div class="card">
+      <h2>Konten zusammenfassen <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Merge accounts</span></h2>
+      <label style="display:flex; align-items:center; gap:8px; font-size:13.5px; margin-bottom:10px;">
+        <input type="checkbox" id="group-broker-toggle" checked>
+        Unterkonten desselben Brokers (gleiche Währung) zu einer Kostenbasis zusammenfassen
+      </label>
+      <div class="sub">Für z. B. mehrere aufgelöste TBSZ-Unterkonten, die beim selben Broker zusammengeführt wurden. Gruppiert nach Broker + Kontowährung (nicht nach Broker allein, damit USD und EUR getrennt bleiben). Diese Zusammenfassung selbst würde ich trotzdem von deinem Steuerberater bestätigen lassen — grenzüberschreitende TBSZ-Fälle sind kein Standardfall.</div>
+    </div>
+    <div class="card" id="stepup-values-card" style="display:none;">
+      <h2>Gemeiner Wert am Zuzugsdatum <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Fair market value on arrival date</span></h2>
+      <div class="sub">Für jede Position, die du zu diesem Zeitpunkt gehalten hast. Vorgeschlagene Werte (letzter bekannter Transaktionspreis vor dem Zuzug) sind nur ein Ausgangspunkt — bitte durch den tatsächlichen Kurswert an diesem Tag ersetzen (z. B. von deinem Broker oder einer Finanzseite).</div>
+      <div id="stepup-values-table"></div>
+    </div>
+    <div style="text-align:right;"><button id="apply-settings-btn">Anwenden & neu berechnen</button></div>
+  </div>
+
+  <div class="panel" id="panel-mapping">
+    <div class="help-box">
+      Für welche Symbole willst du die OeKB-Meldedaten (ausschüttungsgleiche Erträge) später zuordnen? Trag hier die ISIN ein — bei Symbolen, die dich nur für Kostenbasis/Gewinne interessieren, kannst du die ISIN leer lassen.
+      <p style="margin:10px 0 0; font-style:italic; color:#3d6b5e;">Which symbols do you want to later match to OeKB reporting data (deemed distributed income)? Enter the ISIN here; for symbols you only care about for cost basis or gains, you can leave the ISIN blank.</p>
+    </div>
+    <div class="card"><div id="mapping-table"></div></div>
+  </div>
+
+  <div class="panel" id="panel-results">
+    <div id="results-content"></div>
+  </div>
+
+  <div class="save-row" style="margin-top:18px; display:flex; gap:10px;">
+    <button class="ghost small" id="export-btn">⭳ Ergebnis als JSON exportieren</button>
+  </div>
+</div>
+
+<div class="wrap" style="margin-top:20px; color:var(--muted); font-size:12px; line-height:1.6;">
+  Annahmen: gleitender Durchschnittspreis je Depot (Account), ohne Anschaffungsnebenkosten (Gebühren) in der Kostenbasis, wie gesetzlich vorgesehen. Depotinterne Übertragungen zwischen deinen eigenen Konten werden anhand von Symbol + Menge + Datum (±5 Tage) einander zugeordnet und übernehmen die ursprüngliche Kostenbasis. Nicht zugeordnete Abgänge werden als Verkauf, nicht zugeordnete Zugänge als Kauf zum verzeichneten Preis behandelt — bitte stichprobenartig prüfen. Beträge bleiben vorerst in der jeweiligen Kontowährung; EUR-Umrechnung folgt mit der gehosteten Version.
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  let state = {
+    transactions: [],
+    accounts: {},
+    symbolMap: {},
+    results: null,
+    stepUpDate: null,
+    groupByBroker: true,
+    transferMatchMode: false,
+    stepUpValues: {} // groupKey|symbol -> FMV per unit (EUR/account-currency)
+  };
+
+  function num(v){ const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+  function fmt(n){ if (isNaN(n)) n = 0; return n.toLocaleString('de-AT', {minimumFractionDigits:2, maximumFractionDigits:4}); }
+  function daysBetween(a,b){ return Math.abs((a-b)/86400000); }
+
+  // ---------- Import ----------
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('file-input');
+  dropzone.addEventListener('click', ()=>fileInput.click());
+  dropzone.addEventListener('dragover', e=>{e.preventDefault(); dropzone.classList.add('drag');});
+  dropzone.addEventListener('dragleave', ()=>dropzone.classList.remove('drag'));
+  dropzone.addEventListener('drop', e=>{
+    e.preventDefault(); dropzone.classList.remove('drag');
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', e=>{ if (e.target.files.length) handleFile(e.target.files[0]); });
+
+  let manualCounter = 0;
+
+  function renderKnownAccountsDatalist(){
+    const dl = document.getElementById('known-accounts-list');
+    dl.innerHTML = Object.keys(state.accounts).map(a=>`<option value="${a}">`).join('');
+  }
+
+  function renderManualEntriesTable(){
+    const el = document.getElementById('manual-entries-table');
+    const manual = state.transactions.filter(t=>t.manual);
+    if (manual.length === 0){ el.innerHTML = ''; return; }
+    el.innerHTML = `
+      <table>
+        <thead><tr><th>Datum</th><th>Konto</th><th>Art</th><th>Symbol</th><th>Menge</th><th>Preis</th><th></th></tr></thead>
+        <tbody>
+          ${manual.map(t=>`
+            <tr>
+              <td>${t.date ? t.date.toISOString().slice(0,10) : '—'}</td>
+              <td>${t.account}</td>
+              <td>${t.transType}</td>
+              <td class="num">${t.symbol}</td>
+              <td class="num">${fmt(t.qty)}</td>
+              <td class="num">${fmt(t.price)}</td>
+              <td><button class="ghost small" data-del-manual="${t.manualId}">✕</button></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+    el.querySelectorAll('[data-del-manual]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        state.transactions = state.transactions.filter(t=>t.manualId !== btn.dataset.delManual);
+        renderManualEntriesTable();
+        if (state.transactions.length) runEngine();
+      });
+    });
+  }
+
+  document.getElementById('man-add-btn').addEventListener('click', ()=>{
+    const account = document.getElementById('man-account').value.trim();
+    const currency = document.getElementById('man-currency').value;
+    const portfolio = document.getElementById('man-portfolio').value.trim() || account;
+    const dateStr = document.getElementById('man-date').value;
+    const transType = document.getElementById('man-type').value;
+    const symbol = document.getElementById('man-symbol').value.trim();
+    const qty = num(document.getElementById('man-qty').value);
+    const price = num(document.getElementById('man-price').value);
+
+    if (!account || !dateStr || !symbol || !qty){
+      alert('Bitte mindestens Konto, Datum, Symbol und Menge ausfüllen. / Please fill in at least account, date, symbol, and quantity.');
+      return;
+    }
+    if (!state.accounts[account]){
+      state.accounts[account] = { currency, portfolio };
+    }
+    manualCounter++;
+    state.transactions.push({
+      account, date: new Date(dateStr+'T00:00:00Z'), transType, symbol, qty, price, fee:0, totalAmnt: qty*price,
+      rowIndex: 1000000 + manualCounter, manual: true, manualId: 'm'+manualCounter
+    });
+
+    ['man-date','man-symbol','man-qty','man-price'].forEach(id=>document.getElementById(id).value='');
+    renderKnownAccountsDatalist();
+    renderManualEntriesTable();
+
+    const symbols = Object.keys(state.symbolMap);
+    if (!symbols.includes(symbol)) state.symbolMap[symbol] = '';
+    renderMappingTable();
+    runEngine();
+  });
+
+  function findHeaderRow(rows, requiredCols){
+
+    for (let i=0;i<Math.min(rows.length,40);i++){
+      const row = (rows[i]||[]).map(c=>String(c||'').trim());
+      const hasAll = requiredCols.every(rc => row.includes(rc));
+      if (hasAll) return i;
+    }
+    return -1;
+  }
+
+  function sheetToRows(ws){
+    return XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+  }
+
+  function excelDateToJS(v){
+    if (v instanceof Date) return v;
+    if (typeof v === 'number'){
+      const d = XLSX.SSF.parse_date_code(v);
+      return new Date(Date.UTC(d.y, d.m-1, d.d));
+    }
+    if (typeof v === 'string'){
+      const parsed = new Date(v);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return null;
+  }
+
+  function handleFile(file){
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(e.target.result, {type:'array', cellDates:false});
+        const transSheetName = wb.SheetNames.find(n => /trans/i.test(n)) || wb.SheetNames[0];
+        const accSheetName = wb.SheetNames.find(n => /account/i.test(n));
+
+        // --- Transactions ---
+        const transRows = sheetToRows(wb.Sheets[transSheetName]);
+        const tHeaderIdx = findHeaderRow(transRows, ['Account','Date','TransType','Symbol','Qty','Price']);
+        if (tHeaderIdx === -1) throw new Error('Transactions-Header nicht gefunden (erwarte u.a. Account, Date, TransType, Symbol, Qty, Price).');
+        const tHeader = transRows[tHeaderIdx].map(c=>String(c||'').trim());
+        const ti = name => tHeader.indexOf(name);
+        const transactions = [];
+        for (let r=tHeaderIdx+1; r<transRows.length; r++){
+          const row = transRows[r];
+          if (!row || row.every(c=>c===null || c==='')) continue;
+          const account = row[ti('Account')];
+          if (!account) continue;
+          const dateRaw = row[ti('Date')];
+          const date = excelDateToJS(dateRaw);
+          transactions.push({
+            account: String(account).trim(),
+            date: date,
+            transType: String(row[ti('TransType')]||'').trim(),
+            symbol: String(row[ti('Symbol')]||row[ti('SymbolName')]||'').trim(),
+            qty: num(row[ti('Qty')]),
+            price: num(row[ti('Price')]),
+            fee: num(row[ti('Fee')] || 0),
+            totalAmnt: num(row[ti('TotalAmnt')] || 0),
+            rowIndex: r
+          });
+        }
+
+        // --- Accounts ---
+        const accounts = {};
+        if (accSheetName){
+          const accRows = sheetToRows(wb.Sheets[accSheetName]);
+          const aHeaderIdx = findHeaderRow(accRows, ['Account','Currency','Active']);
+          if (aHeaderIdx !== -1){
+            const aHeader = accRows[aHeaderIdx].map(c=>String(c||'').trim());
+            const ai = name => aHeader.indexOf(name);
+            for (let r=aHeaderIdx+1; r<accRows.length; r++){
+              const row = accRows[r];
+              if (!row || !row[ai('Account')]) continue;
+              // stop at first fully-empty row (end of the small Account table)
+              if (row[ai('Account')]===null) break;
+              accounts[String(row[ai('Account')]).trim()] = {
+                currency: String(row[ai('Currency')]||'EUR').trim(),
+                portfolio: String(row[ai('Portfolio')]||row[ai('Account')]).trim()
+              };
+            }
+          }
+        }
+
+        state.transactions = transactions;
+        const manualExisting = state.transactions.filter(t=>t.manual);
+        state.transactions = transactions.concat(manualExisting);
+        state.accounts = Object.assign({}, accounts, state.accounts); // keep any manually-added account defs too
+
+        // seed symbol map
+        const symbols = Array.from(new Set(transactions.map(t=>t.symbol).filter(s=>s && s!=='* Cash')));
+        symbols.forEach(s => { if (!(s in state.symbolMap)) state.symbolMap[s] = ''; });
+
+        renderImportSummary(transSheetName, accSheetName, transactions, accounts, symbols);
+        renderMappingTable();
+        renderKnownAccountsDatalist();
+        renderManualEntriesTable();
+        runEngine();
+      } catch(err){
+        document.getElementById('import-summary').innerHTML =
+          `<div class="warn-box"><b>Import fehlgeschlagen:</b> ${err.message}</div>`;
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function renderImportSummary(transSheet, accSheet, transactions, accounts, symbols){
+    const el = document.getElementById('import-summary');
+    const dates = transactions.map(t=>t.date).filter(Boolean);
+    const minD = dates.length ? new Date(Math.min(...dates)) : null;
+    const maxD = dates.length ? new Date(Math.max(...dates)) : null;
+    el.innerHTML = `
+      <div class="card">
+        <h2>Import erfolgreich ✓</h2>
+        <div class="sub">Sheet "${transSheet}"${accSheet ? ' · Sheet "'+accSheet+'"' : ' · kein Accounts-Sheet gefunden (Währung default EUR)'}</div>
+        <div class="figures" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+          <div><div class="num" style="font-size:22px;">${transactions.length}</div><div style="color:var(--muted); font-size:12px;">Transaktionen</div></div>
+          <div><div class="num" style="font-size:22px;">${Object.keys(accounts).length || new Set(transactions.map(t=>t.account)).size}</div><div style="color:var(--muted); font-size:12px;">Konten</div></div>
+          <div><div class="num" style="font-size:22px;">${symbols.length}</div><div style="color:var(--muted); font-size:12px;">Symbole</div></div>
+        </div>
+        ${minD ? `<div style="margin-top:10px; font-size:12.5px; color:var(--muted);">Zeitraum: ${minD.toISOString().slice(0,10)} – ${maxD.toISOString().slice(0,10)}</div>` : ''}
+      </div>
+    `;
+  }
+
+  function renderMappingTable(){
+    const el = document.getElementById('mapping-table');
+    const symbols = Object.keys(state.symbolMap).sort();
+    if (symbols.length === 0){
+      el.innerHTML = '<div class="empty">Noch keine Datei importiert.</div>';
+      return;
+    }
+    el.innerHTML = `
+      <table>
+        <thead><tr><th>Symbol</th><th>ISIN (optional)</th></tr></thead>
+        <tbody>
+          ${symbols.map(s=>`
+            <tr>
+              <td class="num">${s}</td>
+              <td><input type="text" class="isin-input" data-symbol="${s}" value="${state.symbolMap[s]||''}" placeholder="z. B. IE00B..."></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+    el.querySelectorAll('.isin-input').forEach(inp=>{
+      inp.addEventListener('input', ()=>{
+        state.symbolMap[inp.dataset.symbol] = inp.value.trim().toUpperCase();
+      });
+    });
+  }
+
+  // ---------- Engine ----------
+  function groupKeyFor(account){
+    const meta = state.accounts[account] || {};
+    if (state.groupByBroker && meta.portfolio){
+      return meta.portfolio + '|' + (meta.currency||'EUR');
+    }
+    return account;
+  }
+
+  function runEngine(){
+    const transactions = state.transactions.slice()
+      .filter(t => t.date)
+      .sort((a,b)=> {
+        if (a.date - b.date !== 0) return a.date - b.date;
+        const rank = t => t.transType === 'SymbolTransferOut' ? 0 : (t.transType === 'SymbolTransferIn' ? 1 : 0.5);
+        if (rank(a) !== rank(b)) return rank(a) - rank(b);
+        return a.rowIndex - b.rowIndex;
+      });
+
+    const stepUpDate = state.stepUpDate ? new Date(state.stepUpDate+'T00:00:00Z') : null;
+    const positions = {};      // groupKey|symbol -> {groupKey, symbol, currency, qty, totalCost}
+    const pendingOut = [];     // only used if transferMatchMode is on
+    const realized = [];
+    const notes = [];
+    const stepUpCandidates = {}; // groupKey|symbol -> {qtyAtStepUp, lastKnownPrice}
+
+    function getPos(groupKey, symbol, currency){
+      const key = groupKey+'|'+symbol;
+      if (!positions[key]) positions[key] = { groupKey, symbol, currency, qty:0, totalCost:0, history:[] };
+      return positions[key];
+    }
+
+    for (const t of transactions){
+      if (!t.symbol || t.symbol === '* Cash') continue;
+      const groupKey = groupKeyFor(t.account);
+      const currency = (state.accounts[t.account]||{}).currency || 'EUR';
+      const pos = getPos(groupKey, t.symbol, currency);
+      const type = t.transType;
+      const isPreStepUp = stepUpDate && t.date < stepUpDate;
+
+      // --- Pre-step-up: track quantity only, no cost/gain impact (foreign-residency period) ---
+      if (isPreStepUp){
+        if (type==='Buy'||type==='BuyTA'||type==='DRIP'||type==='DripTA'||type==='SymbolTransferIn'){
+          pos.qty += t.qty;
+        } else if (type==='Sell'||type==='SellTA'||type==='SymbolTransferOut'||type==='SymbolTransferOutAsSale'){
+          pos.qty -= t.qty;
+        } else if (type==='Split'){
+          pos.qty += t.qty;
+        }
+        // remember last seen price as a rough step-up suggestion
+        const skey = groupKey+'|'+t.symbol;
+        stepUpCandidates[skey] = { qtyAtStepUp: pos.qty, lastKnownPrice: t.price, currency };
+        pos.history.push({date: t.date, qty: pos.qty});
+        continue;
+      }
+
+      // --- At/after step-up: apply step-up basis once per group+symbol, then normal ledger ---
+      const skey = groupKey+'|'+t.symbol;
+      if (stepUpDate && stepUpCandidates[skey] && !stepUpCandidates[skey]._applied){
+        const cand = stepUpCandidates[skey];
+        const fmv = state.stepUpValues[skey];
+        pos.qty = cand.qtyAtStepUp;
+        pos.totalCost = cand.qtyAtStepUp * (fmv !== undefined && fmv !== null && fmv !== '' ? num(fmv) : cand.lastKnownPrice);
+        if (fmv === undefined || fmv === null || fmv === '' ) {
+          notes.push(`${t.symbol} (${groupKey}): kein gemeiner Wert zum Zuzugsdatum eingetragen — vorläufig letzter bekannter Preis (${fmt(cand.lastKnownPrice)}) verwendet. Bitte in "2 Einstellungen" korrigieren.`);
+        }
+        cand._applied = true;
+      } else if (stepUpDate && !stepUpCandidates[skey]){
+        stepUpCandidates[skey] = {_applied:true}; // no pre-history: position originates after step-up, nothing to do
+      }
+
+      if (type==='Buy' || type==='BuyTA' || type==='DRIP' || type==='DripTA'){
+        pos.qty += t.qty;
+        pos.totalCost += t.qty * t.price;
+      } else if (type==='Sell' || type==='SellTA'){
+        const avg = pos.qty>0 ? pos.totalCost/pos.qty : 0;
+        const costBasisUsed = t.qty * avg;
+        const proceeds = t.qty * t.price;
+        realized.push({date:t.date, account:t.account, groupKey, symbol:t.symbol, qty:t.qty, proceeds, costBasis:costBasisUsed, gain:proceeds-costBasisUsed, currency:pos.currency, kind:'Verkauf'});
+        pos.qty -= t.qty;
+        pos.totalCost -= costBasisUsed;
+      } else if (type==='NotionalDistrib'){
+        pos.totalCost += t.qty * t.price;
+      } else if (type==='ReturnOfCapital'){
+        pos.totalCost -= t.qty * t.price;
+      } else if (type==='Split'){
+        pos.qty += t.qty;
+      } else if (type==='SymbolTransferOut' || type==='SymbolTransferOutAsSale'){
+        if (state.transferMatchMode){
+          const avg = pos.qty>0 ? pos.totalCost/pos.qty : 0;
+          const carried = t.qty * avg;
+          pendingOut.push({symbol:t.symbol, qty:t.qty, date:t.date, fromGroupKey:groupKey, fromAccount:t.account, carried, matched:false, price:t.price, currency:pos.currency});
+          pos.qty -= t.qty;
+          pos.totalCost -= carried;
+        } else {
+          const avg = pos.qty>0 ? pos.totalCost/pos.qty : 0;
+          const costBasisUsed = t.qty * avg;
+          const proceeds = t.qty * t.price;
+          realized.push({date:t.date, account:t.account, groupKey, symbol:t.symbol, qty:t.qty, proceeds, costBasis:costBasisUsed, gain:proceeds-costBasisUsed, currency:pos.currency, kind:'Verkauf (Depotabgang)'});
+          pos.qty -= t.qty;
+          pos.totalCost -= costBasisUsed;
+        }
+      } else if (type==='SymbolTransferIn'){
+        if (state.transferMatchMode){
+          const match = pendingOut.find(p => !p.matched && p.symbol===t.symbol && Math.abs(p.qty - t.qty) < 0.0005 && daysBetween(p.date, t.date) <= 5);
+          if (match){
+            match.matched = true;
+            if (match.currency !== pos.currency){
+              notes.push(`Übertrag ${t.symbol} (${t.date.toISOString().slice(0,10)}): unterschiedliche Kontowährungen — Kostenbasis ohne Umrechnung übernommen, bitte prüfen.`);
+            }
+            pos.qty += t.qty;
+            pos.totalCost += match.carried;
+          } else {
+            pos.qty += t.qty;
+            pos.totalCost += t.qty * t.price;
+          }
+        } else {
+          pos.qty += t.qty;
+          pos.totalCost += t.qty * t.price;
+        }
+      }
+      pos.history.push({date: t.date, qty: pos.qty});
+    }
+
+    if (state.transferMatchMode){
+      pendingOut.filter(p=>!p.matched).forEach(p=>{
+        realized.push({date:p.date, account:p.fromAccount, groupKey:p.fromGroupKey, symbol:p.symbol, qty:p.qty, proceeds:p.qty*p.price, costBasis:p.carried, gain:(p.qty*p.price)-p.carried, currency:p.currency, kind:'Übertrag ohne Gegenbuchung (als Verkauf gewertet)'});
+      });
+    }
+
+    // Positions with pre-history that were never touched after step-up date still need the basis applied
+    if (stepUpDate){
+      Object.keys(stepUpCandidates).forEach(skey=>{
+        const cand = stepUpCandidates[skey];
+        if (cand._applied) return;
+        const [groupKey, symbol] = skey.split('|');
+        const fmv = state.stepUpValues[skey];
+        const pos = getPos(groupKey, symbol, cand.currency);
+        pos.qty = cand.qtyAtStepUp;
+        pos.totalCost = cand.qtyAtStepUp * (fmv !== undefined && fmv !== null && fmv !== '' ? num(fmv) : cand.lastKnownPrice);
+        if ((fmv === undefined || fmv === null || fmv === '') && Math.abs(cand.qtyAtStepUp) > 0.0001){
+          notes.push(`${symbol} (${groupKey}): kein gemeiner Wert zum Zuzugsdatum eingetragen — vorläufig letzter bekannter Preis verwendet. Bitte in "2 Einstellungen" korrigieren.`);
+        }
+      });
+    }
+
+    state.results = { positions, realized, notes, stepUpCandidates };
+    renderStepUpValuesTable();
+    renderResults();
+  }
+
+  function renderStepUpValuesTable(){
+    const card = document.getElementById('stepup-values-card');
+    const el = document.getElementById('stepup-values-table');
+    if (!state.stepUpDate || !state.results){ card.style.display='none'; return; }
+    const cands = Object.entries(state.results.stepUpCandidates).filter(([k,v])=>Math.abs(v.qtyAtStepUp||0)>0.0001);
+    if (cands.length === 0){ card.style.display='none'; return; }
+    card.style.display='block';
+    el.innerHTML = `
+      <table>
+        <thead><tr><th>Gruppe</th><th>Symbol</th><th>Menge am Zuzugsdatum</th><th>Vorschlag (letzter Preis)</th><th>Gemeiner Wert/Stück (eintragen)</th></tr></thead>
+        <tbody>
+          ${cands.map(([key,v])=>{
+            const [groupKey,symbol] = key.split('|');
+            return `
+            <tr>
+              <td>${groupKey}</td>
+              <td class="num">${symbol}</td>
+              <td class="num">${fmt(v.qtyAtStepUp)}</td>
+              <td class="num" style="color:var(--muted);">${fmt(v.lastKnownPrice)}</td>
+              <td><input type="number" step="0.0001" class="stepup-input" data-key="${key}" value="${state.stepUpValues[key]||''}" placeholder="${fmt(v.lastKnownPrice)}"></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+    el.querySelectorAll('.stepup-input').forEach(inp=>{
+      inp.addEventListener('input', ()=>{ state.stepUpValues[inp.dataset.key] = inp.value; });
+    });
+  }
+
+  function renderResults(){
+    const el = document.getElementById('results-content');
+    if (!state.results){ el.innerHTML = '<div class="card"><div class="empty">Noch keine Daten importiert.</div></div>'; return; }
+    const { positions, realized, notes } = state.results;
+
+    const posRows = Object.values(positions)
+      .filter(p => Math.abs(p.qty) > 0.0001)
+      .sort((a,b)=> a.groupKey.localeCompare(b.groupKey) || a.symbol.localeCompare(b.symbol));
+
+    const posTable = `
+      <div class="card">
+        <h2>Aktuelle Bestände <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Current holdings</span></h2>
+        <div class="sub">Gleitender Durchschnittspreis je ${state.groupByBroker?'Broker (zusammengefasst)':'Depot'}, in Kontowährung.</div>
+        <table>
+          <thead><tr><th>${state.groupByBroker?'Broker':'Konto'}</th><th>Symbol</th><th>ISIN</th><th>Menge</th><th>Ø-Preis/Stück</th><th>Kostenbasis</th><th>Whg.</th></tr></thead>
+          <tbody>
+            ${posRows.map(p=>`
+              <tr>
+                <td>${p.groupKey}</td>
+                <td class="num">${p.symbol}</td>
+                <td class="num" style="color:var(--muted);">${state.symbolMap[p.symbol]||'—'}</td>
+                <td class="num">${fmt(p.qty)}</td>
+                <td class="num">${fmt(p.qty>0 ? p.totalCost/p.qty : 0)}</td>
+                <td class="num">${fmt(p.totalCost)}</td>
+                <td>${p.currency}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    const byYear = {};
+    realized.forEach(r=>{
+      const y = r.date.getUTCFullYear();
+      byYear[y] = byYear[y] || [];
+      byYear[y].push(r);
+    });
+    const years = Object.keys(byYear).sort();
+
+    const realizedTable = realized.length === 0 ? `
+      <div class="card"><div class="empty">Keine realisierten Verkäufe gefunden (alle Zu-/Abgänge konnten als interne Übertragungen einander zugeordnet werden, oder es wurden noch keine Positionen verkauft).</div></div>
+    ` : years.map(y=>{
+      const rows = byYear[y];
+      const totalGain = rows.reduce((s,r)=>s+r.gain,0);
+      return `
+      <div class="card">
+        <h2>${y} <span class="badge">${rows.length} Ereignis(se)</span></h2>
+        <table>
+          <thead><tr><th>Datum</th><th>Konto</th><th>Symbol</th><th>Menge</th><th>Erlös</th><th>Kostenbasis</th><th>Gewinn/Verlust</th><th>Art</th></tr></thead>
+          <tbody>
+            ${rows.map(r=>`
+              <tr>
+                <td>${r.date.toISOString().slice(0,10)}</td>
+                <td>${r.account}</td>
+                <td class="num">${r.symbol}</td>
+                <td class="num">${fmt(r.qty)}</td>
+                <td class="num">${fmt(r.proceeds)} ${r.currency}</td>
+                <td class="num">${fmt(r.costBasis)} ${r.currency}</td>
+                <td class="num ${r.gain>=0?'pos':'neg'}">${fmt(r.gain)} ${r.currency}</td>
+                <td style="font-size:11.5px; color:var(--muted);">${r.kind}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div style="margin-top:8px; text-align:right; font-size:13px;">Summe ${y}: <span class="num ${totalGain>=0?'pos':'neg'}">${fmt(totalGain)}</span></div>
+      </div>
+      `;
+    }).join('');
+
+    const unmatchedCount = realized.filter(r=>r.kind==='Übertrag ohne Gegenbuchung (als Verkauf gewertet)').length;
+    const caveatBox = unmatchedCount ? `
+      <div class="warn-box">
+        <b>Wichtig:</b> ${unmatchedCount} der unten gelisteten Ereignisse sind Abgänge, zu denen keine passende Depot-interne Gegenbuchung gefunden wurde (Übertragungs-Zuordnung ist aktiviert) — sie werden vorsichtshalber als Verkauf gewertet. Bitte stichprobenartig gegen deine echten Kontoauszüge prüfen.
+      </div>
+    ` : '';
+    const notesBox = notes.length ? `<div class="warn-box"><b>Bitte prüfen:</b><ul style="margin:8px 0 0; padding-left:18px;">${notes.map(n=>`<li>${n}</li>`).join('')}</ul></div>` : '';
+
+    el.innerHTML = caveatBox + notesBox + posTable + realizedTable;
+  }
+
+  document.querySelectorAll('.tab').forEach(tab=>{
+    tab.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('panel-'+tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  document.getElementById('export-btn').addEventListener('click', ()=>{
+    if (!state.results){ alert('Bitte zuerst eine Datei importieren.'); return; }
+    const { positions, realized } = state.results;
+    const payload = {
+      generatedAt: new Date().toISOString(),
+      symbolMap: state.symbolMap,
+      stepUpDate: state.stepUpDate,
+      groupByBroker: state.groupByBroker,
+      positions: Object.values(positions).filter(p=>p.history.length>0).map(p=>({
+        group:p.groupKey, symbol:p.symbol, isin: state.symbolMap[p.symbol]||null,
+        qty:p.qty, avgCostPerUnit: p.qty>0 ? p.totalCost/p.qty : 0, totalCost:p.totalCost, currency:p.currency,
+        history: p.history.map(h=>({date: h.date.toISOString().slice(0,10), qty: h.qty}))
+      })),
+      realizedGains: realized.map(r=>({
+        date:r.date.toISOString().slice(0,10), year:r.date.getUTCFullYear(), account:r.account, group:r.groupKey, symbol:r.symbol,
+        isin: state.symbolMap[r.symbol]||null, qty:r.qty, proceeds:r.proceeds, costBasis:r.costBasis, gain:r.gain, currency:r.currency, kind:r.kind
+      }))
+    };
+    const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'depot-kostenbasis-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('apply-settings-btn').addEventListener('click', ()=>{
+    state.stepUpDate = document.getElementById('stepup-date').value || null;
+    state.transferMatchMode = document.getElementById('transfer-match-toggle').checked;
+    state.groupByBroker = document.getElementById('group-broker-toggle').checked;
+    if (state.transactions.length) runEngine();
+  });
+
+})();
+</script>
+</body>
+</html>
