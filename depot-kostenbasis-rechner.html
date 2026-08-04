@@ -139,6 +139,15 @@
       <div class="sub" style="margin-top:6px;">Für jede zu diesem Datum gehaltene Position brauchst du im nächsten Schritt den gemeinen Wert pro Stück.</div>
     </div>
     <div class="card">
+      <h2>Anschaffungskosten-Korrektur (AgE) <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Cost-basis adjustments (deemed distributed income)</span></h2>
+      <div class="sub">Für Fonds mit ausschüttungsgleichen Erträgen (z. B. REITs) muss die Kostenbasis jedes Jahr um den OeKB-Korrekturbetrag angepasst werden — sonst wird beim Verkauf ein falscher (meist zu hoher) Gewinn berechnet. Exportiere die Korrektur-Daten im Meldefonds-Rechner ("Korrektur-Daten für Depot-Rechner exportieren") und importiere sie hier. / For funds with deemed-distributed income (e.g. REITs), the cost basis must be adjusted every year by OeKB's correction amount — otherwise a sale calculates the wrong (usually too high) gain. Export this data from the Meldefonds-Rechner and import it here.</div>
+      <label class="ghost small" style="display:inline-block; padding:6px 12px; border:1px solid var(--hairline); border-radius:4px; cursor:pointer; font-weight:600; margin-top:8px;">
+        ⭱ Korrektur-Daten importieren / Import cost-basis adjustments
+        <input type="file" id="import-korrektur-input" accept="application/json" style="display:none;">
+      </label>
+      <div id="korrektur-status" style="font-size:12px; color:var(--muted); margin-top:8px;"></div>
+    </div>
+    <div class="card">
       <h2>Depotübertragungen <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Depot transfers</span></h2>
       <label style="display:flex; align-items:center; gap:8px; font-size:13.5px; margin-bottom:10px;">
         <input type="checkbox" id="transfer-match-toggle">
@@ -226,6 +235,7 @@
     results: null,
     stepUpDate: null,
     combineRules: [], // {id, accounts:[...], fromDate:'YYYY-MM-DD', label}
+    korrekturData: [], // {isin, rateDate, korrekturPerUnit, currency} imported from the Meldefonds-Rechner
     transferMatchMode: false,
     stepUpValues: {} // groupKey|symbol -> FMV per unit (EUR/account-currency)
   };
@@ -591,7 +601,7 @@
     // every symbol those accounts currently hold into one merged position — carrying the combined
     // cost basis forward, not resetting it. Only that specific rule's named accounts are touched;
     // every other account keeps tracking its own cost basis completely independently.
-    function ensureRuleActivated(rule){
+    function ensureRuleActivated(rule, activationDate){
       if (activatedRules.has(rule.id)) return;
       activatedRules.add(rule.id);
       const symbolsTouched = new Set();
@@ -600,31 +610,89 @@
       });
       const combinedGroupKey = 'RULE:'+rule.id;
       symbolsTouched.forEach(symbol=>{
-        let qty=0, cost=0, currency=null, history=[];
+        let qty=0, cost=0, currency=null;
         rule.accounts.forEach(acc=>{
           const key = acc+'|'+symbol;
           const p = positions[key];
           if (p){
             qty += p.qty; cost += p.totalCost; currency = currency || p.currency;
-            history = history.concat(p.history);
             p.qty = 0; p.totalCost = 0; // balance moved into the merged position
+            // Record the zeroing as an explicit checkpoint too — otherwise this individual
+            // position's exported history still ends at its last pre-merge (non-zero) value,
+            // and summing it together with the new pooled position for any later date would
+            // silently double-count the balance that was already moved into the pool.
+            p.history.push({date: activationDate, qty: 0});
           }
         });
-        positions[combinedGroupKey+'|'+symbol] = { groupKey: combinedGroupKey, symbol, currency: currency||'EUR', qty, totalCost: cost, history };
+        // The pooled position's own history starts fresh at the activation date — it must NOT
+        // inherit the constituent accounts' pre-merge checkpoints, since those periods are
+        // already correctly represented by each individual account's own (separately exported)
+        // history. Concatenating them in here would count the pre-merge balance a third time
+        // when a later date-lookup sums across every exported position sharing the ISIN.
+        positions[combinedGroupKey+'|'+symbol] = { groupKey: combinedGroupKey, symbol, currency: currency||'EUR', qty, totalCost: cost, history: [{date: activationDate, qty}] };
       });
     }
 
     function groupKeyFor(account, dateObj){
       for (const rule of state.combineRules){
         if (rule.accounts.includes(account) && dateObj && dateObj.getTime() >= new Date(rule.fromDate+'T00:00:00Z').getTime()){
-          ensureRuleActivated(rule);
+          ensureRuleActivated(rule, dateObj);
           return 'RULE:' + rule.id;
         }
       }
       return account;
     }
 
-    for (const t of transactions){
+    // Reverse-lookup: ISIN -> every Portfolio-Slicer symbol mapped to it, so a single Korrektur
+    // entry (keyed by ISIN) can find every position that might need the adjustment, regardless
+    // of which ticker/account it's tracked under.
+    const isinToSymbols = {};
+    Object.keys(state.symbolMap).forEach(sym=>{
+      const isin = (state.symbolMap[sym]||'').toUpperCase();
+      if (!isin) return;
+      (isinToSymbols[isin] = isinToSymbols[isin] || []).push(sym);
+    });
+
+    const korrekturEvents = (state.korrekturData||[]).map(k=>{
+      const d = new Date((k.rateDate||'')+'T00:00:00Z');
+      return isNaN(d.getTime()) ? null : {
+        isKorrektur: true, date: d, isin: (k.isin||'').toUpperCase(),
+        korrekturPerUnit: num(k.korrekturPerUnit), currency: k.currency || 'EUR'
+      };
+    }).filter(Boolean);
+
+    // Merge transactions and Korrektur events into one chronological timeline. Same-day ties
+    // resolve transactions first (so a same-day buy/sell is already reflected before that
+    // year's adjustment is applied) — Korrektur events are annual and this ordering only matters
+    // for the rare case of both landing on the exact same date.
+    const timeline = transactions.map(t=>({isKorrektur:false, date:t.date, t}))
+      .concat(korrekturEvents.map(k=>({isKorrektur:true, date:k.date, k})))
+      .sort((a,b)=>{
+        if (a.date - b.date !== 0) return a.date - b.date;
+        return (a.isKorrektur?1:0) - (b.isKorrektur?1:0);
+      });
+
+    for (const item of timeline){
+      if (item.isKorrektur){
+        const k = item.k;
+        const symbols = isinToSymbols[k.isin] || [];
+        symbols.forEach(sym=>{
+          Object.keys(positions).forEach(posKey=>{
+            const pos = positions[posKey];
+            if (pos.symbol !== sym) return;
+            if (Math.abs(pos.qty) < 0.0001) return; // nothing held under this symbol/account at this point
+            if (pos.currency !== k.currency){
+              notes.push(`Korrektur ${k.isin} (${k.rateDate}): Fondswährung ${k.currency} passt nicht zur Kontowährung ${pos.currency} von ${pos.groupKey} — Anpassung übersprungen, bitte manuell prüfen.`);
+              return;
+            }
+            pos.totalCost += k.korrekturPerUnit * pos.qty;
+            pos.history.push({date: k.rateDate, qty: pos.qty});
+          });
+        });
+        continue;
+      }
+
+      const t = item.t;
       if (!t.symbol || t.symbol === '* Cash') continue;
       const groupKey = groupKeyFor(t.account, t.date);
       const currency = (state.accounts[t.account]||{}).currency || 'EUR';
@@ -1003,6 +1071,26 @@
     a.href = url; a.download = 'depot-kostenbasis-' + new Date().toISOString().slice(0,10) + '.json';
     a.click();
     URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('import-korrektur-input').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const parsed = JSON.parse(reader.result);
+        if (!Array.isArray(parsed.corrections)) throw new Error('invalid');
+        state.korrekturData = parsed.corrections;
+        persistDepotState();
+        document.getElementById('korrektur-status').textContent = `${parsed.corrections.length} Korrektur-Werte geladen. / ${parsed.corrections.length} correction values loaded.`;
+        if (state.transactions.length) runEngine();
+      }catch(err){
+        document.getElementById('korrektur-status').textContent = 'Datei konnte nicht gelesen werden — bitte die JSON-Datei aus dem Meldefonds-Rechner wählen. / Could not read file — please pick the JSON file from the Meldefonds-Rechner.';
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   });
 
   document.getElementById('apply-settings-btn').addEventListener('click', ()=>{

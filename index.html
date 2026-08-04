@@ -247,6 +247,9 @@
         </div>
       </div>
     </div>
+    <div style="text-align:right; margin-bottom:10px;">
+      <button class="ghost small" id="refresh-names-btn" type="button">↻ Namen &amp; Währung auffrischen / Refresh names &amp; currency</button>
+    </div>
     <div id="funds-list"></div>
   </div>
 
@@ -319,6 +322,7 @@
 
   <div class="save-row">
     <button class="ghost small" id="export-btn">⭳ Sicherung herunterladen (JSON)</button>
+    <button class="ghost small" id="export-korrektur-btn">⭳ Korrektur-Daten für Depot-Rechner exportieren / Export cost-basis adjustments</button>
     <label class="ghost small" style="display:inline-block; padding:5px 10px; border:1px solid var(--hairline); border-radius:4px; cursor:pointer; font-weight:600;">
       ⭱ Sicherung laden
       <input type="file" id="import-input" accept="application/json" style="display:none;">
@@ -637,13 +641,61 @@
   });
 
   // ---------- Funds ----------
+  // Verified ISIN -> fund name, from the same research used to build the Symbol->ISIN map.
+  // Currency is deliberately NOT hardcoded here — it's appended dynamically from the fund's own
+  // OeKB-reported currency once at least one entry exists, since that's the actual confirmed
+  // value rather than a guess.
+  const KNOWN_FUND_NAMES = {
+    'IE00BK5BQT80': 'Vanguard FTSE All-World UCITS ETF (Acc)',
+    'IE00BG47KH54': 'Vanguard Global Aggregate Bond UCITS ETF EUR Hedged (Acc)',
+    'IE00BKM4GZ66': 'iShares Core MSCI EM IMI UCITS ETF (Acc)',
+    'IE00B4K48X80': 'iShares Core MSCI Europe UCITS ETF (Acc)',
+    'IE00BKWQ0Q14': 'SPDR MSCI Europe UCITS ETF (Acc)',
+    'IE00B52SFT06': 'iShares MSCI USA UCITS ETF (Acc)',
+    'IE00B5BMR087': 'iShares Core S&P 500 UCITS ETF (Acc)',
+    'IE00B4L5Y983': 'iShares Core MSCI World UCITS ETF (Acc)',
+    'IE00BF4RFH31': 'iShares MSCI World Small Cap UCITS ETF (Acc)',
+    'IE00BYXYYM63': 'iShares US Aggregate Bond UCITS ETF (Acc)',
+    'IE00B52MJY50': 'iShares Core MSCI Pacific ex-Japan UCITS ETF (Acc)',
+    'LU1708330318': 'Amundi Core Global Aggregate Bond UCITS ETF EUR Hedged (Acc)',
+    'LU1437018838': 'Amundi FTSE EPRA Nareit Global UCITS ETF (Acc)',
+    'IE00B3VWM098': 'iShares MSCI USA Small Cap UCITS ETF (Acc)',
+    'IE00BCBJG560': 'SPDR MSCI World Small Cap UCITS ETF (Acc)',
+    'IE00B5L01S80': 'HSBC FTSE EPRA Nareit Developed UCITS ETF (Acc)',
+    'IE00BDBRDM35': 'iShares Core Global Aggregate Bond UCITS ETF EUR Hedged (Acc)',
+    'IE00BZ043R46': 'iShares Core Global Aggregate Bond UCITS ETF USD Hedged (Acc)',
+    'US9229085538': 'Vanguard Real Estate ETF (VNQ)',
+    'US9219438580': 'Vanguard FTSE Developed Markets ETF (VEA)'
+  };
+
+  function fundDisplayName(isin, fallback){
+    const base = KNOWN_FUND_NAMES[isin.toUpperCase()] || fallback || isin;
+    const existingEntry = state.entries.find(e=>{
+      const f = state.funds.find(ff=>ff.id===e.fundId);
+      return f && f.isin.toUpperCase()===isin.toUpperCase() && e.currency;
+    });
+    const ccy = existingEntry ? existingEntry.currency : null;
+    return ccy && ccy !== 'EUR' ? `${base} (${ccy})` : (ccy === 'EUR' ? `${base} (EUR)` : base);
+  }
+
+  document.getElementById('refresh-names-btn').addEventListener('click', ()=>{
+    let updated = 0;
+    state.funds.forEach(f=>{
+      const newName = fundDisplayName(f.isin, f.name);
+      if (newName !== f.name){ f.name = newName; updated++; }
+    });
+    onChange();
+    renderFunds();
+    alert(`${updated} Fondsname(n) aktualisiert. / ${updated} fund name(s) updated.`);
+  });
+
   document.getElementById('add-fund-btn').addEventListener('click', ()=>{
     const isinEl = document.getElementById('new-isin');
     const nameEl = document.getElementById('new-name');
     const isin = isinEl.value.trim().toUpperCase();
     const name = nameEl.value.trim();
     if (!isin){ isinEl.focus(); return; }
-    state.funds.push({ id: uid(), isin, name: name || isin });
+    state.funds.push({ id: uid(), isin, name: name || fundDisplayName(isin) });
     isinEl.value = ''; nameEl.value = '';
     onChange();
     renderFunds();
@@ -1169,6 +1221,33 @@
   });
 
   // ---------- Export / Import ----------
+  document.getElementById('export-korrektur-btn').addEventListener('click', ()=>{
+    const corrections = [];
+    state.entries.forEach(e=>{
+      if (!e.rateDate) return;
+      const fund = state.funds.find(f=>f.id===e.fundId);
+      if (!fund) return;
+      const korrektur = num(e.korrekturPerUnit);
+      if (korrektur === 0) return;
+      corrections.push({
+        isin: fund.isin.toUpperCase(),
+        rateDate: e.rateDate,
+        korrekturPerUnit: korrektur,          // in the fund's ORIGINAL reporting currency (not EUR)
+        currency: e.currency || 'EUR'          // so the depot tool can check it matches the account's own currency before applying
+      });
+    });
+    const payload = { generatedAt: new Date().toISOString(), corrections };
+    const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'korrektur-daten-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    if (corrections.length === 0){
+      alert('Keine Korrektur-Werte gefunden (alle sind 0 oder es fehlt das Meldedatum). / No correction values found (all are 0, or the filing date is missing).');
+    }
+  });
+
   document.getElementById('export-btn').addEventListener('click', ()=>{
     const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
     const url = URL.createObjectURL(blob);
