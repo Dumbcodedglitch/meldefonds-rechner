@@ -1,0 +1,45 @@
+name: Scrape OeKB Meldefonds data
+
+"on":
+  schedule:
+    # Runs every Monday at 06:00 UTC. Adjust as you like (crontab.guru helps).
+    - cron: '0 6 * * 1'
+  workflow_dispatch: {}   # lets you trigger it manually from the Actions tab any time
+
+permissions:
+  contents: write   # needed so the workflow can commit the updated data file back to the repo
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run the scraper
+        run: node scripts/scrape-oekb.js data/isins.txt data/oekb-data.json 2020
+
+      - name: Commit updated data file
+        run: |
+          git config user.name "oekb-scraper-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/oekb-data.json
+          git diff --quiet --cached || git commit -m "Update OeKB data ($(date -u +%Y-%m-%d))"
+          git push
+
+      - name: Upload as workflow artifact too
+        uses: actions/upload-artifact@v4
+        with:
+          name: oekb-data
+          path: data/oekb-data.json
