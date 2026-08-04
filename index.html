@@ -527,8 +527,9 @@
       ageTotal += num(e.agePerUnit) * num(e.units) * fx;
       creditTotal += num(e.quellensteuerPerUnit) * num(e.units) * fx;
     });
-    const inc = state.income[year] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0};
+    const inc = state.income[year] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0, familienbonus:0};
     const otherIncome = num(inc.other);
+    const familienbonus = num(inc.familienbonus);
     const yearItems = state.incomeItems.filter(it => it.year === year);
     const itemsDeposit = yearItems.filter(it=>it.category==='deposit').reduce((s,it)=> s + num(it.amount)*fxOf(it), 0);
     const itemsCapital = yearItems.filter(it=>it.category==='capital').reduce((s,it)=> s + num(it.amount)*fxOf(it), 0);
@@ -538,21 +539,33 @@
 
     const capitalIncome275 = ageTotal + otherCapital;
     const capitalIncome = capitalIncome275 + depositInterest; // combined, for the progressive-rate comparison
+    const capitalFlatOnly = capitalIncome275 * KEST_RATE + depositInterest * DEPOSIT_RATE; // informational: KESt on capital income alone
 
-    const flatTax = capitalIncome275 * KEST_RATE + depositInterest * DEPOSIT_RATE;
-    const taxWith = progressiveTax(otherIncome + capitalIncome, brackets);
-    const taxWithout = progressiveTax(otherIncome, brackets);
-    const progTax = Math.max(taxWith - taxWithout, 0);
+    // Familienbonus Plus is a tax CREDIT against the progressive Tarifsteuer only (§ 33 EStG) —
+    // it does NOT reduce the separate flat-rate KESt/25% special tax at all, and it can't push
+    // the tariff tax below zero (non-refundable). Because of that zero-floor, a simple "marginal
+    // difference" shortcut no longer gives the right answer once a credit is involved, so both
+    // full-total scenarios are computed explicitly and compared directly.
+    const tariffOnOtherOnly = progressiveTax(otherIncome, brackets);
+    const tariffOnCombined = progressiveTax(otherIncome + capitalIncome, brackets);
+    const tariffOnOtherOnlyAfterCredit = Math.max(tariffOnOtherOnly - familienbonus, 0);
+    const tariffOnCombinedAfterCredit = Math.max(tariffOnCombined - familienbonus, 0);
 
-    const winnerIsProgressive = progTax < flatTax;
-    const chosenTax = Math.min(progTax, flatTax);
+    const totalIfKESt = tariffOnOtherOnlyAfterCredit + capitalFlatOnly;
+    const totalIfRegelbesteuerung = tariffOnCombinedAfterCredit;
+
+    const winnerIsProgressive = totalIfRegelbesteuerung < totalIfKESt;
+    const chosenTax = Math.min(totalIfKESt, totalIfRegelbesteuerung);
+    const familienbonusUsed = winnerIsProgressive ? Math.min(familienbonus, tariffOnCombined) : Math.min(familienbonus, tariffOnOtherOnly);
+    const familienbonusWasted = Math.max(familienbonus - familienbonusUsed, 0);
+
     const creditApplied = Math.min(creditTotal, chosenTax);
     const netTax = Math.max(chosenTax - creditApplied, 0);
     const refundable = Math.max(creditTotal - chosenTax, 0);
 
     return {
-      year, ageTotal, creditTotal, otherIncome, otherCapital, depositInterest, capitalIncome,
-      flatTax, progTax, winnerIsProgressive, chosenTax, creditApplied, netTax, refundable
+      year, ageTotal, creditTotal, otherIncome, otherCapital, depositInterest, capitalIncome, capitalFlatOnly, familienbonus, familienbonusUsed, familienbonusWasted,
+      flatTax: totalIfKESt, progTax: totalIfRegelbesteuerung, winnerIsProgressive, chosenTax, creditApplied, netTax, refundable
     };
   }
 
@@ -954,7 +967,7 @@
       return;
     }
     list.innerHTML = years.map(y=>{
-      const inc = state.income[y] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0};
+      const inc = state.income[y] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0, familienbonus:0};
       return `
       <div class="card">
         <h2>${y}</h2>
@@ -962,6 +975,11 @@
           <div>
             <label>Sonstiges Einkommen ohne Kapitalerträge (€) <span style="font-weight:400; color:var(--muted);">/ Other non-capital income</span></label>
             <input type="number" step="1" class="inc-other" data-year="${y}" value="${inc.other||0}">
+          </div>
+          <div>
+            <label>Familienbonus Plus (€, dieses Jahr) <span style="font-weight:400; color:var(--muted);">/ Familienbonus Plus (€, this year)</span></label>
+            <input type="number" step="1" class="inc-fabo" data-year="${y}" value="${inc.familienbonus||0}">
+            <div style="font-size:11px; color:var(--muted); margin-top:3px;">Absetzbetrag, wirkt nur gegen die Tarifsteuer (nicht gegen die 27,5%/25%-KESt), max. bis auf 0. Ab 2027 gilt eine Aufteilungspflicht 25:75 oder 50:50 zwischen den Elternteilen (bisher freie Wahl) — trag hier den Betrag ein, der dir tatsächlich zusteht. / Tax credit against the tariff tax only (not the flat KESt), floored at zero. From 2027 a mandatory 25:75 or 50:50 split between parents applies (previously free choice) — enter whatever amount actually applies to you.</div>
           </div>
         </div>
 
@@ -996,15 +1014,23 @@
     list.querySelectorAll('.inc-other').forEach(inp=>{
       inp.addEventListener('input', ()=>{
         const y = parseInt(inp.dataset.year,10);
-        state.income[y] = state.income[y] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0};
+        state.income[y] = state.income[y] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0, familienbonus:0};
         state.income[y].other = num(inp.value);
+        onChange();
+      });
+    });
+    list.querySelectorAll('.inc-fabo').forEach(inp=>{
+      inp.addEventListener('input', ()=>{
+        const y = parseInt(inp.dataset.year,10);
+        state.income[y] = state.income[y] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0, familienbonus:0};
+        state.income[y].familienbonus = num(inp.value);
         onChange();
       });
     });
     list.querySelectorAll('.inc-cap').forEach(inp=>{
       inp.addEventListener('input', ()=>{
         const y = parseInt(inp.dataset.year,10);
-        state.income[y] = state.income[y] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0};
+        state.income[y] = state.income[y] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0, familienbonus:0};
         state.income[y].otherCapital = num(inp.value);
         onChange();
       });
@@ -1012,7 +1038,7 @@
     list.querySelectorAll('.inc-dep').forEach(inp=>{
       inp.addEventListener('input', ()=>{
         const y = parseInt(inp.dataset.year,10);
-        state.income[y] = state.income[y] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0};
+        state.income[y] = state.income[y] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0, familienbonus:0};
         state.income[y].depositInterest = num(inp.value);
         onChange();
       });
@@ -1020,7 +1046,7 @@
     list.querySelectorAll('.inc-depwh').forEach(inp=>{
       inp.addEventListener('input', ()=>{
         const y = parseInt(inp.dataset.year,10);
-        state.income[y] = state.income[y] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0};
+        state.income[y] = state.income[y] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0, familienbonus:0};
         state.income[y].depositInterestWithheld = num(inp.value);
         onChange();
       });
@@ -1054,10 +1080,12 @@
           <div class="figure-row"><span class="lbl">+ Zinsen aus Geldeinlagen (25%)</span><span class="val">${fmt(r.depositInterest)} €</span></div>
           <div class="figure-row total"><span class="lbl">= steuerpflichtiges Kapitaleinkommen</span><span class="val">${fmt(r.capitalIncome)} €</span></div>
           <div class="figure-row"><span class="lbl">Sonstiges Einkommen (Basis)</span><span class="val">${fmt(r.otherIncome)} €</span></div>
+          ${r.familienbonus > 0.005 ? `<div class="figure-row"><span class="lbl">Familienbonus Plus (Absetzbetrag)</span><span class="val">− ${fmt(r.familienbonus)} €</span></div>` : ''}
         </div>
         <div class="figures">
-          <div class="figure-row"><span class="lbl">KESt wären (27,5% / 25% je nach Kategorie)</span><span class="val">${fmt(r.flatTax)} €</span></div>
-          <div class="figure-row"><span class="lbl">Regelbesteuerung (Grenzsteuer) wären</span><span class="val">${fmt(r.progTax)} €</span></div>
+          <div class="figure-row"><span class="lbl">Gesamt bei KESt (27,5%/25% Kapital + Tarif auf Rest, nach Familienbonus)</span><span class="val">${fmt(r.flatTax)} €</span></div>
+          <div class="figure-row"><span class="lbl">Gesamt bei Regelbesteuerung (Tarif auf alles, nach Familienbonus)</span><span class="val">${fmt(r.progTax)} €</span></div>
+          ${r.familienbonusWasted > 0.005 ? `<div class="figure-row" style="color:var(--brick);"><span class="lbl">→ davon Familienbonus ungenutzt verfallen (im gewählten Pfad) / unused, forfeited</span><span class="val">${fmt(r.familienbonusWasted)} €</span></div>` : ''}
           <div class="figure-row"><span class="lbl">Anrechenbare Quellensteuer/einbehaltene Steuer</span><span class="val">− ${fmt(r.creditApplied)} €</span></div>
           ${r.refundable > 0.005 ? `<div class="figure-row" style="color:var(--teal); font-weight:600;"><span class="lbl">→ davon erstattungsfähig (mehr einbehalten als geschuldet) / refundable</span><span class="val">${fmt(r.refundable)} €</span></div>` : ''}
           <div class="figure-row total"><span class="lbl">Steuer nach Anrechnung</span><span class="val">${fmt(r.netTax)} €</span></div>
@@ -1285,7 +1313,7 @@
         });
         Object.keys(eurGainsByYear).forEach(year=>{
           const y = parseInt(year,10);
-          state.income[y] = state.income[y] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0};
+          state.income[y] = state.income[y] || {other:0, otherCapital:0, depositInterest:0, depositInterestWithheld:0, familienbonus:0};
           state.income[y].otherCapital = num(state.income[y].otherCapital) + eurGainsByYear[year];
         });
 

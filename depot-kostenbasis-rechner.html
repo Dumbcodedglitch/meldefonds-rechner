@@ -783,7 +783,7 @@
           }).join('')}
         </tbody>
       </table>
-      <div style="font-size:11px; color:var(--muted); margin-top:6px;">Experimentell: Yahoo Finance bietet keine offizielle, garantierte Schnittstelle an — das kann jederzeit aufhören zu funktionieren. Bei Fehlschlag bitte den Kurs manuell nachsehen. / Experimental: Yahoo Finance has no official, guaranteed interface — this can stop working at any time. On failure, please look up the price manually.</div>
+      <div style="font-size:11px; color:var(--muted); margin-top:6px;">Experimentell: Yahoo Finance bietet keine offizielle, garantierte Schnittstelle an — das kann jederzeit aufhören zu funktionieren, und Daten außerhalb des angefragten Zeitraums werden jetzt verworfen statt falsch angezeigt. Wichtig: der Kurs kommt in der Währung der jeweiligen Börsennotierung (z. B. GBP für eine London-Notiz) — bitte die Größenordnung gegen deine Kontowährung prüfen, bevor du ihn übernimmst. / Experimental: Yahoo Finance has no official, guaranteed interface — this can stop working at any time, and data outside the requested date range is now rejected instead of shown incorrectly. Important: the price comes in whatever currency that specific exchange listing trades in (e.g. GBP for a London listing) — please sanity-check the magnitude against your account's currency before accepting it.</div>
       <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
         <button class="ghost small" id="accept-all-suggested-btn" type="button">✓ Alle Vorschläge übernehmen (letzter bekannter Preis) / Accept all suggestions (last known price)</button>
       </div>
@@ -830,47 +830,47 @@
     }
   }
 
-  // Reverse-lookup: ISIN -> Yahoo ticker, from the same verified mapping used for ISIN auto-fill
-  const ISIN_TO_YAHOO_TICKER = Object.fromEntries(Object.entries(KNOWN_ISIN_MAP).map(([sym,isin])=>[isin,sym]));
-
   async function fetchYahooPrice(symbolOrKey, dateStr){
-    // symbolOrKey here is the Portfolio-Slicer symbol; try it directly as a Yahoo ticker first
-    // (most Portfolio Slicer symbols already are Yahoo-style tickers), then fall back to the
-    // ISIN mapping in case the direct symbol doesn't resolve.
-    const candidates = [symbolOrKey];
-    const isin = state.symbolMap[symbolOrKey];
-    if (isin && ISIN_TO_YAHOO_TICKER[isin] && ISIN_TO_YAHOO_TICKER[isin] !== symbolOrKey) candidates.push(ISIN_TO_YAHOO_TICKER[isin]);
-
+    // Only try the exact given ticker — NOT other cross-listed tickers for the same ISIN.
+    // Different exchange listings of "the same" fund can be priced in different currencies
+    // (e.g. a London GBP listing vs. an Amsterdam EUR listing of the same underlying fund),
+    // so silently substituting one ticker's raw number for another's is a real correctness
+    // risk, not just a cosmetic one — better to fail honestly than guess wrong.
+    const ticker = symbolOrKey;
     const target = new Date(dateStr+'T00:00:00Z');
-    const period1 = Math.floor(target.getTime()/1000) - 7*86400; // small window around the date
-    const period2 = Math.floor(target.getTime()/1000) + 2*86400;
+    const period1 = Math.floor(target.getTime()/1000) - 10*86400; // small window around the date
+    const period2 = Math.floor(target.getTime()/1000) + 5*86400;
+    const MAX_DATE_DRIFT_DAYS = 21; // if the closest available price is further off than this, treat as unreliable rather than silently using a wrong-period price
 
-    for (const ticker of candidates){
-      const directUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${period1}&period2=${period2}&interval=1d`;
-      const proxiedUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`;
-      for (const url of [directUrl, proxiedUrl]){
-        try{
-          const res = await fetch(url);
-          if (!res.ok) throw new Error('HTTP '+res.status);
-          const data = await res.json();
-          const result = data && data.chart && data.chart.result && data.chart.result[0];
-          if (!result) throw new Error('Keine Daten');
-          const timestamps = result.timestamp || [];
-          const closes = result.indicators.quote[0].close || [];
-          if (!timestamps.length) throw new Error('Keine Kursdaten im Zeitraum');
-          // pick the closing price closest to (on or before) the target date
-          let bestIdx = -1;
-          for (let i=0;i<timestamps.length;i++){
-            if (timestamps[i]*1000 <= target.getTime() + 86400000 && closes[i] != null) bestIdx = i;
-          }
-          if (bestIdx === -1) bestIdx = closes.findIndex(c=>c!=null);
-          if (bestIdx === -1) throw new Error('Keine verwertbaren Kurse');
-          const usedDate = new Date(timestamps[bestIdx]*1000).toISOString().slice(0,10);
-          return { ok:true, price: closes[bestIdx], dateUsed: usedDate, ticker };
-        }catch(e){ /* try next candidate/url */ }
-      }
+    const directUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${period1}&period2=${period2}&interval=1d`;
+    const proxiedUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`;
+    for (const url of [directUrl, proxiedUrl]){
+      try{
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('HTTP '+res.status);
+        const data = await res.json();
+        const result = data && data.chart && data.chart.result && data.chart.result[0];
+        if (!result) throw new Error('Keine Daten');
+        const timestamps = result.timestamp || [];
+        const closes = result.indicators.quote[0].close || [];
+        if (!timestamps.length) throw new Error('Keine Kursdaten im Zeitraum');
+        // pick the closing price closest to (on or before) the target date, among timestamps
+        // actually inside/near our requested window — do NOT fall back to "just grab any
+        // available close" if the returned data doesn't actually cover our requested period
+        // (that's exactly how a wrong/default date range gets silently presented as correct).
+        let bestIdx = -1, bestDiffDays = Infinity;
+        for (let i=0;i<timestamps.length;i++){
+          if (closes[i] == null) continue;
+          const diffDays = Math.abs(timestamps[i]*1000 - target.getTime()) / 86400000;
+          if (diffDays < bestDiffDays){ bestDiffDays = diffDays; bestIdx = i; }
+        }
+        if (bestIdx === -1) throw new Error('Keine verwertbaren Kurse');
+        if (bestDiffDays > MAX_DATE_DRIFT_DAYS) throw new Error(`Zurückgegebene Daten liegen ${Math.round(bestDiffDays)} Tage vom Zieldatum entfernt — vermutlich falscher Zeitraum, verworfen.`);
+        const usedDate = new Date(timestamps[bestIdx]*1000).toISOString().slice(0,10);
+        return { ok:true, price: closes[bestIdx], dateUsed: usedDate, ticker };
+      }catch(e){ /* try next url (direct, then proxy) */ }
     }
-    return { ok:false, msg: `Kein Kurs von Yahoo Finance abrufbar für "${symbolOrKey}" — bitte manuell auf finance.yahoo.com/quote/${encodeURIComponent(symbolOrKey)}/history nachsehen.` };
+    return { ok:false, msg: `Kein zuverlässiger Kurs von Yahoo Finance für "${symbolOrKey}" um den ${dateStr} — bitte manuell auf finance.yahoo.com/quote/${encodeURIComponent(symbolOrKey)}/history nachsehen. / No reliable Yahoo Finance price for "${symbolOrKey}" around ${dateStr} — please check manually.` };
   }
 
   function renderResults(){
