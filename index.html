@@ -1292,13 +1292,29 @@
         }
 
         let unitsFilled = 0, unitsSkippedNoIsin = 0;
+        const positionsByIsin = {};
         parsed.positions.forEach(pos=>{
           const isin = (pos.isin||'').toUpperCase();
-          if (!isin || !isinToFundId[isin]) { if(pos.isin) unitsSkippedNoIsin++; return; }
+          if (!isin){ return; }
+          if (!isinToFundId[isin]){ unitsSkippedNoIsin++; return; }
+          (positionsByIsin[isin] = positionsByIsin[isin] || []).push(pos);
+        });
+        // A fund's real holding is very often split across several accounts, or even across
+        // different cross-listed tickers of the exact same fund (e.g. EPRU.AS and EPRA.PA are
+        // literally the same underlying ISIN on two exchanges) — so every position sharing that
+        // ISIN must be SUMMED for a given filing date, never just overwritten by whichever
+        // position happened to be processed last.
+        Object.keys(positionsByIsin).forEach(isin=>{
           const fundId = isinToFundId[isin];
+          const positions = positionsByIsin[isin];
           state.entries.filter(en=>en.fundId===fundId).forEach(entry=>{
-            const q = qtyAtDate(pos.history, entry.rateDate);
-            if (q !== null){ entry.units = q; unitsFilled++; }
+            if (!entry.rateDate) return;
+            let total = 0, anyFound = false;
+            positions.forEach(pos=>{
+              const q = qtyAtDate(pos.history, entry.rateDate);
+              if (q !== null){ total += q; anyFound = true; }
+            });
+            if (anyFound){ entry.units = total; unitsFilled++; }
           });
         });
 

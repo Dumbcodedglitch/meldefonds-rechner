@@ -841,10 +841,12 @@
     const period1 = Math.floor(target.getTime()/1000) - 10*86400; // small window around the date
     const period2 = Math.floor(target.getTime()/1000) + 5*86400;
     const MAX_DATE_DRIFT_DAYS = 21; // if the closest available price is further off than this, treat as unreliable rather than silently using a wrong-period price
+    const cacheBust = Date.now(); // defeats any proxy-level caching keyed only on the outer URL, which would otherwise ignore period1/period2 and serve a stale/wrong-date response
 
-    const directUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${period1}&period2=${period2}&interval=1d`;
-    const proxiedUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`;
-    for (const url of [directUrl, proxiedUrl]){
+    const directUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${period1}&period2=${period2}&interval=1d&_cb=${cacheBust}`;
+    const proxied1 = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`;
+    const proxied2 = `https://corsproxy.io/?url=${encodeURIComponent(directUrl)}`;
+    for (const url of [directUrl, proxied1, proxied2]){
       try{
         const res = await fetch(url);
         if (!res.ok) throw new Error('HTTP '+res.status);
