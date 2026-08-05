@@ -196,6 +196,8 @@
     .figures{grid-template-columns:1fr;}
     .stamp{position:static; transform:none; display:inline-block; margin-bottom:10px;}
   }
+  .ent-year{-moz-appearance:textfield;}
+  .ent-year::-webkit-outer-spin-button, .ent-year::-webkit-inner-spin-button{-webkit-appearance:none; margin:0;}
 </style>
 </head>
 <body>
@@ -678,12 +680,17 @@
     return ccy && ccy !== 'EUR' ? `${base} (${ccy})` : (ccy === 'EUR' ? `${base} (EUR)` : base);
   }
 
-  document.getElementById('refresh-names-btn').addEventListener('click', ()=>{
+  function refreshFundNames(){
     let updated = 0;
     state.funds.forEach(f=>{
       const newName = fundDisplayName(f.isin, f.name);
       if (newName !== f.name){ f.name = newName; updated++; }
     });
+    return updated;
+  }
+
+  document.getElementById('refresh-names-btn').addEventListener('click', ()=>{
+    const updated = refreshFundNames();
     onChange();
     renderFunds();
     alert(`${updated} Fondsname(n) aktualisiert. / ${updated} fund name(s) updated.`);
@@ -746,7 +753,7 @@
       return;
     }
     list.innerHTML = state.funds.map(f=>{
-      const rows = state.entries.filter(e=>e.fundId===f.id).sort((a,b)=>a.year-b.year);
+      const rows = state.entries.filter(e=>e.fundId===f.id).sort((a,b)=> a.year - b.year || (a.rateDate||'').localeCompare(b.rateDate||''));
       const isOpen = state.openFund === f.id;
       return `
       <div class="fund-block">
@@ -771,7 +778,7 @@
                 const isForeign = e.currency && e.currency !== 'EUR';
                 return `
                 <tr data-entry="${e.id}">
-                  <td><input type="number" class="ent-year" value="${e.year}" style="width:64px;"></td>
+                  <td><input type="number" class="ent-year" value="${e.year}" style="width:96px;"></td>
                   <td>
                     <select class="ent-currency">
                       ${FX_CURRENCIES.map(c=>`<option value="${c}" ${e.currency===c?'selected':''}>${c}</option>`).join('')}
@@ -784,21 +791,21 @@
                   <td class="num ent-stpfl">${stpflText(e)}</td>
                   <td><button class="danger small" type="button" data-del-entry="${e.id}">✕</button></td>
                 </tr>
-                <tr class="fx-row" data-fx-for="${e.id}" style="${isForeign ? '' : 'display:none;'}">
+                <tr class="fx-row" data-fx-for="${e.id}">
                   <td colspan="8" style="background:#FAF8F2;">
                     <div class="row" style="align-items:flex-end; gap:14px;">
                       <div style="max-width:170px;">
-                        <label>Meldedatum (Kursstichtag)</label>
+                        <label>Meldedatum (Kursstichtag) / Reporting date</label>
                         <input type="date" class="ent-ratedate" value="${e.rateDate||''}">
                       </div>
-                      <div style="max-width:150px;">
+                      <div style="max-width:150px; ${isForeign ? '' : 'display:none;'}">
                         <label>Kurs (1 ${e.currency} = X €)</label>
                         <input type="number" step="0.000001" class="ent-fxrate" value="${e.fxRate||''}">
                       </div>
-                      <div style="flex:0;">
+                      <div style="flex:0; ${isForeign ? '' : 'display:none;'}">
                         <button class="ghost small" type="button" data-fetch-fx="${e.id}">↻ EZB-Kurs abrufen</button>
                       </div>
-                      <div class="fx-status" style="font-size:12px; color:var(--muted); flex:1;">
+                      <div class="fx-status" style="font-size:12px; color:var(--muted); flex:1; ${isForeign ? '' : 'display:none;'}">
                         ${e.fxRateDateUsed ? ('Kurs vom ' + e.fxRateDateUsed + (e.fxRateDateUsed!==e.rateDate ? ' (nächster verfügbarer Handelstag)':'')) : 'Noch kein Kurs abgerufen.'}
                       </div>
                     </div>
@@ -1332,9 +1339,10 @@
           // units and fxRate are intentionally left untouched — the script can't know your personal holding.
         });
 
+        const namesUpdated = refreshFundNames();
         onChange();
         renderFunds(); renderEntries(); renderIncome(); renderResults();
-        alert(`Import fertig: ${fundsAdded} neue Fonds, ${fundsMatched} bereits vorhanden · ${entriesAdded} neue Meldejahre, ${entriesUpdated} aktualisiert.\n\nWichtig: die Anzahl der Anteile (Anteile-Feld) kennt das Script nicht — bitte bei jedem neuen Meldejahr unter "2 Meldedaten" ergänzen.`);
+        alert(`Import fertig: ${fundsAdded} neue Fonds, ${fundsMatched} bereits vorhanden · ${entriesAdded} neue Meldejahre, ${entriesUpdated} aktualisiert · ${namesUpdated} Fondsname(n) automatisch aktualisiert.\n\nWichtig: die Anzahl der Anteile (Anteile-Feld) kennt das Script nicht — bitte bei jedem neuen Meldejahr unter "2 Meldedaten" ergänzen.`);
       }catch(err){
         alert('Diese Datei konnte nicht gelesen werden. Bitte die JSON-Datei aus dem OeKB Auto-Abruf-Script wählen.');
       }
@@ -1412,8 +1420,9 @@
           state.income[y].otherCapital = num(state.income[y].otherCapital) + eurGainsByYear[year];
         });
 
+        refreshFundNames();
         onChange();
-        renderEntries(); renderIncome(); renderResults();
+        renderFunds(); renderEntries(); renderIncome(); renderResults();
         let msg = `Import fertig: Anteile in ${unitsFilled} Meldejahr(en) automatisch befüllt.`;
         if (Object.keys(eurGainsByYear).length){
           msg += `\nRealisierte EUR-Gewinne zu "sonstige Kapitalerträge" hinzugefügt: ${Object.keys(eurGainsByYear).map(y=>y+': '+fmt(eurGainsByYear[y])+' €').join(', ')}.`;
