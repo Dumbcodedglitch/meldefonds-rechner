@@ -1365,7 +1365,7 @@
           let best = null;
           for (const h of history){
             const hd = new Date(h.date+'T00:00:00Z');
-            if (hd <= target && (best===null || hd > new Date(best.date+'T00:00:00Z'))) best = h;
+            if (hd <= target && (best===null || hd >= new Date(best.date+'T00:00:00Z'))) best = h;
           }
           return best ? best.qty : null;
         }

@@ -195,6 +195,15 @@
   </div>
 
   <div class="panel" id="panel-results">
+    <div class="card">
+      <h2>Mit eigener Excel-Referenz abgleichen <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Cross-check against your own Excel reference</span></h2>
+      <div class="sub">Importiere deine eigene OeKB-Auswertungs-CSV (mehrere Blöcke, je ein Broker pro Zeile, ISINs als Spalten, mit "Meldedatum"-Zeile) — die Summe pro Fonds und Meldedatum wird automatisch mit der hier berechneten Menge verglichen. / Import your own OeKB working CSV (multiple blocks, one broker per row, ISINs as columns, with a "Meldedatum" row) — the total per fund and reporting date gets automatically compared against what's computed here.</div>
+      <label class="ghost small" style="display:inline-block; padding:6px 12px; border:1px solid var(--hairline); border-radius:4px; cursor:pointer; font-weight:600; margin-top:8px;">
+        ⭱ Referenz-CSV importieren / Import reference CSV
+        <input type="file" id="import-reference-input" accept=".csv" style="display:none;">
+      </label>
+    </div>
+    <div id="reference-diff-content"></div>
     <div id="results-content"></div>
   </div>
 
@@ -952,6 +961,31 @@
       .filter(p => Math.abs(p.qty) > 0.0001)
       .sort((a,b)=> a.groupKey.localeCompare(b.groupKey) || a.symbol.localeCompare(b.symbol));
 
+    const allPosForHistory = Object.values(positions).filter(p=>p.history && p.history.length>0)
+      .sort((a,b)=> a.symbol.localeCompare(b.symbol) || a.groupKey.localeCompare(b.groupKey));
+    const historyTable = `
+      <div class="card">
+        <h2>Verlauf &amp; Diagnose <span style="font-weight:400; color:var(--muted); font-size:13px;">/ History &amp; diagnostics</span></h2>
+        <div class="sub">Jede Position (auch bereits leergeräumte, z. B. nach einer Kontenzusammenführung) mit ihrem vollständigen Mengen-Verlauf — zum Abgleich mit deinen eigenen Aufzeichnungen. / Every position (including zeroed-out ones, e.g. after an account merge) with its full quantity history — for cross-checking against your own records.</div>
+        ${allPosForHistory.map(p=>`
+          <div style="margin-top:10px; border:1px solid var(--hairline); border-radius:4px;">
+            <div class="fund-head" data-history-toggle="${p.groupKey}|${p.symbol}" style="cursor:pointer; padding:8px 12px; display:flex; justify-content:space-between; align-items:center; background:#F6F4EE;">
+              <div><b>${p.symbol}</b> <span style="color:var(--muted); font-size:12px;">(${state.symbolMap[p.symbol]||'keine ISIN'}) — ${p.groupKey}</span></div>
+              <div style="font-size:12px; color:var(--muted);">${p.history.length} Einträge / entries — aktuell: ${fmt(p.qty)} ▸</div>
+            </div>
+            <div class="history-body" data-history-body="${p.groupKey}|${p.symbol}" style="display:none; padding:8px 12px;">
+              <table>
+                <thead><tr><th>Datum / Date</th><th>Menge nach Ereignis / Qty after event</th></tr></thead>
+                <tbody>
+                  ${p.history.map(h=>`<tr><td>${h.date instanceof Date ? h.date.toISOString().slice(0,10) : h.date}</td><td class="num">${fmt(h.qty)}</td></tr>`).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
     const posTable = `
       <div class="card">
         <h2>Aktuelle Bestände <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Current holdings</span></h2>
@@ -1021,7 +1055,14 @@
     ` : '';
     const notesBox = notes.length ? `<div class="warn-box"><b>Bitte prüfen / Please check:</b><ul style="margin:8px 0 0; padding-left:18px;">${notes.map(n=>`<li>${n}</li>`).join('')}</ul></div>` : '';
 
-    el.innerHTML = caveatBox + notesBox + posTable + realizedTable;
+    el.innerHTML = caveatBox + notesBox + posTable + realizedTable + historyTable;
+    el.querySelectorAll('[data-history-toggle]').forEach(head=>{
+      head.addEventListener('click', ()=>{
+        const key = head.dataset.historyToggle;
+        const body = el.querySelector(`[data-history-body="${CSS.escape(key)}"]`);
+        if (body) body.style.display = body.style.display === 'none' ? 'block' : 'none';
+      });
+    });
   }
 
   document.querySelectorAll('.tab').forEach(tab=>{
@@ -1090,6 +1131,114 @@
       }
     };
     reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  // ---------- Cross-check against the user's own Excel/CSV reference ----------
+  function parseReferenceCSV(text){
+    const lines = text.split(/\r\n|\n|\r/).filter(l=>l.length>0);
+    const rows = lines.map(l=>l.split(','));
+    const isinRowIdx = rows.findIndex(r=>(r[0]||'').trim()==='ISIN');
+    const isins = {};
+    if (isinRowIdx>=0){
+      rows[isinRowIdx].forEach((v,i)=>{ const t=(v||'').trim(); if (t && t.toUpperCase()!=='ISIN') isins[i]=t.toUpperCase(); });
+    }
+    const blockStarts = [];
+    rows.forEach((r,i)=>{ if (/^\d{4}(\/\d+)?$/.test((r[0]||'').trim())) blockStarts.push(i); });
+    blockStarts.push(rows.length);
+
+    const entries = [];
+    for (let bi=0; bi<blockStarts.length-1; bi++){
+      const block = rows.slice(blockStarts[bi], blockStarts[bi+1]);
+      const meldedatumRow = block.find(r=>(r[0]||'').trim()==='Meldedatum');
+      const sumRow = block.find(r=>(r[0]||'').trim().toUpperCase()==='SUM');
+      if (!meldedatumRow || !sumRow) continue;
+      Object.keys(isins).forEach(colStr=>{
+        const col = parseInt(colStr,10);
+        const isin = isins[col];
+        const meldedatum = (meldedatumRow[col]||'').trim();
+        const sumStr = (sumRow[col]||'').trim().replace(/,/g,'');
+        if (!meldedatum || !sumStr) return;
+        const sum = parseFloat(sumStr);
+        if (isNaN(sum)) return;
+        const m = meldedatum.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        const isoDate = m ? `${m[3]}-${m[2]}-${m[1]}` : meldedatum;
+        entries.push({isin, meldedatum: isoDate, referenceSum: sum});
+      });
+    }
+    return entries;
+  }
+
+  function qtyAtDateLocal(history, dateStr){
+    if (!history || !history.length) return null;
+    let best = null;
+    history.forEach(h=>{
+      const hd = h.date instanceof Date ? h.date.toISOString().slice(0,10) : h.date;
+      if (hd <= dateStr && (best===null || hd >= best.date)) best = {date:hd, qty:h.qty};
+    });
+    return best ? best.qty : null;
+  }
+
+  function toolSumForIsinAtDate(isin){
+    return function(dateStr){
+      if (!state.results) return null;
+      const symbols = Object.keys(state.symbolMap).filter(s => (state.symbolMap[s]||'').toUpperCase() === isin);
+      let total = 0, any = false;
+      Object.values(state.results.positions).forEach(pos=>{
+        if (!symbols.includes(pos.symbol)) return;
+        const q = qtyAtDateLocal(pos.history, dateStr);
+        if (q !== null){ total += q; any = true; }
+      });
+      return any ? total : null;
+    };
+  }
+
+  document.getElementById('import-reference-input').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const el = document.getElementById('reference-diff-content');
+      try{
+        const entries = parseReferenceCSV(reader.result);
+        if (entries.length === 0){
+          el.innerHTML = '<div class="warn-box">Keine verwertbaren Zeilen in dieser Datei gefunden (erwarte Zeilen "ISIN", "Meldedatum" und "SUM"). / No usable rows found (expecting "ISIN", "Meldedatum" and "SUM" rows).</div>';
+          return;
+        }
+        let mismatches = 0;
+        const rows = entries.map(en=>{
+          const toolSum = toolSumForIsinAtDate(en.isin)(en.meldedatum);
+          const diff = toolSum===null ? null : (toolSum - en.referenceSum);
+          const match = toolSum!==null && Math.abs(diff) < 0.01;
+          if (!match) mismatches++;
+          return { ...en, toolSum, diff, match };
+        }).sort((a,b)=> (a.match - b.match) || a.isin.localeCompare(b.isin) || a.meldedatum.localeCompare(b.meldedatum));
+
+        el.innerHTML = `
+          <div class="card">
+            <h2>Abgleich-Ergebnis <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Comparison result</span></h2>
+            <div class="sub">${rows.length} Einträge geprüft, ${mismatches} Abweichung(en) gefunden. Zeilen mit Abweichung stehen oben. / ${rows.length} entries checked, ${mismatches} mismatch(es) found. Mismatched rows are listed first.</div>
+            <table style="margin-top:10px;">
+              <thead><tr><th>ISIN</th><th>Meldedatum / Date</th><th>Referenz / Reference</th><th>Tool</th><th>Differenz / Diff</th></tr></thead>
+              <tbody>
+                ${rows.map(r=>`
+                  <tr style="${r.match?'':'background:#F5E6E2;'}">
+                    <td class="num">${r.isin}</td>
+                    <td>${r.meldedatum}</td>
+                    <td class="num">${fmt(r.referenceSum)}</td>
+                    <td class="num">${r.toolSum===null ? '— (keine Daten / no data)' : fmt(r.toolSum)}</td>
+                    <td class="num" style="${r.match?'color:var(--teal);':'color:var(--brick); font-weight:600;'}">${r.toolSum===null ? '—' : fmt(r.diff)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }catch(err){
+        el.innerHTML = `<div class="warn-box">Datei konnte nicht verarbeitet werden: ${err.message} / File could not be processed: ${err.message}</div>`;
+      }
+    };
+    reader.readAsText(file, 'ISO-8859-1');
     e.target.value = '';
   });
 
