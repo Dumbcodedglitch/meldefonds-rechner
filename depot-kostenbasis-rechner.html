@@ -237,6 +237,40 @@
     'AGGU.L': 'IE00BZ043R46', 'VNQ': 'US9229085538', 'VEA': 'US9219438580'
   };
 
+  // Same verified fund-name list used in the Meldefonds-Rechner, so ISINs are readable here too.
+  const KNOWN_FUND_NAMES = {
+    'IE00BK5BQT80': 'Vanguard FTSE All-World UCITS ETF (Acc)',
+    'IE00BG47KH54': 'Vanguard Global Aggregate Bond UCITS ETF EUR Hedged (Acc)',
+    'IE00BKM4GZ66': 'iShares Core MSCI EM IMI UCITS ETF (Acc)',
+    'IE00B4K48X80': 'iShares Core MSCI Europe UCITS ETF (Acc)',
+    'IE00BKWQ0Q14': 'SPDR MSCI Europe UCITS ETF (Acc)',
+    'IE00B52SFT06': 'iShares MSCI USA UCITS ETF (Acc)',
+    'IE00B5BMR087': 'iShares Core S&P 500 UCITS ETF (Acc)',
+    'IE00B4L5Y983': 'iShares Core MSCI World UCITS ETF (Acc)',
+    'IE00BF4RFH31': 'iShares MSCI World Small Cap UCITS ETF (Acc)',
+    'IE00BYXYYM63': 'iShares US Aggregate Bond UCITS ETF (Acc)',
+    'IE00B52MJY50': 'iShares Core MSCI Pacific ex-Japan UCITS ETF (Acc)',
+    'LU1708330318': 'Amundi Core Global Aggregate Bond UCITS ETF EUR Hedged (Acc)',
+    'LU1437018838': 'Amundi FTSE EPRA Nareit Global UCITS ETF (Acc)',
+    'IE00B3VWM098': 'iShares MSCI USA Small Cap UCITS ETF (Acc)',
+    'IE00BCBJG560': 'SPDR MSCI World Small Cap UCITS ETF (Acc)',
+    'IE00B5L01S80': 'HSBC FTSE EPRA Nareit Developed UCITS ETF (Acc)',
+    'IE00BDBRDM35': 'iShares Core Global Aggregate Bond UCITS ETF EUR Hedged (Acc)',
+    'IE00BZ043R46': 'iShares Core Global Aggregate Bond UCITS ETF USD Hedged (Acc)',
+    'US9229085538': 'Vanguard Real Estate ETF (VNQ)',
+    'US9219438580': 'Vanguard FTSE Developed Markets ETF (VEA)'
+  };
+
+  // Builds a readable label for any symbol: "SYMBOL — Fund Name (ISIN)" where known, falling
+  // back gracefully to whatever is actually known when it isn't a fully-recognized fund.
+  function fundLabel(symbol){
+    const isin = (state.symbolMap[symbol]||'').toUpperCase();
+    const name = KNOWN_FUND_NAMES[isin];
+    if (name) return `${symbol} — ${name} (${isin})`;
+    if (isin) return `${symbol} (${isin})`;
+    return symbol;
+  }
+
   let state = {
     transactions: [],
     accounts: {},
@@ -562,14 +596,18 @@
     }
     el.innerHTML = `
       <table>
-        <thead><tr><th>Symbol</th><th>ISIN (optional)</th></tr></thead>
+        <thead><tr><th>Symbol</th><th>Fondsname / Fund name</th><th>ISIN (optional)</th></tr></thead>
         <tbody>
-          ${symbols.map(s=>`
+          ${symbols.map(s=>{
+            const isin = (state.symbolMap[s]||'').toUpperCase();
+            const name = KNOWN_FUND_NAMES[isin] || '';
+            return `
             <tr>
               <td class="num">${s}</td>
+              <td style="color:var(--muted); font-size:12.5px;">${name || '—'}</td>
               <td><input type="text" class="isin-input" data-symbol="${s}" value="${state.symbolMap[s]||''}" placeholder="z. B. IE00B..."></td>
             </tr>
-          `).join('')}
+          `;}).join('')}
         </tbody>
       </table>
     `;
@@ -691,11 +729,11 @@
             if (pos.symbol !== sym) return;
             if (Math.abs(pos.qty) < 0.0001) return; // nothing held under this symbol/account at this point
             if (pos.currency !== k.currency){
-              notes.push(`Korrektur ${k.isin} (${k.rateDate}): Fondswährung ${k.currency} passt nicht zur Kontowährung ${pos.currency} von ${pos.groupKey} — Anpassung übersprungen, bitte manuell prüfen.`);
+              notes.push(`Korrektur ${k.isin} (${k.date.toISOString().slice(0,10)}): Fondswährung ${k.currency} passt nicht zur Kontowährung ${pos.currency} von ${pos.groupKey} — Anpassung übersprungen, bitte manuell prüfen.`);
               return;
             }
             pos.totalCost += k.korrekturPerUnit * pos.qty;
-            pos.history.push({date: k.rateDate, qty: pos.qty});
+            pos.history.push({date: k.date, qty: pos.qty});
           });
         });
         continue;
@@ -970,7 +1008,7 @@
         ${allPosForHistory.map(p=>`
           <div style="margin-top:10px; border:1px solid var(--hairline); border-radius:4px;">
             <div class="fund-head" data-history-toggle="${p.groupKey}|${p.symbol}" style="cursor:pointer; padding:8px 12px; display:flex; justify-content:space-between; align-items:center; background:#F6F4EE;">
-              <div><b>${p.symbol}</b> <span style="color:var(--muted); font-size:12px;">(${state.symbolMap[p.symbol]||'keine ISIN'}) — ${p.groupKey}</span></div>
+              <div><b>${p.symbol}</b> <span style="color:var(--muted); font-size:12px;">${KNOWN_FUND_NAMES[(state.symbolMap[p.symbol]||'').toUpperCase()] || ''} (${state.symbolMap[p.symbol]||'keine ISIN'}) — ${p.groupKey}</span></div>
               <div style="font-size:12px; color:var(--muted);">${p.history.length} Einträge / entries — aktuell: ${fmt(p.qty)} ▸</div>
             </div>
             <div class="history-body" data-history-body="${p.groupKey}|${p.symbol}" style="display:none; padding:8px 12px;">
@@ -991,12 +1029,13 @@
         <h2>Aktuelle Bestände <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Current holdings</span></h2>
         <div class="sub">Gleitender Durchschnittspreis je Depot (bzw. zusammengeführter Gruppe, falls eine Regel aktiv ist), in Kontowährung.</div>
         <table>
-          <thead><tr><th>Konto/Gruppe / Account-Group</th><th>Symbol</th><th>ISIN</th><th>Menge / Qty</th><th>Ø-Preis/Stück / Avg price per unit</th><th>Kostenbasis / Cost basis</th><th>Whg. / Ccy</th></tr></thead>
+          <thead><tr><th>Konto/Gruppe / Account-Group</th><th>Symbol</th><th>Fondsname / Fund name</th><th>ISIN</th><th>Menge / Qty</th><th>Ø-Preis/Stück / Avg price per unit</th><th>Kostenbasis / Cost basis</th><th>Whg. / Ccy</th></tr></thead>
           <tbody>
             ${posRows.map(p=>`
               <tr>
                 <td>${p.groupKey}</td>
                 <td class="num">${p.symbol}</td>
+                <td style="color:var(--muted); font-size:12.5px;">${KNOWN_FUND_NAMES[(state.symbolMap[p.symbol]||'').toUpperCase()] || '—'}</td>
                 <td class="num" style="color:var(--muted);">${state.symbolMap[p.symbol]||'—'}</td>
                 <td class="num">${fmt(p.qty)}</td>
                 <td class="num">${fmt(p.qty>0 ? p.totalCost/p.qty : 0)}</td>
@@ -1099,7 +1138,7 @@
       positions: Object.values(positions).filter(p=>p.history.length>0).map(p=>({
         group:p.groupKey, symbol:p.symbol, isin: state.symbolMap[p.symbol]||null,
         qty:p.qty, avgCostPerUnit: p.qty>0 ? p.totalCost/p.qty : 0, totalCost:p.totalCost, currency:p.currency,
-        history: p.history.map(h=>({date: h.date.toISOString().slice(0,10), qty: h.qty}))
+        history: p.history.map(h=>({date: h.date instanceof Date ? h.date.toISOString().slice(0,10) : h.date, qty: h.qty}))
       })),
       realizedGains: realized.map(r=>({
         date:r.date.toISOString().slice(0,10), year:r.date.getUTCFullYear(), account:r.account, group:r.groupKey, symbol:r.symbol,
