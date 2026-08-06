@@ -785,6 +785,13 @@
         const avg = pos.qty>0 ? pos.totalCost/pos.qty : 0;
         const costBasisUsed = t.qty * avg;
         const proceeds = t.qty * t.price;
+        // Selling more than the recorded holding means the transaction data is incomplete
+        // (most often a missing purchase or transfer-in). Left unflagged this produces a
+        // negative position and a plausible-looking but wrong gain, so it is surfaced loudly
+        // rather than absorbed silently.
+        if (t.qty > pos.qty + 0.0001){
+          notes.push(`${t.symbol} (${groupKey}, ${t.date.toISOString().slice(0,10)}): Verkauf über ${fmt(t.qty)} Stück, aber nur ${fmt(pos.qty)} im Bestand — es fehlt vermutlich ein Kauf/Zugang in den Daten. Gewinn/Verlust und Kostenbasis für diese Position sind dadurch unzuverlässig. / Sale of ${fmt(t.qty)} units but only ${fmt(pos.qty)} on record — a purchase or transfer-in is probably missing from your data, so this position's gain and cost basis are unreliable.`);
+        }
         realized.push({date:t.date, account:t.account, groupKey, symbol:t.symbol, qty:t.qty, proceeds, costBasis:costBasisUsed, gain:proceeds-costBasisUsed, currency:pos.currency, kind:'Verkauf'});
         pos.qty -= t.qty;
         pos.totalCost -= costBasisUsed;
@@ -809,6 +816,9 @@
           const avg = pos.qty>0 ? pos.totalCost/pos.qty : 0;
           const costBasisUsed = t.qty * avg;
           const proceeds = t.qty * t.price;
+          if (t.qty > pos.qty + 0.0001){
+            notes.push(`${t.symbol} (${groupKey}, ${t.date.toISOString().slice(0,10)}): Abgang über ${fmt(t.qty)} Stück, aber nur ${fmt(pos.qty)} im Bestand — es fehlt vermutlich ein Kauf/Zugang in den Daten. Gewinn/Verlust und Kostenbasis für diese Position sind dadurch unzuverlässig. / Disposal of ${fmt(t.qty)} units but only ${fmt(pos.qty)} on record — a purchase or transfer-in is probably missing, so this position's gain and cost basis are unreliable.`);
+          }
           realized.push({date:t.date, account:t.account, groupKey, symbol:t.symbol, qty:t.qty, proceeds, costBasis:costBasisUsed, gain:proceeds-costBasisUsed, currency:pos.currency, kind:'Verkauf (Depotabgang)'});
           pos.qty -= t.qty;
           pos.totalCost -= costBasisUsed;
@@ -1201,7 +1211,11 @@
         const sum = parseFloat(sumStr);
         if (isNaN(sum)) return;
         const m = meldedatum.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-        const isoDate = m ? `${m[3]}-${m[2]}-${m[1]}` : meldedatum;
+        // Rows without a real date (e.g. a literal "-" where the fund didn't report that
+        // period) aren't comparable to anything, so they're skipped rather than reported as
+        // mismatches — otherwise they pad the difference list with noise that looks like bugs.
+        if (!m) return;
+        const isoDate = `${m[3]}-${m[2]}-${m[1]}`;
         entries.push({isin, meldedatum: isoDate, referenceSum: sum});
       });
     }
@@ -1305,6 +1319,59 @@
       renderCombineRulesUI();
     }
   })();
+
+  // ---------- Test/audit hook ----------
+  // Exposes the cost-basis engine so it can be exercised directly, making the calculation
+  // independently auditable against exactly the code that ships.
+  window.__depotCore = {
+    runEngine, qtyAtDateLocal, parseReferenceCSV, num,
+    KNOWN_ISIN_MAP, KNOWN_FUND_NAMES,
+    getState: () => state,
+    setState: (s) => { state = Object.assign(state, s); },
+    resetState: () => {
+      state = { transactions: [], accounts: {}, symbolMap: {}, results: null,
+                stepUpDate: null, combineRules: [], korrekturData: [],
+                transferMatchMode: false, stepUpValues: {} };
+    },
+    // Convenience: load a scenario and run the engine, returning a plain serialisable result.
+    run: (scenario) => {
+      state = { transactions: [], accounts: {}, symbolMap: {}, results: null,
+                stepUpDate: null, combineRules: [], korrekturData: [],
+                transferMatchMode: false, stepUpValues: {} };
+      state.accounts = scenario.accounts || {};
+      state.symbolMap = scenario.symbolMap || {};
+      state.stepUpDate = scenario.stepUpDate || null;
+      state.stepUpValues = scenario.stepUpValues || {};
+      state.combineRules = scenario.combineRules || [];
+      state.korrekturData = scenario.korrekturData || [];
+      state.transferMatchMode = !!scenario.transferMatchMode;
+      state.transactions = (scenario.transactions || []).map((t, i) => ({
+        account: t.account, date: new Date(t.date + 'T00:00:00Z'), transType: t.transType,
+        symbol: t.symbol, qty: t.qty, price: t.price, fee: t.fee || 0,
+        totalAmnt: t.totalAmnt || 0, rowIndex: t.rowIndex !== undefined ? t.rowIndex : i
+      }));
+      runEngine();
+      const res = state.results;
+      return {
+        positions: Object.values(res.positions).map(p => ({
+          groupKey: p.groupKey, symbol: p.symbol, currency: p.currency,
+          qty: p.qty, totalCost: p.totalCost,
+          avgCost: p.qty > 0 ? p.totalCost / p.qty : 0,
+          history: p.history.map(h => ({
+            date: h.date instanceof Date ? h.date.toISOString().slice(0, 10) : h.date,
+            qty: h.qty
+          }))
+        })),
+        realized: res.realized.map(r => ({
+          date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : r.date,
+          account: r.account, groupKey: r.groupKey, symbol: r.symbol, qty: r.qty,
+          proceeds: r.proceeds, costBasis: r.costBasis, gain: r.gain,
+          currency: r.currency, kind: r.kind
+        })),
+        notes: res.notes
+      };
+    }
+  };
 
 })();
 </script>

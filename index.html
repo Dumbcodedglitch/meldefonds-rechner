@@ -198,6 +198,54 @@
   }
   .ent-year{-moz-appearance:textfield;}
   .ent-year::-webkit-outer-spin-button, .ent-year::-webkit-inner-spin-button{-webkit-appearance:none; margin:0;}
+  /* ---- Statistics dashboard ---- */
+  .kpi-band{
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(168px,1fr));
+    gap:1px; background:var(--hairline); border:1px solid var(--hairline);
+    border-radius:8px; overflow:hidden; margin-bottom:22px;
+  }
+  .kpi{background:var(--surface); padding:18px 20px;}
+  .kpi .k-label{
+    font-family:'IBM Plex Mono', monospace; font-size:9.5px; letter-spacing:.13em;
+    text-transform:uppercase; color:var(--muted); margin-bottom:9px; line-height:1.35;
+  }
+  .kpi .k-value{
+    font-family:'IBM Plex Mono', monospace; font-size:21px; font-variant-numeric:tabular-nums;
+    letter-spacing:-0.03em; line-height:1.15; color:var(--ink);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .kpi .k-sub{font-size:11.5px; color:var(--muted); margin-top:7px; line-height:1.4;}
+  .kpi.accent .k-value{color:var(--teal);}
+  .kpi.warn .k-value{color:var(--brick);}
+
+  .chart-card{
+    background:var(--surface); border:1px solid var(--hairline); border-radius:8px;
+    padding:22px 24px 18px; margin-bottom:18px;
+  }
+  .chart-card h3{
+    font-family:'Source Serif 4', serif; font-size:17px; font-weight:600; margin:0 0 3px;
+  }
+  .chart-card .c-sub{color:var(--muted); font-size:12.5px; margin-bottom:18px; line-height:1.55;}
+  .chart-card table td, .chart-card table th{white-space:nowrap;}
+  .chart-card table{font-size:12.5px;}
+  .chart-holder{width:100%; overflow-x:auto;}
+  .chart-holder svg{display:block;}
+  .chart-holder svg text{font-family:'IBM Plex Mono', monospace;}
+
+  .chart-legend{display:flex; gap:18px; flex-wrap:wrap; margin-top:14px; font-size:12px; color:var(--muted);}
+  .chart-legend .li{display:flex; align-items:center; gap:7px;}
+  .chart-legend .sw{width:11px; height:11px; border-radius:2.5px; display:inline-block;}
+
+  .stats-empty{
+    background:var(--surface); border:1px solid var(--hairline); border-radius:8px;
+    padding:48px 24px; text-align:center; color:var(--muted); font-size:13.5px; line-height:1.7;
+  }
+  .insight{
+    background:var(--teal-bg); border:1px solid #C7DAD2; border-left:3px solid var(--teal);
+    border-radius:0 6px 6px 0; padding:13px 16px; font-size:12.5px; color:#1F4A3F;
+    margin-top:16px; line-height:1.6;
+  }
+  .insight b{color:var(--teal);}
 </style>
 </head>
 <body>
@@ -223,6 +271,7 @@
     <div class="tab" data-tab="entries"><span class="n">2</span>Meldedaten <span style="opacity:.6;">/ Reporting data</span></div>
     <div class="tab" data-tab="income"><span class="n">3</span>Einkommen <span style="opacity:.6;">/ Income</span></div>
     <div class="tab" data-tab="results"><span class="n">4</span>Ergebnis <span style="opacity:.6;">/ Result</span></div>
+    <div class="tab" data-tab="stats"><span class="n">5</span>Statistik <span style="opacity:.6;">/ Statistics</span></div>
     <div class="tab" data-tab="tariff"><span class="n">⚙</span>Tarif <span style="opacity:.6;">/ Tax brackets</span></div>
   </div>
 
@@ -267,6 +316,17 @@
       Achtung: die Seite zeigt auch eine „Anzahl Anteile zum Zuflusszeitpunkt" — das ist die <b>Gesamtzahl aller Anteile des Fonds</b>, nicht deine persönliche Anzahl. Für das Feld „Anteile" unten trägst du ein, wie viele Anteile <b>du selbst</b> laut deinem Depotauszug zum Meldestichtag gehalten hast.
       <p style="margin:10px 0 0; font-style:italic; color:var(--muted);">What to read off the OeKB fund page: it shows two columns — "Privatanleger mit Option" and "Privatanleger ohne Option." Since you hold via a foreign broker, the "ohne Option" column applies to you (tax-return line 937/998), not the first one. "Ausschüttungsgleiche Erträge" is the deemed-distributed income per unit that's taxable each year; "Anzurechnende ausländische (Quellen-)Steuer" is the foreign tax credit per unit; "Die Anschaffungskosten... sind zu korrigieren um" adjusts your cost basis for a future sale (informational, see below). Note: "Anzahl Anteile zum Zuflusszeitpunkt" is the fund's total units outstanding, not your personal holding — the "Anteile" field below is for how many units <b>you</b> held per your own broker statement.</p>
     </div>
+    <div class="card" style="margin-top:6px;">
+      <h2 style="font-size:15px;">Automatisch von GitHub abholen <span style="font-weight:400; color:var(--muted); font-size:12.5px;">/ Auto-pull from GitHub</span></h2>
+      <div class="sub">Trag einmalig den "raw"-Link zu deiner <code>oekb-data.json</code> im GitHub-Repo ein (z. B. https://raw.githubusercontent.com/DEIN-NAME/REPO/main/data/oekb-data.json) — wird gemerkt, und ab dann reicht ein Klick, kein Download/Upload mehr nötig. / Enter the "raw" link to your oekb-data.json in your GitHub repo once — remembered from then on, one click instead of manual download/upload.</div>
+      <div class="row" style="margin-top:8px;">
+        <div style="flex:3;">
+          <input type="text" id="github-raw-url" placeholder="https://raw.githubusercontent.com/username/repo/main/data/oekb-data.json">
+        </div>
+        <div style="flex:0;"><button class="ghost small" id="github-fetch-btn" type="button">↻ Neue Daten prüfen / Check for new data</button></div>
+      </div>
+      <div id="github-fetch-status" style="font-size:12px; color:var(--muted); margin-top:6px;"></div>
+    </div>
     <div style="margin-bottom:14px; display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap;">
       <label class="ghost small" style="display:inline-block; padding:5px 10px; border:1px solid var(--hairline); border-radius:4px; cursor:pointer; font-weight:600;">
         ⭱ Daten vom Auto-Abruf-Script importieren
@@ -305,6 +365,10 @@
   </div>
 
   <!-- TAB 5: TARIFF -->
+  <div class="panel" id="panel-stats">
+    <div id="stats-content"></div>
+  </div>
+
   <div class="panel" id="panel-tariff">
     <div class="card">
       <h2>Steuertarif-Tabellen <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Tax bracket tables</span></h2>
@@ -359,6 +423,7 @@
     entries: [],     // {id, fundId, year, agePerUnit, quellensteuerPerUnit, korrekturPerUnit, units}
     income: {},      // year -> {other, otherCapital}
     incomeItems: [], // {id, year, category:'deposit'|'capital', label, rateDate, currency, amount, fxRate, fxRateDateUsed}
+    githubRawUrl: '', // saved raw.githubusercontent.com link to oekb-data.json, for one-click re-fetching
     tariffs: JSON.parse(JSON.stringify(DEFAULT_TARIFFS)),
     openFund: null,
   };
@@ -629,6 +694,358 @@
     return {ok:false, msg:'Kurs konnte nicht automatisch abgerufen werden (keine Internetverbindung? CORS?). Bitte manuell auf frankfurter.app/'+entry.rateDate+'?from='+entry.currency+'&to=EUR nachsehen und eintragen.'};
   }
 
+  // ---------- Statistics dashboard ----------
+  // Charts are hand-rolled SVG: no external library, so nothing to load, nothing to break,
+  // and full control over how the numbers read.
+  const C = {
+    tax:    '#8B6F2E',   // brass — tax actually owed
+    saved:  '#2F6F62',   // teal  — money kept
+    age:    '#6E5722',
+    other:  '#9C8448',
+    dep:    '#B7A06B',
+    credit: '#2F6F62',
+    loss:   '#9C4A3C',
+    grid:   '#E7E1D2',
+    axis:   '#69726A'
+  };
+
+  function svgWrap(w, h, inner){
+    return `<div class="chart-holder"><svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" preserveAspectRatio="xMinYMin meet">${inner}</svg></div>`;
+  }
+  // Picks an axis maximum whose quarter-divisions are themselves round numbers, so ticks read
+  // as 0/7k/14k/21k/28k rather than 0/6.25k/12.5k/18.75k/25k.
+  function niceMax(v){
+    if (v <= 0) return 1;
+    const ladder = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 10];
+    const target = v / 4;
+    const mag = Math.pow(10, Math.floor(Math.log10(target)));
+    const n = target / mag;
+    const step = ladder.find(s => n <= s + 1e-9) || 10;
+    return step * mag * 4;
+  }
+  // Tick labels adapt their precision to the range: without this, a small or all-zero range
+  // renders duplicated ticks like "0 0 1 1 1", which reads as broken.
+  function axisLabel(v, max){
+    const scale = Math.abs(max === undefined ? v : max);
+    const a = Math.abs(v);
+    if (scale >= 1000000) return (v/1000000).toFixed(a % 1000000 === 0 ? 0 : 1) + 'M';
+    if (scale >= 10000)   return (v/1000).toFixed(0) + 'k';
+    if (scale >= 1000)    return (v/1000).toFixed(1) + 'k';
+    if (scale >= 10)      return String(Math.round(v));
+    if (scale >= 1)       return v.toFixed(1);
+    return v.toFixed(2);
+  }
+  // Rounded-top bar, drawn as a path so the corner radius never exceeds the bar height.
+  function barPath(x, y, w, h, r){
+    if (h <= 0.5) return '';
+    const rr = Math.min(r, w/2, h);
+    return `M${x},${y+h} L${x},${y+rr} Q${x},${y} ${x+rr},${y} L${x+w-rr},${y} Q${x+w},${y} ${x+w},${y+rr} L${x+w},${y+h} Z`;
+  }
+
+  // Grouped / stacked column chart with an optional overlaid rate line.
+  function columnChart(opts){
+    const { categories, series, height = 300, line = null, lineLabel = '' } = opts;
+    const W = 940, H = height, padL = 66, padR = line ? 58 : 20, padT = 22, padB = 44;
+    if (!categories.length) return '<div class="empty">Keine Daten / No data</div>';
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+
+    const stacked = !!opts.stacked;
+    let maxV = 0;
+    categories.forEach((_, i) => {
+      if (stacked) maxV = Math.max(maxV, series.reduce((s, sr) => s + Math.max(0, sr.values[i] || 0), 0));
+      else series.forEach(sr => { maxV = Math.max(maxV, sr.values[i] || 0); });
+    });
+    // An all-zero chart is a real and meaningful outcome here (no tax owed), so it gets an
+    // explicit statement rather than an empty grid the reader has to interpret.
+    const allZero = maxV <= 0.005;
+    maxV = niceMax(maxV || 1);
+    const sy = v => padT + plotH - (v / maxV) * plotH;
+
+    let g = '';
+    for (let i = 0; i <= 4; i++){
+      const v = maxV * i / 4, y = sy(v);
+      g += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="${C.grid}" stroke-width="1"/>`;
+      g += `<text x="${padL-10}" y="${(y+3.5).toFixed(1)}" fill="${C.axis}" font-size="10" text-anchor="end">${allZero && i>0 ? '' : axisLabel(v, maxV)}</text>`;
+    }
+    if (allZero){
+      g += `<text x="${(padL + plotW/2).toFixed(1)}" y="${(padT + plotH/2).toFixed(1)}" fill="${C.axis}" font-size="12.5" text-anchor="middle" opacity="0.85">keine Beträge in diesem Zeitraum / nothing owed in this period</text>`;
+    }
+
+    const slot = plotW / categories.length;
+    const groupW = slot * 0.6;
+    let bars = '';
+    categories.forEach((cat, i) => {
+      const cx = padL + slot * i + slot / 2;
+      if (stacked){
+        let acc = 0;
+        series.forEach(sr => {
+          const v = Math.max(0, sr.values[i] || 0);
+          if (v <= 0) return;
+          const y = sy(acc + v), h = sy(acc) - sy(acc + v);
+          bars += `<path d="${barPath(cx - groupW/2, y, groupW, h, 3)}" fill="${sr.color}"><title>${sr.name}: ${fmt(v)} €</title></path>`;
+          acc += v;
+        });
+      } else {
+        const bw = groupW / series.length;
+        series.forEach((sr, si) => {
+          const v = Math.max(0, sr.values[i] || 0);
+          const y = sy(v), h = sy(0) - sy(v);
+          const x = cx - groupW/2 + si * bw;
+          bars += `<path d="${barPath(x + bw*0.08, y, bw*0.84, h, 3)}" fill="${sr.color}"><title>${sr.name}: ${fmt(v)} €</title></path>`;
+        });
+      }
+      bars += `<text x="${cx.toFixed(1)}" y="${H-22}" fill="${C.axis}" font-size="11" text-anchor="middle">${cat}</text>`;
+    });
+
+    let lineEls = '';
+    if (line && line.some(v => v !== null && !isNaN(v))){
+      const lmax = niceMax(Math.max(...line.filter(v=>v!==null && !isNaN(v)), 0.0001));
+      const ly = v => padT + plotH - (v / lmax) * plotH;
+      const pts = line.map((v, i) => v === null || isNaN(v) ? null : `${(padL + slot*i + slot/2).toFixed(1)},${ly(v).toFixed(1)}`).filter(Boolean);
+      if (pts.length){
+        lineEls += `<polyline points="${pts.join(' ')}" fill="none" stroke="${C.loss}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+        line.forEach((v, i) => {
+          if (v === null || isNaN(v)) return;
+          lineEls += `<circle cx="${(padL + slot*i + slot/2).toFixed(1)}" cy="${ly(v).toFixed(1)}" r="3.5" fill="${C.surface||'#fff'}" stroke="${C.loss}" stroke-width="2"><title>${lineLabel}: ${(v*100).toFixed(2)} %</title></circle>`;
+        });
+        for (let i = 0; i <= 4; i++){
+          const v = lmax * i / 4;
+          const dp = lmax >= 0.1 ? 0 : lmax >= 0.02 ? 1 : 2;
+          lineEls += `<text x="${W-padR+10}" y="${(ly(v)+3.5).toFixed(1)}" fill="${C.loss}" font-size="10" text-anchor="start" opacity="0.8">${(v*100).toFixed(dp)}%</text>`;
+        }
+      }
+    }
+    return svgWrap(W, H, g + bars + lineEls);
+  }
+
+  // Horizontal ranked bars — better than columns when labels are long (fund names).
+  function rankedBars(rows, opts){
+    opts = opts || {};
+    if (!rows.length) return '<div class="empty">Keine Daten / No data</div>';
+    const rowH = 30, W = 940, padL = 268, padR = 96, padT = 6;
+    // Labels are right-anchored against the gutter, so anything wider than the gutter is
+    // clipped off the left edge of the viewBox. Truncate to what actually fits (monospace at
+    // 11.5px is ~6.9px per character) rather than letting names disappear.
+    const maxChars = Math.floor((padL - 14) / 6.9);
+    const fitLabel = s => s.length > maxChars ? s.slice(0, maxChars - 1) + '…' : s;
+    const H = padT + rows.length * rowH + 6;
+    const maxV = Math.max(...rows.map(r => Math.abs(r.value)), 1);
+    const plotW = W - padL - padR;
+    let out = '';
+    rows.forEach((r, i) => {
+      const y = padT + i * rowH;
+      const w = (Math.abs(r.value) / maxV) * plotW;
+      const color = r.color || (r.value >= 0 ? C.tax : C.loss);
+      out += `<text x="${padL-12}" y="${y+19}" fill="${C.axis}" font-size="11.5" text-anchor="end">${fitLabel(r.label)}<title>${r.label}</title></text>`;
+      out += `<rect x="${padL}" y="${y+7}" width="${plotW}" height="15" rx="3" fill="${C.grid}" opacity="0.55"/>`;
+      out += `<path d="${barPath(padL, y+7, Math.max(w,1.5), 15, 3)}" fill="${color}"><title>${r.label}: ${fmt(r.value)} ${opts.unit||'€'}</title></path>`;
+      out += `<text x="${padL+plotW+10}" y="${y+19}" fill="${C.axis}" font-size="11" text-anchor="start">${fmt(r.value)}</text>`;
+    });
+    return svgWrap(W, H, out);
+  }
+
+  function legend(items){
+    return `<div class="chart-legend">${items.map(i=>`<div class="li"><span class="sw" style="background:${i.color}"></span>${i.label}</div>`).join('')}</div>`;
+  }
+
+  function renderStats(){
+    const el = document.getElementById('stats-content');
+    const years = getYearsFromEntries();
+    if (!years.length){
+      el.innerHTML = `<div class="stats-empty">Noch keine Daten zum Auswerten.<br>Erfasse zuerst Fonds und Meldedaten — die Statistik entsteht dann automatisch.<br><span style="opacity:.7;">Nothing to visualise yet. Add funds and reporting data first; the statistics build themselves.</span></div>`;
+      return;
+    }
+
+    const R = years.map(y => computeYear(y));
+    const yLabels = years.map(String);
+
+    // The tax a year's capital income actually causes is the difference between the total bill
+    // and what would have been owed on the other (non-capital) income alone. Dividing the whole
+    // tax bill by capital income would blend in tax on employment income and produce nonsense
+    // rates — over 100% whenever other income dominates.
+    R.forEach(r => {
+      const baseTax = Math.max(r.flatTax - r.capitalFlatOnly, 0); // tariff on other income, after Familienbonus
+      r.capitalAttributableTax = Math.max(r.chosenTax - baseTax, 0);
+      r.effRateOnCapital = r.capitalIncome > 0 ? r.capitalAttributableTax / r.capitalIncome : null;
+    });
+
+    const totalNet      = R.reduce((s,r)=>s+r.netTax, 0);
+    const totalCapital  = R.reduce((s,r)=>s+r.capitalIncome, 0);
+    const totalCapTax   = R.reduce((s,r)=>s+r.capitalAttributableTax, 0);
+    const totalCredit   = R.reduce((s,r)=>s+r.creditApplied, 0);
+    const totalRefund   = R.reduce((s,r)=>s+r.refundable, 0);
+    const totalSaved    = R.reduce((s,r)=>s+Math.max(r.flatTax - r.progTax, 0), 0);
+    const totalWasted   = R.reduce((s,r)=>s+(r.familienbonusWasted||0), 0);
+    const effOverall    = totalCapital > 0 ? totalCapTax / totalCapital : 0;
+    const progYears     = R.filter(r=>r.winnerIsProgressive).length;
+
+    // cumulative cost-basis correction across all funds — the tax already pre-paid that
+    // will reduce a future capital gain
+    const totalKorrektur = state.funds.reduce((s,f)=>s+fundCostBasisCumulative(f.id), 0);
+
+    const kpis = `
+      <div class="kpi-band">
+        <div class="kpi">
+          <div class="k-label">Steuer gesamt<br>Total tax</div>
+          <div class="k-value">${fmt(totalNet)}&nbsp;€</div>
+          <div class="k-sub">über ${years.length} Jahr(e) / across ${years.length} year(s)</div>
+        </div>
+        <div class="kpi">
+          <div class="k-label">Effektiver Satz auf Kapital<br>Effective rate on capital</div>
+          <div class="k-value">${(effOverall*100).toFixed(2)} %</div>
+          <div class="k-sub">${fmt(totalCapTax)} € Steuer auf ${fmt(totalCapital)} € Kapitaleinkommen</div>
+        </div>
+        <div class="kpi accent">
+          <div class="k-label">Durch Regelbesteuerung gespart<br>Saved by opting in</div>
+          <div class="k-value">${fmt(totalSaved)}&nbsp;€</div>
+          <div class="k-sub">günstiger in ${progYears} von ${years.length} Jahren</div>
+        </div>
+        <div class="kpi accent">
+          <div class="k-label">Angerechnete Steuer<br>Tax credited</div>
+          <div class="k-value">${fmt(totalCredit)}&nbsp;€</div>
+          <div class="k-sub">${totalRefund > 0.005 ? fmt(totalRefund)+' € erstattungsfähig / refundable' : 'keine Erstattung offen'}</div>
+        </div>
+        <div class="kpi">
+          <div class="k-label">Vorausbezahlt in Kostenbasis<br>Pre-paid into cost basis</div>
+          <div class="k-value">${fmt(totalKorrektur)}&nbsp;€</div>
+          <div class="k-sub">senkt künftige Verkaufsgewinne / reduces future capital gains</div>
+        </div>
+      </div>`;
+
+    // 1 — tax per year with effective rate overlay
+    const effRates = R.map(r => r.effRateOnCapital);
+    const chart1 = `
+      <div class="chart-card">
+        <h3>Steuerlast pro Jahr <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Tax per year</span></h3>
+        <div class="c-sub">Balken: tatsächlich geschuldete Steuer nach Anrechnung. Linie: effektiver Satz auf das Kapitaleinkommen — also nur die Steuer, die das Kapitaleinkommen zusätzlich auslöst, nicht die Steuer auf dein übriges Einkommen. <span style="opacity:.75;">Bars: tax actually owed after credits. Line: effective rate on capital income — only the tax the capital income itself causes, not tax on your other income.</span></div>
+        ${columnChart({
+          categories: yLabels,
+          series: [{ name:'Steuer nach Anrechnung', color: C.tax, values: R.map(r=>r.netTax) }],
+          line: effRates, lineLabel: 'Effektiver Satz', height: 300
+        })}
+        ${legend([{color:C.tax,label:'Steuer nach Anrechnung / Tax owed'},{color:C.loss,label:'Effektiver Satz auf Kapital / Effective rate on capital (rechte Achse)'}])}
+      </div>`;
+
+    // 2 — the two regimes side by side
+    const chart2 = `
+      <div class="chart-card">
+        <h3>KESt gegen Regelbesteuerung <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Flat rate vs. progressive option</span></h3>
+        <div class="c-sub">Was du in jedem Jahr unter beiden Varianten zahlen würdest — die niedrigere gewinnt. <span style="opacity:.75;">What each year would cost under both regimes; the lower one wins.</span></div>
+        ${columnChart({
+          categories: yLabels,
+          series: [
+            { name:'KESt 27,5/25 %', color: C.other, values: R.map(r=>r.flatTax) },
+            { name:'Regelbesteuerung', color: C.saved, values: R.map(r=>r.progTax) }
+          ], height: 300
+        })}
+        ${legend([{color:C.other,label:'KESt (pauschal) / flat'},{color:C.saved,label:'Regelbesteuerung / progressive'}])}
+        ${totalSaved > 0.005 ? `<div class="insight">Die Regelbesteuerungsoption hat dir über den erfassten Zeitraum <b>${fmt(totalSaved)} €</b> gespart. <span style="opacity:.8;">/ Opting into progressive taxation saved you ${fmt(totalSaved)} € over the period covered.</span></div>` : ''}
+      </div>`;
+
+    // 3 — where the taxable income comes from
+    const chart3 = `
+      <div class="chart-card">
+        <h3>Zusammensetzung des Kapitaleinkommens <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Composition of capital income</span></h3>
+        <div class="c-sub">Ausschüttungsgleiche Erträge sind Erträge, die du nie als Bargeld erhalten hast — trotzdem jedes Jahr steuerpflichtig. <span style="opacity:.75;">Deemed distributed income is never received in cash, yet taxed every year.</span></div>
+        ${columnChart({
+          categories: yLabels, stacked: true,
+          series: [
+            { name:'Ausschüttungsgleiche Erträge', color: C.age,   values: R.map(r=>r.ageTotal) },
+            { name:'Sonstige Kapitalerträge 27,5 %', color: C.other, values: R.map(r=>r.otherCapital) },
+            { name:'Zinsen 25 %',                   color: C.dep,   values: R.map(r=>r.depositInterest) }
+          ], height: 300
+        })}
+        ${legend([
+          {color:C.age,label:'Ausschüttungsgleiche Erträge / Deemed distributed'},
+          {color:C.other,label:'Sonstige Kapitalerträge 27,5 % / Other capital income'},
+          {color:C.dep,label:'Zinsen 25 % / Deposit interest'}
+        ])}
+      </div>`;
+
+    // 4 — per-fund contribution to taxable income
+    const fundRows = state.funds.map(f=>{
+      const total = state.entries.filter(e=>e.fundId===f.id)
+        .reduce((s,e)=> s + num(e.agePerUnit)*num(e.units)*fxOf(e), 0);
+      return { label: (f.name||f.isin), value: total, isin: f.isin };
+    }).filter(r=>Math.abs(r.value) > 0.005).sort((a,b)=>b.value-a.value);
+
+    const chart4 = fundRows.length ? `
+      <div class="chart-card">
+        <h3>Steuerpflichtiger Ertrag je Fonds <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Taxable income by fund</span></h3>
+        <div class="c-sub">Summe der ausschüttungsgleichen Erträge über alle erfassten Meldejahre. <span style="opacity:.75;">Total deemed distributed income across all reporting years on record.</span></div>
+        ${rankedBars(fundRows)}
+      </div>` : '';
+
+    // 5 — cumulative cost-basis correction per fund (the pre-paid tax story)
+    const korrRows = state.funds.map(f=>({
+      label: (f.name||f.isin),
+      value: fundCostBasisCumulative(f.id),
+      color: C.saved
+    })).filter(r=>Math.abs(r.value) > 0.005).sort((a,b)=>b.value-a.value);
+
+    const chart5 = korrRows.length ? `
+      <div class="chart-card">
+        <h3>Aufgelaufene Anschaffungskosten-Korrektur <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Accumulated cost-basis adjustment</span></h3>
+        <div class="c-sub">Diese Beträge erhöhen deine Anschaffungskosten und senken damit den steuerpflichtigen Gewinn beim späteren Verkauf — die Gegenbuchung zur jährlich vorausbezahlten Steuer. <span style="opacity:.75;">These raise your cost basis and therefore reduce the taxable gain when you eventually sell — the counterpart to the tax you pre-pay each year.</span></div>
+        ${rankedBars(korrRows)}
+        <div class="insight">Ein hoher Wert hier bedeutet: du hast über die Jahre viel Steuer auf Erträge gezahlt, die dir nie als Bargeld zugeflossen sind. Beim Verkauf schlägt sich das als geringerer Gewinn — oder als Verlust — nieder. <span style="opacity:.8;">/ A high figure means you paid tax over the years on income you never received in cash. On sale that shows up as a smaller gain — or a loss.</span></div>
+      </div>` : '';
+
+    // 6 — per-year detail table
+    const table = `
+      <div class="chart-card">
+        <h3>Jahresübersicht <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Year-by-year detail</span></h3>
+        <div class="c-sub">Alle Kennzahlen im Detail, zum Abgleich mit deiner Steuererklärung.</div>
+        <div style="overflow-x:auto;">
+        <table style="margin-top:4px; min-width:880px;">
+          <thead><tr>
+            <th>Jahr / Year</th>
+            <th style="text-align:right;">Kapitaleinkommen</th>
+            <th style="text-align:right;">KESt</th>
+            <th style="text-align:right;">Regelbest.</th>
+            <th style="text-align:right;">Gewählt</th>
+            <th style="text-align:right;">Anrechnung</th>
+            <th style="text-align:right;">Steuer netto</th>
+            <th style="text-align:right;">davon auf Kapital</th>
+            <th style="text-align:right;">Eff. Satz Kapital</th>
+          </tr></thead>
+          <tbody>
+            ${R.map(r=>`<tr>
+              <td class="num">${r.year}</td>
+              <td class="num" style="text-align:right;">${fmt(r.capitalIncome)} €</td>
+              <td class="num" style="text-align:right; ${r.winnerIsProgressive?'color:var(--muted);':'font-weight:600;'}">${fmt(r.flatTax)} €</td>
+              <td class="num" style="text-align:right; ${r.winnerIsProgressive?'font-weight:600;':'color:var(--muted);'}">${fmt(r.progTax)} €</td>
+              <td class="num" style="text-align:right;">${fmt(r.chosenTax)} €</td>
+              <td class="num" style="text-align:right; color:var(--teal);">− ${fmt(r.creditApplied)} €</td>
+              <td class="num" style="text-align:right; font-weight:600;">${fmt(r.netTax)} €</td>
+              <td class="num" style="text-align:right;">${fmt(r.capitalAttributableTax)} €</td>
+              <td class="num" style="text-align:right;">${r.effRateOnCapital!==null ? (r.effRateOnCapital*100).toFixed(2)+' %' : '—'}</td>
+            </tr>`).join('')}
+            <tr style="border-top:2px solid var(--hairline);">
+              <td class="num" style="font-weight:600;">Σ</td>
+              <td class="num" style="text-align:right; font-weight:600;">${fmt(totalCapital)} €</td>
+              <td class="num" style="text-align:right; color:var(--muted);">${fmt(R.reduce((s,r)=>s+r.flatTax,0))} €</td>
+              <td class="num" style="text-align:right; color:var(--muted);">${fmt(R.reduce((s,r)=>s+r.progTax,0))} €</td>
+              <td class="num" style="text-align:right;">${fmt(R.reduce((s,r)=>s+r.chosenTax,0))} €</td>
+              <td class="num" style="text-align:right; color:var(--teal);">− ${fmt(totalCredit)} €</td>
+              <td class="num" style="text-align:right; font-weight:600;">${fmt(totalNet)} €</td>
+              <td class="num" style="text-align:right; font-weight:600;">${fmt(totalCapTax)} €</td>
+              <td class="num" style="text-align:right; font-weight:600;">${(effOverall*100).toFixed(2)} %</td>
+            </tr>
+          </tbody>
+        </table>
+        </div>
+      </div>`;
+
+    const faboNote = totalWasted > 0.005 ? `
+      <div class="chart-card" style="border-left:3px solid var(--brick);">
+        <h3>Ungenutzter Familienbonus <span style="font-weight:400; color:var(--muted); font-size:13px;">/ Unused Familienbonus</span></h3>
+        <div class="c-sub" style="margin-bottom:6px;">Insgesamt <b style="color:var(--brick);">${fmt(totalWasted)} €</b> Familienbonus konnten im jeweils gewählten Besteuerungspfad nicht genutzt werden, weil kein ausreichender Tarifsteuerbetrag zum Abziehen vorhanden war. Der Absetzbetrag ist nicht erstattungsfähig — er verfällt. <span style="opacity:.75;">/ ${fmt(totalWasted)} € of Familienbonus couldn't be used, because there wasn't enough tariff tax to offset. The credit is non-refundable, so it simply lapses.</span></div>
+      </div>` : '';
+
+    el.innerHTML = kpis + chart1 + chart2 + chart3 + chart4 + chart5 + faboNote + table;
+  }
+
   // ---------- Tabs ----------
   document.querySelectorAll('.tab').forEach(tab=>{
     tab.addEventListener('click', ()=>{
@@ -637,6 +1054,7 @@
       tab.classList.add('active');
       document.getElementById('panel-'+tab.dataset.tab).classList.add('active');
       if (tab.dataset.tab === 'results') renderResults();
+      if (tab.dataset.tab === 'stats') renderStats();
       if (tab.dataset.tab === 'income') renderIncome();
       if (tab.dataset.tab === 'tariff') renderTariff();
     });
@@ -1288,61 +1706,60 @@
 
   // Merge-import for the OeKB Auto-Abruf userscript's output ({funds:[{isin,name}], entries:[{isin,year,...}]})
   // Upserts by ISIN + year instead of overwriting the whole state, so existing data (units, other funds) is preserved.
+  function mergeScriptData(parsed){
+    if (!Array.isArray(parsed.funds) || !Array.isArray(parsed.entries)) throw new Error('invalid');
+    snapshotForUndo();
+    let fundsAdded = 0, fundsMatched = 0, entriesAdded = 0, entriesUpdated = 0;
+    const isinToFundId = {};
+    state.funds.forEach(f => { isinToFundId[f.isin.toUpperCase()] = f.id; });
+
+    parsed.funds.forEach(pf=>{
+      const isin = (pf.isin||'').toUpperCase();
+      if (!isin) return;
+      if (isinToFundId[isin]){ fundsMatched++; return; }
+      const id = uid();
+      state.funds.push({ id, isin, name: pf.name || isin });
+      isinToFundId[isin] = id;
+      fundsAdded++;
+    });
+
+    parsed.entries.forEach(pe=>{
+      const isin = (pe.isin||'').toUpperCase();
+      const fundId = isinToFundId[isin];
+      if (!fundId) return;
+      const year = parseInt(pe.year,10);
+      let existing = pe.rateDate
+        ? state.entries.find(en => en.fundId===fundId && en.rateDate===pe.rateDate)
+        : state.entries.find(en => en.fundId===fundId && en.year===year && !en.rateDate);
+      if (!existing){
+        existing = { id: uid(), fundId, year, currency:'EUR', rateDate:'', fxRate:1, fxRateDateUsed:'', agePerUnit:0, quellensteuerPerUnit:0, korrekturPerUnit:0, units:0 };
+        state.entries.push(existing);
+        entriesAdded++;
+      } else {
+        entriesUpdated++;
+      }
+      existing.year = year;
+      if (pe.currency) existing.currency = pe.currency;
+      if (pe.rateDate) existing.rateDate = pe.rateDate;
+      if (pe.agePerUnit !== null && pe.agePerUnit !== undefined) existing.agePerUnit = pe.agePerUnit;
+      if (pe.quellensteuerPerUnit !== null && pe.quellensteuerPerUnit !== undefined) existing.quellensteuerPerUnit = pe.quellensteuerPerUnit;
+      if (pe.korrekturPerUnit !== null && pe.korrekturPerUnit !== undefined) existing.korrekturPerUnit = pe.korrekturPerUnit;
+    });
+
+    const namesUpdated = refreshFundNames();
+    onChange();
+    renderFunds(); renderEntries(); renderIncome(); renderResults();
+    return { fundsAdded, fundsMatched, entriesAdded, entriesUpdated, namesUpdated };
+  }
+
   document.getElementById('import-script-input').addEventListener('change', (e)=>{
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
       try{
-        const parsed = JSON.parse(reader.result);
-        if (!Array.isArray(parsed.funds) || !Array.isArray(parsed.entries)) throw new Error('invalid');
-        snapshotForUndo();
-        let fundsAdded = 0, fundsMatched = 0, entriesAdded = 0, entriesUpdated = 0;
-        const isinToFundId = {};
-        state.funds.forEach(f => { isinToFundId[f.isin.toUpperCase()] = f.id; });
-
-        parsed.funds.forEach(pf=>{
-          const isin = (pf.isin||'').toUpperCase();
-          if (!isin) return;
-          if (isinToFundId[isin]){ fundsMatched++; return; }
-          const id = uid();
-          state.funds.push({ id, isin, name: pf.name || isin });
-          isinToFundId[isin] = id;
-          fundsAdded++;
-        });
-
-        parsed.entries.forEach(pe=>{
-          const isin = (pe.isin||'').toUpperCase();
-          const fundId = isinToFundId[isin];
-          if (!fundId) return; // fund wasn't in parsed.funds and doesn't exist locally either
-          const year = parseInt(pe.year,10);
-          // Match by fundId + rateDate (the true unique identifier of a specific OeKB filing), NOT
-          // by fundId + year — a fund can file twice in one calendar year (e.g. a catch-up filing)
-          // and file none in another; matching by year alone would silently overwrite one filing
-          // with the other instead of keeping both so they can be summed for that tax year.
-          let existing = pe.rateDate
-            ? state.entries.find(en => en.fundId===fundId && en.rateDate===pe.rateDate)
-            : state.entries.find(en => en.fundId===fundId && en.year===year && !en.rateDate);
-          if (!existing){
-            existing = { id: uid(), fundId, year, currency:'EUR', rateDate:'', fxRate:1, fxRateDateUsed:'', agePerUnit:0, quellensteuerPerUnit:0, korrekturPerUnit:0, units:0 };
-            state.entries.push(existing);
-            entriesAdded++;
-          } else {
-            entriesUpdated++;
-          }
-          existing.year = year; // keep year in sync with this filing's own rateDate-derived year
-          if (pe.currency) existing.currency = pe.currency;
-          if (pe.rateDate) existing.rateDate = pe.rateDate;
-          if (pe.agePerUnit !== null && pe.agePerUnit !== undefined) existing.agePerUnit = pe.agePerUnit;
-          if (pe.quellensteuerPerUnit !== null && pe.quellensteuerPerUnit !== undefined) existing.quellensteuerPerUnit = pe.quellensteuerPerUnit;
-          if (pe.korrekturPerUnit !== null && pe.korrekturPerUnit !== undefined) existing.korrekturPerUnit = pe.korrekturPerUnit;
-          // units and fxRate are intentionally left untouched — the script can't know your personal holding.
-        });
-
-        const namesUpdated = refreshFundNames();
-        onChange();
-        renderFunds(); renderEntries(); renderIncome(); renderResults();
-        alert(`Import fertig: ${fundsAdded} neue Fonds, ${fundsMatched} bereits vorhanden · ${entriesAdded} neue Meldejahre, ${entriesUpdated} aktualisiert · ${namesUpdated} Fondsname(n) automatisch aktualisiert.\n\nWichtig: die Anzahl der Anteile (Anteile-Feld) kennt das Script nicht — bitte bei jedem neuen Meldejahr unter "2 Meldedaten" ergänzen.`);
+        const r = mergeScriptData(JSON.parse(reader.result));
+        alert(`Import fertig: ${r.fundsAdded} neue Fonds, ${r.fundsMatched} bereits vorhanden · ${r.entriesAdded} neue Meldejahre, ${r.entriesUpdated} aktualisiert · ${r.namesUpdated} Fondsname(n) automatisch aktualisiert.\n\nWichtig: die Anzahl der Anteile (Anteile-Feld) kennt das Script nicht — bitte bei jedem neuen Meldejahr unter "2 Meldedaten" ergänzen.`);
       }catch(err){
         alert('Diese Datei konnte nicht gelesen werden. Bitte die JSON-Datei aus dem OeKB Auto-Abruf-Script wählen.');
       }
@@ -1473,12 +1890,56 @@
         if (btn) btn.disabled = false;
       }
     }catch(e){}
+    const urlInput = document.getElementById('github-raw-url');
+    if (urlInput) urlInput.value = state.githubRawUrl || '';
     renderFunds();
     renderEntries();
     renderIncome();
     renderResults();
     renderTariff();
   })();
+
+  document.getElementById('github-raw-url').addEventListener('change', (e)=>{
+    state.githubRawUrl = e.target.value.trim();
+    onChange();
+  });
+
+  document.getElementById('github-fetch-btn').addEventListener('click', async ()=>{
+    const url = document.getElementById('github-raw-url').value.trim();
+    const statusEl = document.getElementById('github-fetch-status');
+    if (!url){ statusEl.textContent = 'Bitte zuerst den Link eintragen. / Please enter the link first.'; statusEl.style.color = 'var(--brick)'; return; }
+    state.githubRawUrl = url;
+    onChange();
+    statusEl.textContent = 'Lade … / Loading …';
+    statusEl.style.color = 'var(--muted)';
+    try{
+      const res = await fetch(url + (url.includes('?') ? '&' : '?') + '_cb=' + Date.now()); // cache-bust so you always get the latest committed data
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const parsed = await res.json();
+      const r = mergeScriptData(parsed);
+      statusEl.textContent = `Aktualisiert: ${r.fundsAdded} neue Fonds, ${r.entriesAdded} neue Meldejahre, ${r.entriesUpdated} aktualisiert. / Updated: ${r.fundsAdded} new funds, ${r.entriesAdded} new filing years, ${r.entriesUpdated} refreshed.`;
+      statusEl.style.color = 'var(--teal)';
+    }catch(err){
+      statusEl.textContent = 'Abruf fehlgeschlagen (CORS/Internet/falscher Link?) — bitte stattdessen die Datei manuell herunterladen und importieren. / Fetch failed (CORS/internet/wrong link?) — please download and import the file manually instead.';
+      statusEl.style.color = 'var(--brick)';
+    }
+  });
+
+  // ---------- Test/audit hook ----------
+  // Exposes the calculation core (not the UI) so it can be exercised directly from outside.
+  // This is what makes the tax logic independently auditable: tests run against exactly the
+  // code that ships, rather than against a separate copy that could silently drift from it.
+  window.__taxCore = {
+    progressiveTax, computeYear, fxOf, num, itemsSubtotal,
+    mergeScriptData, fundCostBasisCumulative, getYearsFromEntries,
+    DEFAULT_TARIFFS, KEST_RATE, DEPOSIT_RATE,
+    getState: () => state,
+    setState: (s) => { state = Object.assign(state, s); },
+    resetState: () => {
+      state = { funds: [], entries: [], income: {}, incomeItems: [],
+                tariffs: JSON.parse(JSON.stringify(DEFAULT_TARIFFS)), openFund: null, githubRawUrl: '' };
+    }
+  };
 
 })();
 </script>
