@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-26T12:14:18.176Z",
+  "generatedAt": "2026-11-02T14:43:11.559Z",
   "funds": [
     {
       "isin": "IE00BK5BQT80",
@@ -792,6 +792,15 @@
       "agePerUnit": 1.4965,
       "quellensteuerPerUnit": 0.1396,
       "korrekturPerUnit": 1.3425
+    },
+    {
+      "isin": "IE00BKWQ0Q14",
+      "year": 2026,
+      "currency": "EUR",
+      "rateDate": "2026-10-29",
+      "agePerUnit": 11.1515,
+      "quellensteuerPerUnit": 0.5069,
+      "korrekturPerUnit": 10.3991
     },
     {
       "isin": "IE00BKWQ0Q14",
