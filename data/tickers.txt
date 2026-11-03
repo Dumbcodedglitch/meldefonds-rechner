@@ -1,0 +1,26 @@
+# Yahoo symbols whose daily prices are fetched, one per line. Lines that start with # are ignored.
+# Made by the tracker (Performance tab). Replace the list when you add or sell a security.
+AGGH.SW
+AGGU.L
+CPXJ.L
+CSPX.L
+CSUS.SW
+CUSS.L
+EIMI.L
+EMIM.AS
+EPRA.PA
+EPRU.AS
+EUNL.DE
+GAGH.PA
+HPRD.L
+IMEA.L
+IUAA.L
+IUSN.DE
+IWDA.L
+SPYE.F
+VAGF.F
+VEA
+VNQ
+VWCE.DE
+WDSC.L
+WSML.L
