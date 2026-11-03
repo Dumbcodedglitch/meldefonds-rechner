@@ -1,0 +1,51 @@
+# Fetches the daily closing prices of the securities in data/tickers.txt from Yahoo Finance and saves them in data/prices.json.
+# Made by the Austria Tax Tracker. You can also start it by hand: Actions tab > Fetch prices > Run workflow.
+name: Fetch prices
+
+"on":
+  schedule:
+    # Tuesday to Saturday at 00:30 UTC: after the close of Monday to Friday everywhere. GitHub may start it some minutes late.
+    - cron: '30 0 * * 2-6'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # lets the job save data/prices.json in this repository
+  pages: write      # lets the job ask GitHub Pages to publish the new file (last step)
+
+concurrency:
+  group: fetch-prices
+  cancel-in-progress: false
+
+jobs:
+  prices:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Fetch the prices
+        run: node scripts/fetch-prices.js data/tickers.txt data/prices.json
+
+      - name: Save the prices
+        run: |
+          git config user.name "price-bot"
+          git config user.email "actions@users.noreply.github.com"
+          if [ -f data/prices.json ]; then git add data/prices.json; fi
+          git diff --quiet --cached || git commit -m "Update prices ($(date -u +%Y-%m-%d))"
+          git pull --rebase
+          git push
+
+      - name: Ask GitHub Pages to publish the new file
+        # GitHub does not publish a Pages site again after a push made by a job with its built-in token, so the copy of
+        # data/prices.json on the site would stay old. This step asks for it. The tracker reads the newest copy straight from
+        # the repository, so it does not depend on this step; the step keeps the copy on the site up to date as well.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${{ github.repository }}/pages/builds" --silent || echo "Pages could not be asked to publish. This step is only a safety net."
