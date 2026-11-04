@@ -1,6 +1,6 @@
 {
  "format": "prices-v1",
- "generatedAt": "2026-11-03T10:08:29Z",
+ "generatedAt": "2026-11-04T06:52:20Z",
  "source": "Yahoo Finance",
  "symbols": {
   "AGGH.SW": {
@@ -8,7 +8,7 @@
    "name": "iShares Core Global Aggregate Bond UCITS ETF EUR Hedged (Acc)",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2018-04-03","4.9575"],
@@ -2173,7 +2173,7 @@
    "name": "iShares Core Global Aggregate Bond UCITS ETF USD Hedged (Acc)",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2017-11-21","4.99671"],
@@ -4443,7 +4443,7 @@
    "name": "iShares VII PLC - iShares Core MSCI Pac ex-Jpn ETF USD Acc",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2015-01-02","118.34"],
@@ -7442,7 +7442,7 @@
    "name": "iShares Core S&P 500 UCITS ETF USD (Acc)",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2015-01-02","187.64"],
@@ -10441,7 +10441,7 @@
    "name": "iShares VII PLC - iShares MSCI USA ETF USD Acc",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2015-01-05","183.23"],
@@ -13424,7 +13424,7 @@
    "name": "iShares MSCI USA Small Cap CTB Enhanced ESG UCITS ETF USD Acc",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2015-01-02","235.965"],
@@ -16423,7 +16423,7 @@
    "name": "iShares Core MSCI EM IMI UCITS ETF USD (Acc)",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2015-01-02","23.21"],
@@ -19424,7 +19424,7 @@
    "name": "iShares Core MSCI EM IMI UCITS ETF USD (Acc)",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2015-01-02","19.33"],
@@ -22461,7 +22461,7 @@
    "name": "Amundi Index Solutions - Amundi FTSE EPRA NAREIT Global UCITS ETF DR",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2016-11-11","50.16"],
@@ -25024,7 +25024,7 @@
    "name": "Amundi Index Solutions - Amundi FTSE EPRA NAREIT Global UCITS ETF DR",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2016-11-11","50.16"],
@@ -27581,7 +27581,7 @@
    "name": "iShares Core MSCI World UCITS ETF USD (Acc)",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2015-01-02","34.26"],
@@ -30598,7 +30598,7 @@
    "name": "Amundi Index Solutions - Amundi Core Global Aggregate Bond UCITS ETF DR EUR Hedged",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2017-11-08","49.9792"],
@@ -32906,7 +32906,7 @@
    "name": "HSBC FTSE EPRA NAREIT Developed UCITS ETF",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2015-01-02","22.7425"],
@@ -35907,7 +35907,7 @@
    "name": "iShares Core MSCI Europe UCITS ETF EUR (Acc)",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2015-01-02","40.375"],
@@ -38946,7 +38946,7 @@
    "name": "iShares US Aggregate Bond UCITS ETF USD (Acc)",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2017-04-13","5.0158"],
@@ -41369,7 +41369,7 @@
    "name": "iShares MSCI World Small Cap UCITS ETF USD (Acc)",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2018-04-26","4.2275"],
@@ -43542,7 +43542,7 @@
    "name": "iShares Core MSCI World UCITS ETF USD (Acc)",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2015-01-02","41.16"],
@@ -46543,7 +46543,7 @@
    "name": "State Street SPDR MSCI Europe UCITS ETF",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2015-01-02","159.01"],
@@ -49557,7 +49557,7 @@
    "name": "Vanguard Global Aggregate Bond UCITS ETF EUR Hedged Accumulation",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2019-06-20","24.99"],
@@ -51441,7 +51441,7 @@
    "name": "Vanguard FTSE Developed Markets Index Fund ETF Shares",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2015-01-02","37.69"],
@@ -54419,7 +54419,8 @@
     ["2026-10-28","70.34"],
     ["2026-10-29","70.47"],
     ["2026-10-30","69.44"],
-    ["2026-11-02","69.61"]
+    ["2026-11-02","69.61"],
+    ["2026-11-03","69.37"]
    ]
   },
   "VNQ": {
@@ -54427,7 +54428,7 @@
    "name": "Vanguard Real Estate Index Fund ETF Shares",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2015-01-02","82.22"],
@@ -57405,7 +57406,8 @@
     ["2026-10-28","91.79"],
     ["2026-10-29","93.87"],
     ["2026-10-30","93.94"],
-    ["2026-11-02","95.06"]
+    ["2026-11-02","95.06"],
+    ["2026-11-03","95.01"]
    ]
   },
   "VWCE.DE": {
@@ -57413,7 +57415,7 @@
    "name": "Vanguard FTSE All-World UCITS ETF USD Accumulation",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2019-07-29","71.85"],
@@ -59270,7 +59272,7 @@
    "name": "State Street SPDR MSCI World Small Cap UCITS ETF",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2015-01-02","52.885"],
@@ -62270,7 +62272,7 @@
    "name": "iShares MSCI World Small Cap UCITS ETF USD (Acc)",
    "status": "ok",
    "error": "",
-   "fetchedAt": "2026-11-03T10:08:29Z",
+   "fetchedAt": "2026-11-04T06:52:20Z",
    "splits": [],
    "closes": [
     ["2018-03-27","5.03"],
