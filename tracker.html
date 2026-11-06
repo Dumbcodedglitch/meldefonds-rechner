@@ -325,6 +325,77 @@ details.mini > .body { padding-top: 6px; }
 .step-body > .list, .closure > .list { margin-top: 2px; }
 .kv dd { overflow-wrap: anywhere; }
 .rc-sub { overflow-wrap: anywhere; }
+
+/* performance: calendar-year chips, the heatmap, the shaded gaps in the charts, where the result came from */
+.yearbar { display: grid; gap: 4px; min-width: 0; }
+.yearbar-lab { color: var(--muted); font-size: 12px; }
+.ychips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
+.ychip { position: relative; flex: 0 0 auto; cursor: pointer; }
+.ychip input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.ychip span { display: block; padding: 7px 13px; min-height: 38px; font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); font-variant-numeric: tabular-nums; }
+.ychip input:checked + span { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.ychip input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.band { stroke: none; fill-opacity: 0.22; }
+
+.heat-box { display: grid; gap: 10px; min-width: 0; }
+.heat-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+.heat { border-collapse: separate; border-spacing: 2px; width: 100%; font: 11px/1 var(--font-mono); font-variant-numeric: tabular-nums; }
+.heat th { font-weight: 500; color: var(--muted); font-size: 11px; padding: 4px 2px; text-align: center; white-space: nowrap; }
+.heat thead th:first-child, .heat tbody th { position: sticky; left: 0; z-index: 1; background: var(--surface); text-align: left; padding-right: 8px; }
+.heat tbody th { font-size: 12px; color: var(--fg); }
+.heat td { padding: 0; min-width: 40px; }
+.hc { display: block; width: 100%; min-height: 30px; padding: 0 2px; border: 0; border-radius: 4px; font: inherit; line-height: 30px; text-align: center; color: var(--fg); background: var(--surface-2); cursor: pointer; }
+span.hc { cursor: default; }
+.hc.hm-void { background: transparent; }
+.hc.hm-none { background: transparent; color: var(--muted); border: 1px dashed var(--line); line-height: 28px; }
+.hc.part { outline: 1px dashed var(--fg); outline-offset: -3px; }
+.hc.sel, tr.sel .hc.tot { box-shadow: 0 0 0 2px var(--accent); }
+.hc.tot { font-weight: 600; }
+.hc:hover { filter: brightness(1.15); }
+.hm-0 { background-color: var(--surface-2); }
+.hm-p1 { background-color: color-mix(in srgb, var(--c-gain) 20%, var(--surface-2)); }
+.hm-p2 { background-color: color-mix(in srgb, var(--c-gain) 32%, var(--surface-2)); }
+.hm-p3 { background-color: color-mix(in srgb, var(--c-gain) 44%, var(--surface-2)); color: #fff; }
+.hm-p4 { background-color: color-mix(in srgb, var(--c-gain) 56%, var(--surface-2)); color: #fff; }
+.hm-p5 { background-color: color-mix(in srgb, var(--c-gain) 68%, var(--surface-2)); color: #fff; }
+.hm-n1 { background-color: color-mix(in srgb, var(--c-more) 20%, var(--surface-2)); }
+.hm-n2 { background-color: color-mix(in srgb, var(--c-more) 32%, var(--surface-2)); }
+.hm-n3 { background-color: color-mix(in srgb, var(--c-more) 44%, var(--surface-2)); color: #fff; }
+.hm-n4 { background-color: color-mix(in srgb, var(--c-more) 56%, var(--surface-2)); color: #fff; }
+.hm-n5 { background-color: color-mix(in srgb, var(--c-more) 68%, var(--surface-2)); color: #fff; }
+/* a loss is also hatched, so it can be told from a gain without colour */
+.hm-n1, .hm-n2, .hm-n3, .hm-n4, .hm-n5 { background-image: repeating-linear-gradient(135deg, transparent 0 5px, rgba(11, 14, 20, 0.32) 5px 7px); }
+.hfoot { display: grid; gap: 6px; }
+.hlegend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.hlegend > span:first-child { margin-right: 4px; }
+.hlegend > span:last-child { margin-left: 4px; }
+.hsw { display: inline-block; width: 16px; height: 14px; border-radius: 3px; }
+.only-narrow { display: none; }
+@media (max-width: 759px) { .only-narrow { display: block; } }
+
+.bridge-grid { display: grid; gap: 18px; }
+@media (min-width: 760px) { .bridge-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; } }
+.bridge-col { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.bridge-col h3 { font-size: 14px; color: var(--muted); font-weight: 500; }
+.bridge { display: grid; gap: 12px; list-style: none; padding: 0; margin: 0; }
+.bridge li { display: grid; gap: 3px; min-width: 0; }
+.br-line { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.br-lab { min-width: 0; }
+.br-val { white-space: nowrap; font-size: 15px; }
+.br-sub { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.bridge li.total { border-top: 1px solid var(--axis); padding-top: 10px; }
+.bridge li.total .br-val { font-weight: 600; }
+.br-track { position: relative; height: 8px; border-radius: 4px; background: var(--surface-2); margin-top: 2px; }
+.br-track::before { content: ""; position: absolute; top: -2px; bottom: -2px; left: var(--z, 0%); width: 1px; background: var(--axis); }
+.br-track i { position: absolute; top: 0; bottom: 0; border-radius: 3px; min-width: 2px; }
+.br-track i.pos { background: var(--c-gain); }
+.br-track i.neg { background: var(--c-more); }
+.cmp { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+.cmp-side { border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); padding: 12px 14px; min-width: 0; }
+.cmp-side.better { border-color: rgba(74, 222, 154, 0.45); }
+.cmp-side h3 { margin: 0; font-size: 14px; font-weight: 600; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.cmp-side .kv { padding-top: 8px; }
+.kv dt.strong, .kv dd.strong { font-weight: 600; color: var(--fg); }
 </style>
 <div class="wrap" id="app">
   <header class="top">
@@ -4495,26 +4566,12 @@ details.mini > .body { padding-top: 6px; }
     return { gains: [], losses: [], income: [], blocked: [], lostDeemedSales: [], lostReports: [], excludedRealizations: 0, excludedIncome: 0 };
   }
 
-  function computeYear(year, b, rateSpecial, rateBank, withheld, undecidedYears) {
-    const specialIncome = b.income.filter((l) => POOL_OF_KIND[l.kind] === "SPECIAL");
-    const bankIncome = b.income.filter((l) => POOL_OF_KIND[l.kind] === "BANK");
-    const kindSum = (kind) => sum(specialIncome.filter((l) => l.kind === kind), (l) => l.g);
-
-    const gains = sum(b.gains, (x) => x.amount);
-    const losses = sum(b.losses, (x) => x.amount);
-    const age = kindSum("AGE");
-    const dividends = kindSum("DIVIDEND");
-    const interestOther = kindSum("INTEREST_OTHER");
-    const otherSpecial = kindSum("OTHER_SPECIAL");
-    const positive = Dec.round(Dec.add(Dec.add(Dec.add(Dec.add(gains, age), dividends), interestOther), otherSpecial), DP);
-    const offset = Dec.min(losses, positive);
-    const net = Dec.sub(positive, offset);
-    const forfeited = Dec.sub(losses, offset);
-    const kestSpecial = Dec.mulRound(rateSpecial, net, DP);
-
-    const bankGross = sum(bankIncome, (l) => l.g);
-    const kestBank = Dec.mulRound(rateBank, bankGross, DP);
-
+  /**
+   * The foreign-tax credit of one year, from the income lines (Dec amounts), the realised gains, the loss offset and the positive income.
+   * rateS and rateB are the Austrian rates that cap the credit on the two kinds of income, as exact fractions { n, d }: 27.5 % and 25 %
+   * under the special rates; under the normal tax scale (regular.js) the average rate of the tariff.
+   */
+  function foreignCredit(specialIncome, bankIncome, gains, offset, positive, rateS, rateB) {
     // Foreign tax. Per line the credit before any loss offset is the smallest of: tax paid, treaty rate x income, Austrian
     // rate x income. A line with foreign tax and no treaty rate (other than OeKB lines) counts nothing and makes the year incomplete.
     const lineCredit = (l, rate) => {
@@ -4528,8 +4585,6 @@ details.mini > .body { padding-top: 6px; }
       return { c: frMin(maxC, treaty), unknown: false, max: maxC, excess: frCmp(over, F0) > 0 ? over : F0 };
     };
     const fSum = (list, pick) => list.reduce((t, x) => frAdd(t, pick(x)), F0);
-    const rateS = frDec(rateSpecial);
-    const rateB = frDec(rateBank);
     const specialCredits = specialIncome.map((l) => Object.assign({ l }, lineCredit(l, rateS)));
     const bankCredits = bankIncome.map((l) => Object.assign({ l }, lineCredit(l, rateB)));
     const unknownCap = specialCredits.concat(bankCredits).filter((x) => x.unknown);
@@ -4567,6 +4622,32 @@ details.mini > .body { padding-top: 6px; }
     const treatyExcess = frRound(fSum(specialCredits.concat(bankCredits), (x) => x.excess), DP);
     const unknownMax = frRound(fSum(unknownCap, (x) => x.max), DP);
     const paid = Dec.add(paidSpecial, paidBank);
+    return { unknownCap, creditHigh, creditLow, creditBeforeLoss, treatyExcess, unknownMax, paid };
+  }
+
+  function computeYear(year, b, rateSpecial, rateBank, withheld, undecidedYears) {
+    const specialIncome = b.income.filter((l) => POOL_OF_KIND[l.kind] === "SPECIAL");
+    const bankIncome = b.income.filter((l) => POOL_OF_KIND[l.kind] === "BANK");
+    const kindSum = (kind) => sum(specialIncome.filter((l) => l.kind === kind), (l) => l.g);
+
+    const gains = sum(b.gains, (x) => x.amount);
+    const losses = sum(b.losses, (x) => x.amount);
+    const age = kindSum("AGE");
+    const dividends = kindSum("DIVIDEND");
+    const interestOther = kindSum("INTEREST_OTHER");
+    const otherSpecial = kindSum("OTHER_SPECIAL");
+    const positive = Dec.round(Dec.add(Dec.add(Dec.add(Dec.add(gains, age), dividends), interestOther), otherSpecial), DP);
+    const offset = Dec.min(losses, positive);
+    const net = Dec.sub(positive, offset);
+    const forfeited = Dec.sub(losses, offset);
+    const kestSpecial = Dec.mulRound(rateSpecial, net, DP);
+
+    const bankGross = sum(bankIncome, (l) => l.g);
+    const kestBank = Dec.mulRound(rateBank, bankGross, DP);
+
+    // Foreign tax: see foreignCredit.
+    const fc = foreignCredit(specialIncome, bankIncome, gains, offset, positive, frDec(rateSpecial), frDec(rateBank));
+    const { unknownCap, creditHigh, creditLow, creditBeforeLoss, treatyExcess, unknownMax, paid } = fc;
 
     const kestBefore = Dec.add(kestSpecial, kestBank);
     const dueLow = Dec.sub(Dec.sub(kestBefore, creditHigh), withheld);
@@ -4787,7 +4868,341 @@ details.mini > .body { padding-top: 6px; }
     return done();
   }
 
-  return { VERSION, ROUNDING_POINTS, POOL_OF_KIND, summarize };
+  /** The exact quotient of two decimals as a fraction { n, d } (BigInt), for the rates that foreignCredit takes. Null when the divisor is zero. */
+  function ratio(num, den) {
+    if (Dec.isZero(den)) return null;
+    return fr(num.u * Dec.P10(den.s), den.u * Dec.P10(num.s));
+  }
+
+  /**
+   * The foreign-tax credit of a year result (one entry of summarize().years) when the Austrian rates that cap it are the given ones
+   * (exact fractions, see ratio). With the filed rates (27.5 % and 25 %) it gives the figures the year result already holds.
+   */
+  function creditAt(year, rateS, rateB) {
+    const lines = year.lines.income.map((l) => ({ id: l.id, date: l.date, kind: l.kind, g: Dec.parse(l.grossEur), w: Dec.parse(l.foreignTaxEur), capRate: l.treatyCapRate === null || l.treatyCapRate === undefined ? null : Dec.parse(l.treatyCapRate) }));
+    const f = foreignCredit(lines.filter((l) => POOL_OF_KIND[l.kind] === "SPECIAL"), lines.filter((l) => POOL_OF_KIND[l.kind] === "BANK"), Dec.parse(year.special.realizedGainsEur), Dec.parse(year.special.lossOffsetEur), Dec.parse(year.special.incomeBeforeOffsetEur), rateS, rateB);
+    return { creditLowEur: M(f.creditLow), creditHighEur: M(f.creditHigh), creditBeforeLossEur: M(f.creditBeforeLoss), paidEur: M(f.paid), unknownLines: f.unknownCap.length };
+  }
+
+  return { VERSION, ROUNDING_POINTS, POOL_OF_KIND, summarize, ratio, creditAt };
+});
+
+/* ---- src/engine/regular.js ---- */
+/*
+ * The normal income-tax scale instead of the special rates (Regelbesteuerungsoption, § 27a Abs 5 EStG):
+ * for one year, would it be cheaper to have the capital income taxed with the tariff than at 27.5 % and 25 %?
+ *
+ * What the law says, and where it was checked (3 to 5 Nov 2026):
+ *  - § 27a Abs 5 EStG: on request, income that is taxed at the special rate (§ 27a Abs 1: 27.5 % and 25 %) is taxed with the tariff
+ *    (§ 33 Abs 1) instead. The request covers all such income of the year, never single items. It is made in the return (form E 1,
+ *    point 8.1, with Beilage E 1kv). The Finanzamt does not work out the cheaper way by itself ("kein automatischer Günstigkeitsvergleich").
+ *  - The loss rules of § 27 Abs 8 stay as they are under the option (last sentence of Abs 8): a loss from realised gains is set only against
+ *    income at the special rate, never against deposit interest (Z 1) or other kinds of income, and an unused loss is not carried forward.
+ *    So the capital income that enters the tariff is the NET base of the special-rate pool (after the loss offset) plus the gross bank interest.
+ *  - § 20 Abs 2 EStG: no expenses can be deducted from this income, with or without the option.
+ *  - Tax credits (Absetzbeträge, for example the Familienbonus Plus) reduce the tax of the tariff and can only bring it down to zero here.
+ *    Income at the special rate does not use them, so the option can make them useful. Credits that can be paid out
+ *    (Alleinverdiener-/Alleinerzieherabsetzbetrag and others) have their own conditions that this module does not work out; the owner enters
+ *    what he can use against the tariff tax.
+ *  - Foreign tax is credited at most with "die auf die ausländischen Einkünfte entfallende inländische Steuer" (BMF explanation of E 1kv). Under the
+ *    tariff that is the AVERAGE rate of the tariff tax times the foreign income (an approximation of the attributable tax; the tax before the
+ *    credits is used). Per income line the credit is the smallest of: tax paid, treaty rate x income, average rate x income; the loss interplay
+ *    (Method A / Method B) is the one of taxyear.js, so the saving comes as a range when the two readings differ.
+ *  - The tariff of § 33 Abs 1 EStG for 2020 to 2026 is built in (source: usp.gv.at, Tarifstufen, read 4 Nov 2026). Other years are refused,
+ *    never guessed. The 55 % band above one million euros is in the table.
+ *
+ * Money is exact (Dec). The tariff tax is exact and rounded to cents once; every amount that is shown is in cents. The Finanzamt rounds the
+ * final amount to whole euros; this module does not.
+ *
+ * Pure functions, no clock, no storage. Runs in Node (tests) and in a browser page.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("../lib/decimal.js"), require("./taxyear.js"));
+  else root.Regular = factory(root.Dec, root.TaxYear);
+})(typeof self !== "undefined" ? self : this, function (Dec, TaxYear) {
+  "use strict";
+
+  const VERSION = "regular-0.1.0";
+  const DP = 2;
+  const Z = Dec.mk(0n, DP);
+  const M = (d) => Dec.str(d, DP);
+  const cents = (d) => Dec.round(d, DP);
+  const D = (t) => Dec.parse(t);
+  const dMax = Dec.max;
+  const dMin = Dec.min;
+
+  /** Every place where a figure of this module is rounded, to 2 decimals, half away from zero. */
+  const ROUNDING_POINTS = Object.freeze({
+    TARIFF_TAX_EUR: "the tariff tax of one income, once, from the exact sum of rate x slice",
+    AVERAGE_RATE: "not rounded: an exact fraction (tariff tax / income) that only caps the foreign-tax credit",
+  });
+
+  /**
+   * § 33 Abs 1 EStG. limits: the upper end of each band in whole euros; rates: one more than limits (the last one is above the last limit).
+   * 2020 and 2021: BGBl I 103/2019 (20 % band from 2020). 2022: 32.5 % in the third band (BGBl I 10/2022). 2023 on: the bands move with
+   * the inflation adjustment; the rates of the third and fourth band come down (30 % and 41 % in 2023, 40 % from 2024).
+   * The 55 % above one million euros applies from 2016 to 2029 (the table holds the 2020 to 2026 values).
+   */
+  const TARIFF = Object.freeze({
+    2020: { limits: [11000, 18000, 31000, 60000, 90000, 1000000], rates: ["0", "0.2", "0.35", "0.42", "0.48", "0.5", "0.55"] },
+    2021: { limits: [11000, 18000, 31000, 60000, 90000, 1000000], rates: ["0", "0.2", "0.35", "0.42", "0.48", "0.5", "0.55"] },
+    2022: { limits: [11000, 18000, 31000, 60000, 90000, 1000000], rates: ["0", "0.2", "0.325", "0.42", "0.48", "0.5", "0.55"] },
+    2023: { limits: [11693, 19134, 32075, 62080, 93120, 1000000], rates: ["0", "0.2", "0.3", "0.41", "0.48", "0.5", "0.55"] },
+    2024: { limits: [12816, 20818, 34513, 66612, 99266, 1000000], rates: ["0", "0.2", "0.3", "0.4", "0.48", "0.5", "0.55"] },
+    2025: { limits: [13308, 21617, 35836, 69166, 103072, 1000000], rates: ["0", "0.2", "0.3", "0.4", "0.48", "0.5", "0.55"] },
+    2026: { limits: [13539, 21992, 36458, 70365, 104859, 1000000], rates: ["0", "0.2", "0.3", "0.4", "0.48", "0.5", "0.55"] },
+  });
+  const SUPPORTED_YEARS = Object.freeze(Object.keys(TARIFF));
+  const SEARCH_LIMIT_EUR = 150000n; // the break-even is looked for up to this other income
+  const MAX_INPUT = Dec.mk(1000000000n, 0);
+
+  const isSupported = (year) => Object.prototype.hasOwnProperty.call(TARIFF, String(year));
+  const percent = (rate) => Dec.str(Dec.normalize(Dec.mul(D(rate), Dec.mk(100n, 0))));
+
+  /** The bands of one year for display: [{ fromEur, toEur (null = no end), ratePercent }]. Null for a year that is not built in. */
+  function scale(year) {
+    const t = TARIFF[String(year)];
+    if (!t) return null;
+    return t.rates.map((r, i) => ({ fromEur: i === 0 ? "0" : String(t.limits[i - 1]), toEur: i < t.limits.length ? String(t.limits[i]) : null, ratePercent: percent(r) }));
+  }
+
+  /** The tariff tax of an income, exact (not rounded). Null for a year that is not built in or a negative income. */
+  function tariffExact(year, income) {
+    const t = TARIFF[String(year)];
+    if (!t || Dec.isNeg(income)) return null;
+    let tax = Dec.mk(0n, 0);
+    let lower = Dec.mk(0n, 0);
+    for (let i = 0; i < t.rates.length; i++) {
+      if (Dec.cmp(income, lower) <= 0) break;
+      const upper = i < t.limits.length ? Dec.mk(BigInt(t.limits[i]), 0) : null;
+      const top = upper && Dec.cmp(income, upper) > 0 ? upper : income;
+      tax = Dec.add(tax, Dec.mul(Dec.sub(top, lower), D(t.rates[i])));
+      if (!upper) break;
+      lower = upper;
+    }
+    return tax;
+  }
+
+  /** The tariff tax of an income in cents, or null. */
+  function tariffTax(year, income) {
+    const x = tariffExact(year, income);
+    return x === null ? null : cents(x);
+  }
+
+  /** The tariff rate that the next euro above this income is taxed at, as text ("30"). Null for a year that is not built in. */
+  function marginalPercent(year, income) {
+    const t = TARIFF[String(year)];
+    if (!t) return null;
+    for (let i = 0; i < t.limits.length; i++) if (Dec.cmp(income, Dec.mk(BigInt(t.limits[i]), 0)) < 0) return percent(t.rates[i]);
+    return percent(t.rates[t.rates.length - 1]);
+  }
+
+  /** A typed amount: null when it is fine (or empty), otherwise the message for the field. Digits and one dot, at most 2 decimals. */
+  function checkAmount(text) {
+    const t = typeof text === "string" ? text.trim() : "";
+    if (t === "") return null;
+    if (!/^\d{1,10}(\.\d{1,2})?$/.test(t)) return "Use digits and a dot only, for example 30000 or 30000.50.";
+    if (Dec.cmp(D(t), MAX_INPUT) > 0) return "That is more than a billion euros, which is surely a typing mistake.";
+    return null;
+  }
+  const amountOf = (text) => (typeof text === "string" && text.trim() !== "" && checkAmount(text) === null ? cents(D(text.trim())) : null);
+
+  // ---------------------------------------------------------------- one comparison
+
+  /** What the year's figures are, read once: the capital income, the KESt on it and the foreign-tax credit on the special rates. */
+  function context(y, credits) {
+    const net = D(y.special.netBaseEur);
+    const bank = D(y.bankInterest.grossEur);
+    return {
+      y,
+      year: String(y.year),
+      credits,
+      net,
+      bank,
+      capital: Dec.add(net, bank),
+      kest: Dec.add(D(y.special.kestBeforeCreditEur), D(y.bankInterest.kestBeforeCreditEur)),
+      creditHigh: D(y.foreignTax.creditHighEur),
+      creditLow: D(y.foreignTax.creditLowEur),
+      withheld: D(y.kestWithheldEur),
+    };
+  }
+
+  /**
+   * Both ways at one other income. All amounts in cents (Dec); the readings A (credit kept as far as possible) and B (in proportion) of the
+   * foreign-tax credit are carried through both ways, so the saving of A is the saving of the same reading.
+   */
+  function evaluate(ctx, other) {
+    // the special rates: the tariff on the other income alone (credits only up to that tax), plus the KESt
+    const tS = tariffTax(ctx.year, other);
+    const cuS = dMin(ctx.credits, tS);
+    const incS = Dec.sub(tS, cuS);
+    // the option: the tariff on the other income and the capital income together
+    const base = Dec.add(other, ctx.capital);
+    const tO = tariffTax(ctx.year, base);
+    const cuO = dMin(ctx.credits, tO);
+    const incO = Dec.sub(tO, cuO);
+    const avg = Dec.isZero(base) ? TaxYear.ratio(Z, Dec.mk(1n, 0)) : TaxYear.ratio(tO, base);
+    const fo = TaxYear.creditAt(ctx.y, avg, avg);
+    const foHigh = D(fo.creditHighEur);
+    const foLow = D(fo.creditLowEur);
+    // totals (before the KESt that was already withheld): A = credit kept as far as possible (the lower tax), B = in proportion
+    const spA = Dec.sub(Dec.add(incS, ctx.kest), ctx.creditHigh);
+    const spB = Dec.sub(Dec.add(incS, ctx.kest), ctx.creditLow);
+    const opA = dMax(Z, Dec.sub(incO, foHigh));
+    const opB = dMax(Z, Dec.sub(incO, foLow));
+    const savingA = Dec.sub(spA, opA);
+    const savingB = Dec.sub(spB, opB);
+    return {
+      other, base, tS, cuS, incS, tO, cuO, incO, avg, foHigh, foLow, spA, spB, opA, opB,
+      savingLow: dMin(savingA, savingB),
+      savingHigh: dMax(savingA, savingB),
+      averagePercent: Dec.isZero(base) ? "0" : Dec.str(Dec.normalize(Dec.divRound(Dec.mul(tO, Dec.mk(100n, 0)), base, 1))),
+    };
+  }
+
+  /** The saving at an other income given in cents (BigInt), used by the searches. */
+  const savingAt = (ctx, centsValue) => evaluate(ctx, Dec.mk(centsValue, 2));
+
+  /** The largest other income (to the cent) at which the saving is still not below zero, for the low or the high end of the range. */
+  function searchBreakEven(ctx, which) {
+    const f = (c) => savingAt(ctx, c)[which];
+    if (Dec.isNeg(f(0n))) return { state: "NEVER", eur: null };
+    let hi = SEARCH_LIMIT_EUR * 100n;
+    if (!Dec.isNeg(f(hi))) return { state: "ABOVE_LIMIT", eur: M(Dec.mk(hi, 2)) };
+    let lo = 0n;
+    while (hi - lo > 1n) {
+      const mid = (lo + hi) / 2n;
+      if (Dec.isNeg(f(mid))) hi = mid;
+      else lo = mid;
+    }
+    return { state: "FOUND", eur: M(Dec.mk(lo, 2)) };
+  }
+
+  function breakEven(ctx) {
+    const low = searchBreakEven(ctx, "savingLow");
+    const high = searchBreakEven(ctx, "savingHigh");
+    return { lowEnd: low, highEnd: high, same: low.state === high.state && low.eur === high.eur };
+  }
+
+  // The bars of the chart: other income from 0 in equal steps, the saving at each.
+  const STEPS = [1000, 2000, 5000, 10000, 20000, 25000];
+  function curve(ctx, wantedTop) {
+    const top = Math.min(Math.max(wantedTop, 40000), Number(SEARCH_LIMIT_EUR));
+    const raw = top / 12; // about 9 to 13 bars, at amounts that read well on the axis
+    const step = STEPS.find((s) => s >= raw) || 25000;
+    const n = Math.max(2, Math.ceil(top / step));
+    const points = [];
+    for (let i = 0; i <= n; i++) {
+      const r = savingAt(ctx, BigInt(i * step) * 100n);
+      points.push({ otherEur: String(i * step), savingLowEur: M(r.savingLow), savingHighEur: M(r.savingHigh) });
+    }
+    return { stepEur: String(step), points };
+  }
+
+  const verdictOf = (low, high) => {
+    if (Dec.cmp(low, Z) > 0) return "OPTION_CHEAPER";
+    if (Dec.cmp(high, Z) < 0) return "SPECIAL_CHEAPER";
+    if (Dec.isZero(low) && Dec.isZero(high)) return "EQUAL";
+    return "UNCLEAR";
+  };
+
+  /**
+   * @param y       one entry of TaxYear.summarize().years
+   * @param inputs  { otherEur: "30000" (as typed; empty = not entered), creditsEur: "2000" (as typed; empty = none) }
+   */
+  function compare(y, inputs) {
+    inputs = inputs || {};
+    const year = y && y.year ? String(y.year) : "";
+    const out = { version: VERSION, ok: false, year, reason: "", text: "", problems: [] };
+    if (!y || !y.special || !y.bankInterest) {
+      out.reason = "NO_YEAR";
+      out.text = "There is no tax year to compare.";
+      return out;
+    }
+    if (!isSupported(year)) {
+      out.reason = "NO_TARIFF";
+      out.text = "The tax scale for " + year + " is not built into the tracker (it has 2020 to 2026), so no comparison is made. It is never guessed.";
+      return out;
+    }
+    const otherProblem = checkAmount(inputs.otherEur);
+    const creditsProblem = checkAmount(inputs.creditsEur);
+    if (otherProblem) out.problems.push({ field: "otherEur", text: otherProblem });
+    if (creditsProblem) out.problems.push({ field: "creditsEur", text: creditsProblem });
+    const other = amountOf(inputs.otherEur);
+    const credits = amountOf(inputs.creditsEur);
+    const ctx = context(y, credits === null ? Z : credits);
+
+    out.ok = true;
+    out.tariffYear = year;
+    out.scale = scale(year);
+    out.entered = other !== null;
+    out.creditsEntered = credits !== null && !Dec.isZero(credits);
+    out.capital = { specialNetEur: M(ctx.net), bankGrossEur: M(ctx.bank), totalEur: M(ctx.capital), kestEur: M(ctx.kest) };
+    out.nothingToCompare = Dec.isZero(ctx.capital);
+    out.notes = [];
+    out.at = null;
+    out.breakEven = null;
+    out.curve = null;
+    if (out.nothingToCompare) {
+      out.notes.push({ level: "info", id: "NO_CAPITAL_INCOME", text: "There is no capital income at the special rate in " + year + ", so there is nothing to compare." });
+      return out;
+    }
+    if (!y.complete) out.notes.push({ level: "warn", id: "YEAR_INCOMPLETE", text: "The tax figures of " + year + " are not complete yet (see the notes above). The comparison uses them as they are." });
+    if (!Dec.isZero(D(y.special.lossForfeitedEur))) out.notes.push({ level: "info", id: "LOSS_FORFEITED", text: M(D(y.special.lossForfeitedEur)) + " of realised losses found no income to be set against in " + year + ". The loss rules (§ 27 Abs 8 EStG) are the same under the normal scale, so this stays lost either way." });
+    if (y.foreignTax.capUnknown.lines > 0) out.notes.push({ level: "warn", id: "TREATY_UNKNOWN", text: "Foreign tax on " + y.foreignTax.capUnknown.lines + " income line(s) has no treaty rate yet. No credit is counted for it on either side." });
+    if (!out.creditsEntered) out.notes.push({ level: "info", id: "NO_CREDITS", text: "No tax credits (Absetzbeträge) are entered, so none are assumed. Credits only reduce tax on the normal scale, so entering them can only make the normal scale look better, never worse." });
+
+    if (other !== null) {
+      const r = evaluate(ctx, other);
+      const marginO = marginalPercent(year, other);
+      const marginT = marginalPercent(year, r.base);
+      const extra = Dec.sub(r.incO, r.incS);
+      out.at = {
+        otherEur: M(other),
+        creditsEur: M(ctx.credits),
+        special: {
+          tariffTaxEur: M(r.tS),
+          creditsUsedEur: M(r.cuS),
+          incomeTaxEur: M(r.incS),
+          kestEur: M(ctx.kest),
+          foreignCreditLowEur: M(ctx.creditLow),
+          foreignCreditHighEur: M(ctx.creditHigh),
+          totalLowEur: M(r.spA),
+          totalHighEur: M(r.spB),
+        },
+        option: {
+          taxableIncomeEur: M(r.base),
+          tariffTaxEur: M(r.tO),
+          creditsUsedEur: M(r.cuO),
+          incomeTaxEur: M(r.incO),
+          averageRatePercent: r.averagePercent,
+          foreignCreditLowEur: M(r.foLow),
+          foreignCreditHighEur: M(r.foHigh),
+          totalLowEur: M(r.opA),
+          totalHighEur: M(r.opB),
+        },
+        extraTaxEur: M(extra),
+        extraRatePercent: Dec.str(Dec.normalize(Dec.divRound(Dec.mul(extra, Dec.mk(100n, 0)), ctx.capital, 1))), // the extra income tax as a share of the capital income
+        kestRatePercent: Dec.str(Dec.normalize(Dec.divRound(Dec.mul(ctx.kest, Dec.mk(100n, 0)), ctx.capital, 1))), // the KESt as a share of the capital income
+        kestWithheldEur: M(ctx.withheld),
+        marginalOtherPercent: marginO,
+        marginalTotalPercent: marginT,
+        savingLowEur: M(r.savingLow),
+        savingHighEur: M(r.savingHigh),
+        verdict: verdictOf(r.savingLow, r.savingHigh),
+      };
+      if (!Dec.isZero(Dec.sub(r.savingLow, r.savingHigh))) out.notes.push({ level: "info", id: "CREDIT_RANGE", text: "Foreign tax with losses set against it has two readings (see the Tax tab), so the saving is a range, not one figure." });
+    }
+    out.breakEven = breakEven(ctx);
+    let top = 40000;
+    const be = out.breakEven.lowEnd.state === "FOUND" ? Number(out.breakEven.lowEnd.eur) : 0;
+    const be2 = out.breakEven.highEnd.state === "FOUND" ? Number(out.breakEven.highEnd.eur) : 0;
+    top = Math.max(top, Math.max(be, be2) * 1.6, other !== null ? Number(M(other)) * 1.4 : 0);
+    out.curve = curve(ctx, top);
+    return out;
+  }
+
+  return { VERSION, ROUNDING_POINTS, TARIFF, SUPPORTED_YEARS, SEARCH_LIMIT_EUR: String(SEARCH_LIMIT_EUR), isSupported, scale, tariffExact, tariffTax, marginalPercent, checkAmount, compare };
 });
 
 /* ---- src/engine/scenarios.js ---- */
@@ -5895,8 +6310,11 @@ details.mini > .body { padding-top: 6px; }
  *               which source wins a disagreement between OeKB files
  *   manual      transactions the owner typed in by hand (a purchase, a sale or a dividend), kept as typed. The converter
  *               reads them like the rows of the transaction file (see ledger.js). A document without any is unchanged.
- *   plans       planned sales the owner is thinking about (day, depot, security, units, expected price). Never part of
- *               the filed position: they only feed the comparison on the What-if screen
+ *   plans       planned sales and planned moves to another broker the owner is thinking about (day, depot, security, units,
+ *               expected price; a move also the name of the receiving broker). Never part of the filed position: they only
+ *               feed the comparison on the What-if screen
+ *   regular     by tax year, what the owner typed for the comparison with the normal tax scale on the Tax screen: his other taxable
+ *               income and the tax credits he can use (as typed; the screen checks them). A document without any is unchanged.
  *   whatIf      the ticks on the What-if screen
  *
  * Rules of this module:
@@ -5919,12 +6337,13 @@ details.mini > .body { padding-top: 6px; }
   const SEC_TYPES = ["REPORTING_FUND", "SHARE", "NON_REPORTING_FUND"];
   const ACCOUNT_KINDS = ["TBSZ", "REGULAR"];
   const OEKB_KINDS = ["OEKB_DATA", "KORREKTUR_FILE"];
-  const PLAN_KINDS = ["SALE"];
+  const PLAN_KINDS = ["SALE", "MOVE"];
   const PLAN_ID = /^[A-Za-z0-9_-]{1,30}$/;
   const MAX_PLANS = 50;
   const ENTRY_KINDS = ["BUY", "SELL", "DIVIDEND"];
   const ENTRY_ID = /^m\d{1,6}$/;
   const MAX_MANUAL = 5000;
+  const MAX_REGULAR = 40;
   const DEFAULT_RELOCATION = "2020-01-28";
   const DEFAULT_OEKB_ADDRESS = "data/oekb-data.json";
   const MAX_ADDRESS = 500;
@@ -5964,6 +6383,7 @@ details.mini > .body { padding-top: 6px; }
       decisions: { reviewAck: "", noReport: {}, oekb: [] },
       manual: [],
       plans: [],
+      regular: {},
       whatIf: null,
     };
   }
@@ -6198,9 +6618,35 @@ details.mini > .body { padding-top: 6px; }
           return;
         }
         seen.add(id);
-        doc.plans.push({ id, kind: p.kind, date: isIso(p.date) ? p.date : "", depot: str(p.depot, 60), isin: str(p.isin, 40).toUpperCase(), qty: str(p.qty, 30), price: str(p.price, 30), ccy: ccyText(p.ccy), rate: str(p.rate, 30), fee: str(p.fee, 30), note: str(p.note, 200) });
+        const plan = { id, kind: p.kind, date: isIso(p.date) ? p.date : "", depot: str(p.depot, 60), isin: str(p.isin, 40).toUpperCase(), qty: str(p.qty, 30), price: str(p.price, 30), ccy: ccyText(p.ccy), rate: str(p.rate, 30), fee: str(p.fee, 30), note: str(p.note, 200) };
+        // a planned move to another broker also keeps the name of the receiving broker (a sale has no such field, so it is unchanged)
+        if (p.kind === "MOVE") plan.to = str(p.to, 60);
+        doc.plans.push(plan);
       });
       if (tooMany) problems.push("Only the first " + MAX_PLANS + " planned sales are kept; " + tooMany + " more were dropped.");
+    }
+
+    // What was typed for the comparison with the normal tax scale, by year. Kept as typed (the screen shows a wrong figure as wrong next to
+    // its field, and the comparison ignores it); an empty entry is not kept, so a document that never used this is unchanged.
+    if (isObj(raw.regular)) {
+      let kept = 0;
+      let tooMany = 0;
+      for (const y of Object.keys(raw.regular).sort()) {
+        const r = raw.regular[y];
+        if (!/^\d{4}$/.test(y) || !isObj(r)) {
+          problems.push("The figures typed for the normal tax scale under " + JSON.stringify(String(y).slice(0, 10)) + " could not be read and were dropped.");
+          continue;
+        }
+        const e = { otherEur: str(r.otherEur, 20), creditsEur: str(r.creditsEur, 20) };
+        if (e.otherEur === "" && e.creditsEur === "") continue;
+        if (kept >= MAX_REGULAR) {
+          tooMany++;
+          continue;
+        }
+        doc.regular[y] = e;
+        kept++;
+      }
+      if (tooMany) problems.push("Only the first " + MAX_REGULAR + " years of figures for the normal tax scale are kept; " + tooMany + " more were dropped.");
     }
 
     // The ticks on the What-if screen are checked by the model when it reads them; here only the shape is kept.
@@ -6224,6 +6670,7 @@ details.mini > .body { padding-top: 6px; }
     const slim = JSON.parse(JSON.stringify(doc, (k, v) => (k === "text" ? undefined : v)));
     if (Array.isArray(slim.plans) && slim.plans.length === 0) delete slim.plans; // no plans = the same fingerprint as before plans existed
     if (Array.isArray(slim.manual) && slim.manual.length === 0) delete slim.manual; // likewise no typed-in transactions
+    if (slim.regular && typeof slim.regular === "object" && Object.keys(slim.regular).length === 0) delete slim.regular; // likewise nothing typed for the normal tax scale
     return Hash.hashOf(slim);
   }
 
@@ -7778,6 +8225,25 @@ details.mini > .body { padding-top: 6px; }
       return Array.from(set).sort();
     };
     const PLAN_RATE_LAG_DAYS = 14;
+    // The euro rate of a plan: 1 for euro, the one the owner typed, or the ECB rate of the day (of today when the day is still ahead).
+    // Returns null and says why through `bad` when there is none.
+    const planRate = (pl, row, ccy, bad, dec) => {
+      if (!ccy) return bad("Choose the currency of the price."), null;
+      if (ccy === "EUR") return { dec: ONE, text: "1", rateDate: pl.date };
+      if (pl.rate !== "") {
+        const r = dec(pl.rate);
+        if (!r || Dec.isNeg(r) || Dec.isZero(r)) return bad("The rate must be a number above zero, written with a dot (units of " + ccy + " per euro). Leave it empty to use the latest ECB rate."), null;
+        row.rateTyped = true;
+        return { dec: r, text: Dec.str(Dec.normalize(r)), rateDate: "typed" };
+      }
+      if (!pl.date) return null;
+      const ledger = ledgers[ccy];
+      if (!ledger) return bad("There is no ECB rate file for " + ccy + ". Load it in step 4 of the Data tab, or type a rate."), null;
+      const ref = today && pl.date > today ? today : pl.date;
+      const rr = ledger.rateOn(ref, { maxLagDays: PLAN_RATE_LAG_DAYS });
+      if (!rr.ok) return bad("No usable " + ccy + " rate: " + rr.reason + " Load a newer file, or type a rate."), null;
+      return { dec: Dec.parse(rr.rate), text: rr.rate, rateDate: rr.rateDate };
+    };
     doc.plans.forEach((pl, i) => {
       const row = { id: pl.id, eventId: "plan:" + pl.id, kind: pl.kind, date: pl.date, depot: pl.depot, isin: pl.isin, qty: pl.qty, price: pl.price, ccy: pl.ccy, rate: pl.rate, fee: pl.fee, note: pl.note, currencies: [], ccyUsed: "", ok: false, problems: [], rateUsed: null, rateDate: null, rateTyped: false, proceedsEur: null, feeEur: null };
       planTable.push(row);
@@ -7789,6 +8255,50 @@ details.mini > .body { padding-top: 6px; }
         if (!d || Dec.isNeg(d) || Dec.isZero(d)) return bad("The " + what.replace(/^the /, "") + " must be a number above zero, written with a dot (like 60 or 12.5)."), null;
         return d;
       };
+      if (pl.kind === "MOVE") {
+        // A planned move to another broker. The units go to a new depot of the receiving broker (the engine opens it by itself) and the
+        // cost is carried over, which is what the notification of § 27 Abs 6 Z 2 EStG makes of it. The price is only needed to show what
+        // a missing notification would do (a deemed sale at market value): without one the plan still gives the cost to report.
+        const toDepot = "PLAN-MOVE-" + pl.id;
+        Object.assign(row, { to: pl.to || "", toDepot, toLabel: pl.to || "the receiving broker", marketValueEur: null });
+        if (!pl.date) bad("Choose the day of the move.");
+        else if (pl.date < reloc) bad("A move before " + reloc + " is outside the Austrian tax.");
+        if (!pl.depot) bad("Choose the depot it is moved from.");
+        else if (!depots[pl.depot]) bad("The depot " + pl.depot + " is not in your data any more.");
+        else row.currencies = currenciesOfDepot(pl.depot);
+        if (!pl.isin) bad("Choose the security.");
+        else if (!securities[pl.isin]) bad("The security " + pl.isin + " is not in your data any more.");
+        let mqty = null;
+        if (pl.qty === "") bad("Enter the number of units.");
+        else {
+          const d = dec(pl.qty);
+          if (!d || Dec.isNeg(d) || Dec.isZero(d)) bad("The number of units must be a number above zero, written with a dot (like 60).");
+          else if (Dec.str(Dec.normalize(d)).includes(".")) bad("The number of units must be a whole number: the notification to the Finanzamt takes whole units only.");
+          else mqty = d;
+        }
+        const mprice = pl.price === "" ? null : positive(pl.price, "the expected price per unit");
+        const mccy = pl.ccy || (row.currencies.length === 1 ? row.currencies[0] : "");
+        row.ccyUsed = mccy;
+        // the currency and rate matter only when a price was typed; without one nothing is converted
+        const mrate = mprice ? planRate(pl, row, mccy, bad, dec) : null;
+        if (!row.problems.length && mqty) {
+          const ev = { id: row.eventId, type: "TRANSFER", date: pl.date, fromDepot: pl.depot, toDepot, isin: pl.isin, qty: q(mqty), kind: "BROKER_TRANSFER", treatment: "CARRY_OVER", seq: 3000000 + i, src: "plan " + pl.id, planned: true };
+          if (mprice && mrate) {
+            const gross = Dec.mul(mqty, mprice);
+            ev.marketValueEur = toEur(gross, mrate);
+            ev.native = { ccy: mccy, qty: q(mqty), price: Dec.str(mprice), gross: Dec.str(gross), rate: mrate.text, rateDate: mrate.rateDate };
+            row.marketValueEur = ev.marketValueEur;
+            row.rateUsed = mrate.text;
+            row.rateDate = mrate.rateDate;
+          }
+          events.push(ev);
+          stats.planned++;
+          row.ok = true;
+          const sec = metaSecurities[pl.isin];
+          plannedMeta[ev.id] = { label: "Move " + q(mqty) + " " + (sec ? sec.short : pl.isin) + " from " + depots[pl.depot].label + " to " + row.toLabel + " on " + pl.date, plan: pl.id, kind: "MOVE", toDepot, toLabel: row.toLabel };
+        }
+        return;
+      }
       if (!pl.date) bad("Choose the day of the sale.");
       else if (pl.date < reloc) bad("A sale before " + reloc + " is outside the Austrian tax.");
       if (!pl.depot) bad("Choose the depot it is sold from.");
@@ -7806,26 +8316,7 @@ details.mini > .body { padding-top: 6px; }
       }
       const ccy = pl.ccy || (row.currencies.length === 1 ? row.currencies[0] : "");
       row.ccyUsed = ccy;
-      let rate = null;
-      if (!ccy) bad("Choose the currency of the price.");
-      else if (ccy === "EUR") rate = { dec: ONE, text: "1", rateDate: pl.date };
-      else if (pl.rate !== "") {
-        const r = dec(pl.rate);
-        if (!r || Dec.isNeg(r) || Dec.isZero(r)) bad("The rate must be a number above zero, written with a dot (units of " + ccy + " per euro). Leave it empty to use the latest ECB rate.");
-        else {
-          rate = { dec: r, text: Dec.str(Dec.normalize(r)), rateDate: "typed" };
-          row.rateTyped = true;
-        }
-      } else if (pl.date) {
-        const ledger = ledgers[ccy];
-        if (!ledger) bad("There is no ECB rate file for " + ccy + ". Load it in step 4 of the Data tab, or type a rate.");
-        else {
-          const ref = today && pl.date > today ? today : pl.date;
-          const rr = ledger.rateOn(ref, { maxLagDays: PLAN_RATE_LAG_DAYS });
-          if (!rr.ok) bad("No usable " + ccy + " rate: " + rr.reason + " Load a newer file, or type a rate.");
-          else rate = { dec: Dec.parse(rr.rate), text: rr.rate, rateDate: rr.rateDate };
-        }
-      }
+      const rate = planRate(pl, row, ccy, bad, dec);
       if (!row.problems.length && qty && price && rate) {
         const gross = Dec.mul(qty, price);
         const ev = { id: row.eventId, type: "DISPOSE", date: pl.date, depot: pl.depot, isin: pl.isin, qty: q(qty), seq: 3000000 + i, native: { ccy, qty: q(qty), price: Dec.str(price), gross: Dec.str(gross), fee: Dec.str(fee), rate: rate.text, rateDate: rate.rateDate }, proceedsEur: toEur(gross, rate), feeEur: toEur(fee, rate), src: "plan " + pl.id, planned: true };
@@ -8144,9 +8635,9 @@ details.mini > .body { padding-top: 6px; }
  * Pure functions, no clock, no storage, no DOM. Runs in Node (tests) and in a browser page.
  */
 (function (root, factory) {
-  if (typeof module === "object" && module.exports) module.exports = factory(require("../lib/decimal.js"), require("../engine/scenarios.js"));
-  else root.Model = factory(root.Dec, root.Scenarios);
-})(typeof self !== "undefined" ? self : this, function (Dec, Scenarios) {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("../lib/decimal.js"), require("../engine/scenarios.js"), require("../engine/regular.js"));
+  else root.Model = factory(root.Dec, root.Scenarios, root.Regular);
+})(typeof self !== "undefined" ? self : this, function (Dec, Scenarios, Regular) {
   "use strict";
 
   const VERSION = "model-0.1.0";
@@ -8425,7 +8916,7 @@ details.mini > .body { padding-top: 6px; }
   function planOutcome(p, ev, entry, filedEv, filedEntry) {
     const e = p.event;
     const year = e.date.slice(0, 4);
-    const res = { planId: p.planId, eventId: p.eventId, label: p.label, date: e.date, year, depot: e.depot, isin: e.isin, qty: e.qty, ok: false, status: "ERROR", blocked: null, errors: [], heldQty: null, sale: null, yearInfo: null, lossUsedEur: "0.00", roomEur: "0.00", unitsForRoom: null, kestCentNote: false };
+    const res = { kind: "SALE", planId: p.planId, eventId: p.eventId, label: p.label, date: e.date, year, depot: e.depot, isin: e.isin, qty: e.qty, ok: false, status: "ERROR", blocked: null, errors: [], heldQty: null, sale: null, yearInfo: null, lossUsedEur: "0.00", roomEur: "0.00", unitsForRoom: null, kestCentNote: false };
     const errs = (entry.errors || []).concat(entry.engineErrors || []);
     if (!ev || !ev.engine || ev.engine.fatal || !entry.ok) {
       res.errors = errs.map((x) => x.text);
@@ -8494,16 +8985,147 @@ details.mini > .body { padding-top: 6px; }
     return res;
   }
 
+  // ---------------------------------------------------------------- planned moves to another broker
+
+  /** The planned events that are moves to another broker, from the owner's own list of plans, in the order of that list. */
+  function moveEvents(base, meta) {
+    const info = (meta && meta.planned) || {};
+    return ((base && base.events) || [])
+      .filter((e) => e.planned === true && e.type === "TRANSFER" && info[e.id] && info[e.id].plan && info[e.id].kind === "MOVE")
+      .map((e) => ({ planId: info[e.id].plan, eventId: e.id, event: e, label: info[e.id].label || e.id, toLabel: info[e.id].toLabel || "the receiving broker" }));
+  }
+
   /**
-   * What each typed plan does on its own against the position as filed (one run per plan; the filed run is shared).
-   * Returns { ok, error, byPlan: { planId: outcome } }. Plans that did not convert (see Convert tables.plans) are not here.
+   * The last day of "within one month" counted as § 108 Abs 2 BAO counts it: the same day of the next month, or the last day of that
+   * month when it has no such day. A weekend, a public holiday, Good Friday or 24 December moves the end to the next working day
+   * (§ 108 Abs 3 BAO); that is only said on the page, never added here, so the date shown is never later than the statute allows.
+   */
+  function oneMonthAfter(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso));
+    if (!m) return null;
+    let y = Number(m[1]);
+    let mo = Number(m[2]) + 1;
+    let d = Number(m[3]);
+    if (mo > 12) {
+      mo = 1;
+      y += 1;
+    }
+    const last = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+    if (d > last) d = last;
+    return String(y) + "-" + String(mo).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+  }
+
+  /** The year a plan falls in: as filed and with the plan, from the runs that were made for it. */
+  function yearInfoOf(year, filedEv, filedEntry, ev, entry) {
+    const fRow = filedEntry.byYear ? filedEntry.byYear[year] : null;
+    const pRow = entry.byYear ? entry.byYear[year] : null;
+    const filedYear = filedEv.summary && filedEv.summary.ok ? filedEv.summary.years[year] : null;
+    const withYear = ev.summary && ev.summary.ok ? ev.summary.years[year] : null;
+    return {
+      existedBefore: !!filedYear,
+      filed: fRow,
+      with: pRow,
+      delta: entry.delta ? entry.delta.byYear[year] : null,
+      complete: pRow ? pRow.complete : false,
+      reasons: withYear ? withYear.reasons : [],
+      filedSpecial: filedYear ? filedYear.special : null,
+      withSpecial: withYear ? withYear.special : null,
+    };
+  }
+
+  /**
+   * What one planned move says. Two readings of the same move:
+   *   carried   the Finanzamt is told in time (§ 27 Abs 6 Z 2 EStG): nothing is taxed, the cost goes with the units. This is what the
+   *             owner has to report: the whole units and their total acquisition cost.
+   *   sold      it is not told in time: the move counts as a sale at market value (needs the price the owner typed). The gain is taxed
+   *             in the year of the move, and the units start at the receiving broker with the market value as their cost.
+   */
+  function moveOutcome(m, kept, sold, filedEv, filedEntry) {
+    const e = m.event;
+    const year = e.date.slice(0, 4);
+    const res = { kind: "MOVE", planId: m.planId, eventId: m.eventId, label: m.label, date: e.date, year, depot: e.fromDepot, toDepot: e.toDepot, toLabel: m.toLabel, isin: e.isin, qty: e.qty, ok: false, status: "ERROR", blocked: null, errors: [], heldQty: heldOn(filedEv.engine, e.fromDepot, e.isin, e.date), deadline: oneMonthAfter(e.date), valued: e.marketValueEur !== undefined && e.marketValueEur !== null, marketValueEur: e.marketValueEur || null, native: e.native || null, carried: null, sold: null, soldError: null };
+    const errs = (kept.entry.errors || []).concat(kept.entry.engineErrors || []);
+    if (!kept.ev || !kept.ev.engine || kept.ev.engine.fatal || !kept.entry.ok) {
+      res.errors = errs.map((x) => x.text);
+      if (!res.errors.length) res.errors.push("This plan could not be calculated.");
+      return res;
+    }
+    const logs = (kept.ev.engine.log || []).filter((l) => l.eventId === m.eventId);
+    const out = logs.find((l) => l.kind === "TRANSFER_OUT");
+    const into = logs.find((l) => l.kind === "TRANSFER_IN");
+    if (!out || !into) {
+      const f = (kept.ev.engine.findings || []).find((x) => x.eventId === m.eventId);
+      if (f) {
+        res.status = "BLOCKED";
+        res.blocked = { id: f.id, text: f.text };
+      } else res.errors.push("The calculator did not return this move.");
+      return res;
+    }
+    res.status = "OK";
+    const cost = Dec.sub(Dec.parse(out.before.tax), Dec.parse(out.after.tax));
+    const perUnit = Dec.isZero(Dec.parse(e.qty)) ? null : Dec.divRound(cost, Dec.parse(e.qty), 6);
+    res.carried = {
+      qty: e.qty,
+      costEur: Dec.str(cost, 2),
+      avgCostPerUnit: perUnit ? Dec.str(perUnit, 6) : null,
+      leftQty: out.after.qty,
+      leftCostEur: out.after.tax,
+      receivingQty: into.after.qty,
+      receivingCostEur: into.after.tax,
+      receivingAvgPerUnit: Dec.isZero(Dec.parse(into.after.qty)) ? null : Dec.str(Dec.divRound(Dec.parse(into.after.tax), Dec.parse(into.after.qty), 6), 6),
+    };
+    if (sold) {
+      const sid = m.eventId + "#sale";
+      if (!sold.ev || !sold.ev.engine || sold.ev.engine.fatal || !sold.entry.ok) res.soldError = ((sold.entry.errors || []).concat(sold.entry.engineErrors || []).map((x) => x.text).join(" ")) || "The move as a sale could not be calculated.";
+      else {
+        const r = sold.ev.engine.realizations.find((x) => x.id === sid);
+        const sIn = (sold.ev.engine.log || []).find((l) => l.eventId === m.eventId && l.kind === "TRANSFER_IN_DEEMED_SALE");
+        if (!r) res.soldError = "The calculator did not return the move as a sale.";
+        else if (r.status !== "OK") res.soldError = "The move as a sale is blocked (" + (r.blockedReason || "no reason given") + ").";
+        else {
+          const yi = yearInfoOf(year, filedEv, filedEntry, sold.ev, sold.entry);
+          let used = "0.00";
+          let room = "0.00";
+          if (yi.filed && yi.with) {
+            room = yi.filed.lossForfeitedEur;
+            const u = Dec.sub(Dec.parse(yi.filed.lossForfeitedEur), Dec.parse(yi.with.lossForfeitedEur));
+            used = Dec.isNeg(u) ? "0.00" : Dec.str(u, 2);
+          }
+          // the same one-cent note as for a sale: the year's KESt is rounded once for the whole year, "this gain alone" on its own
+          let centNote = false;
+          if (Dec.isZero(Dec.parse(used)) && r.kestStandaloneEur && yi.delta) centNote = Dec.cmp(Dec.abs(Dec.sub(Dec.parse(r.kestStandaloneEur), Dec.parse(yi.delta.kestBeforeCreditEur))), Dec.parse("0.01")) === 0;
+          res.sold = { marketValueEur: r.proceedsEur, costRemovedEur: r.taxCostRemoved.total, gainEur: r.taxGainEur, kestAloneEur: r.kestStandaloneEur, newCostEur: sIn ? sIn.after.tax : r.proceedsEur, yearInfo: yi, lossUsedEur: used, roomEur: room, kestCentNote: centNote };
+        }
+      }
+    }
+    res.ok = true;
+    return res;
+  }
+
+  // ---------------------------------------------------------------- what the plans do
+
+  /**
+   * What each typed plan does on its own against the position as filed (one run per plan, a move one run per reading; the filed run is
+   * shared). Returns { ok, error, byPlan: { planId: outcome } }; an outcome has kind "SALE" or "MOVE". Plans that did not convert
+   * (see Convert tables.plans) are not here.
    */
   function planResults(base, meta) {
     const out = { ok: true, error: null, byPlan: {} };
     const list = planEvents(base, meta);
-    if (!list.length) return out;
+    const moves = moveEvents(base, meta);
+    if (!list.length && !moves.length) return out;
     try {
       const defs = list.map((p) => ({ id: "ONE_" + p.planId, label: p.label, switches: { includePlanned: [p.eventId] } }));
+      const at = moves.map((m) => {
+        const kept = defs.length;
+        defs.push({ id: "MOVE_" + m.planId, label: m.label + " (notified in time)", switches: { includePlanned: [m.eventId] } });
+        let sold = -1;
+        if (m.event.marketValueEur) {
+          sold = defs.length;
+          defs.push({ id: "MOVESALE_" + m.planId, label: m.label + " (not notified: taxable sale)", switches: { includePlanned: [m.eventId], treatmentById: { [m.eventId]: TREAT.SALE } } });
+        }
+        return { kept, sold };
+      });
       const cmp = Scenarios.compare(base, defs);
       const filedEv = cmp.evaluations[0];
       const filedEntry = cmp.scenarios[0];
@@ -8514,6 +9136,12 @@ details.mini > .body { padding-top: 6px; }
       }
       list.forEach((p, i) => {
         out.byPlan[p.planId] = planOutcome(p, cmp.evaluations[i + 1], cmp.scenarios[i + 1], filedEv, filedEntry);
+      });
+      moves.forEach((m, i) => {
+        const a = at[i];
+        const keptRun = { ev: cmp.evaluations[a.kept + 1], entry: cmp.scenarios[a.kept + 1] };
+        const soldRun = a.sold >= 0 ? { ev: cmp.evaluations[a.sold + 1], entry: cmp.scenarios[a.sold + 1] } : null;
+        out.byPlan[m.planId] = moveOutcome(m, keptRun, soldRun, filedEv, filedEntry);
       });
     } catch (e) {
       out.ok = false;
@@ -8610,6 +9238,21 @@ details.mini > .body { padding-top: 6px; }
     return rows;
   }
 
+  /**
+   * The comparison with the normal tax scale for one year (Regular.compare), from the year of a tax summary and what the owner typed.
+   * The last answer is kept, because the break-even search and the chart are many calculations and the screen is drawn often.
+   */
+  let regularLast = { key: "", value: null };
+  function regularView(summary, year, inputs) {
+    const y = summary && summary.years ? summary.years[year] : null;
+    const typed = inputs || {};
+    const key = [summary && summary.hash, year, typed.otherEur || "", typed.creditsEur || ""].join("|");
+    if (y && summary.hash && regularLast.key === key) return regularLast.value;
+    const value = Regular.compare(y, { otherEur: typed.otherEur || "", creditsEur: typed.creditsEur || "" });
+    if (y && summary.hash) regularLast = { key, value };
+    return value;
+  }
+
   /** Estimated amount still to pay: low and high end (the foreign-tax credit is a range until the matching rule is settled). */
   function dueText(y) {
     if (!y) return { low: "0.00", high: "0.00", exact: true };
@@ -8684,12 +9327,14 @@ details.mini > .body { padding-top: 6px; }
     plannedList,
     planEvents,
     planResults,
+    oneMonthAfter,
     planAlternatives,
     sellable,
     applyInputs,
     buildDefs,
     compute,
     yearRows,
+    regularView,
     dueText,
     holdings,
     history,
@@ -8735,7 +9380,7 @@ details.mini > .body { padding-top: 6px; }
 })(typeof self !== "undefined" ? self : this, function (Prices) {
   "use strict";
 
-  const VERSION = "perf-0.1.0";
+  const VERSION = "perf-0.2.0";
   const DAY = 86400000;
   const EPS = 1e-9;
   const dayNumber = Prices.dayNumber;
@@ -8853,7 +9498,8 @@ details.mini > .body { padding-top: 6px; }
           P.add("warn", "NO_AMOUNT", "A dividend of " + l.ticker + " on " + l.date + " has no usable amount and is not part of the figures.", l.ticker);
           continue;
         }
-        g.divs.push({ dn, net: gross - (num(l.withheld) || 0), ccy: str(l.ccy) });
+        const wh = num(l.withheld) || 0;
+        g.divs.push({ dn, gross, withheld: wh, net: gross - wh, ccy: str(l.ccy) });
       } else {
         const q = num(l.qty);
         const price = num(l.price);
@@ -9024,12 +9670,12 @@ details.mini > .body { padding-top: 6px; }
     const N = endDn - startDn + 2; // index 0 is the day before the first row
     const dn0 = startDn - 1;
     const zeros = () => new Float64Array(N);
-    const total = { value: zeros(), inflow: zeros(), outflow: zeros(), dividends: zeros(), market: zeros(), costs: zeros(), index: zeros(), invested: zeros() };
+    const total = { value: zeros(), inflow: zeros(), outflow: zeros(), dividends: zeros(), market: zeros(), costs: zeros(), index: zeros(), invested: zeros(), fees: zeros(), divGross: zeros(), withheld: zeros() };
 
     // ---- 5. every security, day by day
     const per = [];
     for (const { g, ser, info } of live) {
-      const A = { ticker: g.ticker, symbol: info.symbol, name: info.name, currency: ser.ccy, valuedBy: info.valuedBy, value: zeros(), units: zeros(), inflow: zeros(), outflow: zeros(), dividends: zeros(), index: zeros() };
+      const A = { ticker: g.ticker, symbol: info.symbol, name: info.name, currency: ser.ccy, valuedBy: info.valuedBy, value: zeros(), units: zeros(), inflow: zeros(), outflow: zeros(), dividends: zeros(), index: zeros(), fees: zeros(), divGross: zeros(), withheld: zeros(), trades: [] };
       const tr = g.trades;
       const dv = g.divs;
       let qty = 0;
@@ -9094,6 +9740,7 @@ details.mini > .body { padding-top: 6px; }
             P.add("warn", "NO_FX_DAY", "A row of " + g.ticker + " on " + t.date + " could not be converted to euro (no ECB rate) and is left out.", g.ticker);
             continue;
           }
+          const ub = qty; // the units held just before this row (splits of the day are in already)
           qty = clean(t.buy ? qty + t.qty : qty - t.qty);
           if (qty < -EPS && !negFirst) {
             negFirst = t.date;
@@ -9110,19 +9757,27 @@ details.mini > .body { padding-top: 6px; }
               if (u !== null) slip += t.qty * (pe - u);
             }
             fee += feeE;
+            A.trades.push({ i, buy: t.buy, qty: t.qty, pe, ub });
           } else if (u !== null) {
             if (t.buy) inCost += t.qty * u;
             else outNet += t.qty * u;
+            A.trades.push({ i, buy: t.buy, qty: t.qty, pe: u, ub });
             P.add("info", "IN_KIND", "Rows of " + g.ticker + " without a price (a gift or a transfer in kind, first on " + t.date + ") are valued at the closing price of their day: they count as money in or out, not as a gain.", g.ticker);
           } else {
             P.add("warn", "IN_KIND_NO_PRICE", "A row of " + g.ticker + " on " + t.date + " has no price and there is no market price for that day, so it could not be valued.", g.ticker);
           }
         }
         let div = 0;
+        let divG = 0;
+        let divW = 0;
         while (di < dv.length && dv[di].dn <= dn) {
           if (dv[di].dn === dn) {
             const f = fx(dv[di].ccy || ser.ccy, dn);
-            if (f) div += dv[di].net / f.rate;
+            if (f) {
+              div += dv[di].net / f.rate;
+              divG += dv[di].gross / f.rate;
+              divW += dv[di].withheld / f.rate;
+            }
             else P.add("warn", "NO_FX_DAY", "A dividend of " + g.ticker + " on " + isoOf(dn) + " could not be converted to euro (no ECB rate) and is left out.", g.ticker);
           }
           di++;
@@ -9134,6 +9789,9 @@ details.mini > .body { padding-top: 6px; }
         A.inflow[i] = inCost;
         A.outflow[i] = outNet;
         A.dividends[i] = div;
+        A.divGross[i] = divG;
+        A.withheld[i] = divW;
+        A.fees[i] = fee;
         // the return of the day
         const base2 = vPrev + inCost;
         let r = 0;
@@ -9151,6 +9809,9 @@ details.mini > .body { padding-top: 6px; }
         total.inflow[i] += A.inflow[i];
         total.outflow[i] += A.outflow[i];
         total.dividends[i] += A.dividends[i];
+        total.divGross[i] += A.divGross[i];
+        total.withheld[i] += A.withheld[i];
+        total.fees[i] += A.fees[i];
       }
     }
     for (const [ccy, s] of fxStale) P.add("warn", "FX_STALE", "The ECB rates for " + ccy + " were more than " + o.maxFxLagDays + " days old on " + s.n + " lookups (the last on " + isoOf(s.last) + "). The latest rate before the day was used. Load a newer ECB file.", "");
@@ -9205,6 +9866,7 @@ details.mini > .body { padding-top: 6px; }
   function resolve(model, spec) {
     const e0 = model.N - 1;
     const preset = typeof spec === "string" ? PRESETS.find((p) => p.key === spec) : null;
+    const yearSpec = typeof spec === "string" ? /^Y(\d{4})$/.exec(spec) : null;
     const out = { key: preset ? preset.key : "CUSTOM", label: preset ? preset.label : "Custom", s: 0, e: e0, from: "", to: "", days: 0, available: true, clamped: false, error: "" };
     let s;
     let e = e0;
@@ -9216,6 +9878,21 @@ details.mini > .body { padding-top: 6px; }
       } else {
         s = idxOf(model, addMonths(model.days[e0], -preset.months));
         if (s < 0) out.available = false;
+      }
+    } else if (yearSpec) {
+      // a calendar year: from the close of 31 December before it (or from the start, in the year the history starts) to the close of 31 December
+      const y = +yearSpec[1];
+      out.key = spec;
+      out.label = String(y);
+      out.year = y;
+      s = idxOf(model, y - 1 + "-12-31");
+      const eIdx = idxOf(model, y + "-12-31");
+      if (s === null || eIdx === null || eIdx < 1 || s > e0 - 1) {
+        out.available = false;
+        s = 0;
+      } else {
+        e = Math.min(eIdx, e0);
+        if (s < 0) s = 0;
       }
     } else if (spec && typeof spec === "object") {
       s = idxOf(model, spec.from);
@@ -9371,6 +10048,261 @@ details.mini > .body { padding-top: 6px; }
     return rows.sort((a, b) => b.valueEnd - a.valueEnd || (a.ticker < b.ticker ? -1 : 1));
   }
 
+  // ---------------------------------------------------------------- months, drawdown, risk, the breakdown of the result
+
+  /**
+   * One row per calendar month, from the month of the first row to the last day of data: its time-weighted return and what it earned.
+   * { year, month (1-12), s, e, from, to, twr, gain, valueEnd, net, dividends, partial, held }. partial: the first month of the history
+   * starts with the first row, the last one is not over. held: something was held, bought, sold or paid out in the month.
+   */
+  function months(model) {
+    const out = [];
+    const T = model.total;
+    let y = +model.start.slice(0, 4);
+    let mo = +model.start.slice(5, 7);
+    const yEnd = +model.end.slice(0, 4);
+    const moEnd = +model.end.slice(5, 7);
+    while (y < yEnd || (y === yEnd && mo <= moEnd)) {
+      const firstDn = Date.UTC(y, mo - 1, 1) / DAY;
+      const lastDn = Date.UTC(y, mo, 0) / DAY;
+      let s = firstDn - 1 - model.dn0;
+      const e = Math.min(lastDn - model.dn0, model.N - 1);
+      const partialStart = s < 0;
+      if (s < 0) s = 0;
+      const partialEnd = lastDn - model.dn0 > model.N - 1;
+      if (e > s) {
+        const st = stats(model, { s, e });
+        const held = T.value[s] > 0 || T.value[e] > 0 || st.inflow > 0 || st.outflow > 0 || st.dividends > 0;
+        out.push({ year: y, month: mo, s, e, from: model.days[s], to: model.days[e], twr: st.twr, gain: st.gain, valueEnd: st.valueEnd, net: st.net, dividends: st.dividends, partial: partialStart || partialEnd, held });
+      }
+      mo++;
+      if (mo > 12) {
+        mo = 1;
+        y++;
+      }
+    }
+    return out;
+  }
+
+  /**
+   * The calendar months (or years) inside a time-frame, each cut to the time-frame: what the bar chart and the table of periods show.
+   * unit: "month" or "year". Every day the return of which belongs to the time-frame (the days after its first close, up to its last
+   * close) is put in the period of its calendar month or year. Chained, the returns of the rows are the return of the time-frame and
+   * the gains add up to its gain. Row: { unit, year, month (0 for a year), s, e, from, to, twr, gain, net, dividends, valueEnd,
+   * partial, held }. partial: the row does not cover the whole calendar month or year (the time-frame starts or ends inside it, the
+   * history starts inside it, or it is not over yet). held: something was held, bought, sold or paid out in it.
+   */
+  function periods(model, win, unit) {
+    const T = model.total;
+    const groups = [];
+    let cur = null;
+    for (let i = win.s + 1; i <= win.e; i++) {
+      const day = model.days[i];
+      const key = unit === "year" ? day.slice(0, 4) : day.slice(0, 7);
+      if (!cur || cur.key !== key) {
+        if (cur) groups.push(cur);
+        cur = { key, a: i, b: i };
+      } else cur.b = i;
+    }
+    if (cur) groups.push(cur);
+    return groups.map((g) => {
+      const s = g.a - 1;
+      const e = g.b;
+      const st = stats(model, { s, e });
+      const y = +g.key.slice(0, 4);
+      const mo = unit === "month" ? +g.key.slice(5, 7) : 0;
+      const first = model.days[g.a];
+      const last = model.days[g.b];
+      const firstWhole = unit === "year" ? first.slice(5) === "01-01" : first.slice(8) === "01";
+      const lastWhole = unit === "year" ? last.slice(5) === "12-31" : +last.slice(8) === new Date(Date.UTC(y, mo, 0)).getUTCDate();
+      const held = T.value[s] > 0 || T.value[e] > 0 || st.inflow > 0 || st.outflow > 0 || st.dividends > 0;
+      return { unit, year: y, month: mo, s, e, from: model.days[s], to: model.days[e], twr: st.twr, gain: st.gain, net: st.net, dividends: st.dividends, valueEnd: st.valueEnd, partial: !(firstWhole && lastWhole), held };
+    });
+  }
+
+  /**
+   * How far the time-weighted index was below its previous high, day by day, over a time-frame. The index ignores money put in and
+   * taken out, so a purchase never hides a loss and a sale never makes one.
+   * Returns { days, dd (0 or negative fractions), current, max }. max is null when the index never fell; otherwise
+   * { depth, peak, trough, recovered ("" when it has not got back to that high), recoveryDays (null then), downDays }.
+   */
+  function drawdown(model, win, maxPoints) {
+    const T = model.total;
+    const { s, e } = win;
+    let peak = T.index[s];
+    let peakI = s;
+    const dd = new Float64Array(e - s + 1);
+    let worst = 0;
+    let worstI = s;
+    let worstPeakI = s;
+    for (let i = s; i <= e; i++) {
+      if (T.index[i] > peak) {
+        peak = T.index[i];
+        peakI = i;
+      }
+      const d = T.index[i] / peak - 1;
+      dd[i - s] = d;
+      if (d < worst) {
+        worst = d;
+        worstI = i;
+        worstPeakI = peakI;
+      }
+    }
+    let recoveredI = -1;
+    if (worst < 0) {
+      const target = T.index[worstPeakI];
+      for (let i = worstI + 1; i <= e; i++) {
+        if (T.index[i] >= target) {
+          recoveredI = i;
+          break;
+        }
+      }
+    }
+    let ix = thin(s, e, maxPoints || 300);
+    if (worst < 0 && ix.indexOf(worstI) < 0) ix = ix.concat([worstI]).sort((a, b) => a - b);
+    return {
+      days: ix.map((i) => model.days[i]),
+      dd: ix.map((i) => dd[i - s]),
+      current: dd[e - s],
+      max: worst < 0 ? { depth: worst, peak: model.days[worstPeakI], trough: model.days[worstI], recovered: recoveredI >= 0 ? model.days[recoveredI] : "", recoveryDays: recoveredI >= 0 ? recoveredI - worstI : null, downDays: worstI - worstPeakI } : null,
+    };
+  }
+
+  /**
+   * How bumpy the ride was over a time-frame. vol: the standard deviation of the daily returns of the index, times the square root of
+   * 365 (calendar days: a weekend is a day of no return, which is how a year of 252 trading days adds up), only with 60 or more days.
+   * Months are the complete calendar months inside the time-frame (pass the rows of months() to save the work).
+   */
+  function risk(model, win, monthRows) {
+    const T = model.total;
+    const { s, e } = win;
+    const rs = [];
+    let best = null;
+    let worst = null;
+    for (let i = s + 1; i <= e; i++) {
+      if (!(T.value[i - 1] > 0)) continue;
+      const r = T.index[i] / T.index[i - 1] - 1;
+      rs.push(r);
+      if (!best || r > best.r) best = { r, day: model.days[i] };
+      if (!worst || r < worst.r) worst = { r, day: model.days[i] };
+    }
+    let vol = null;
+    if (rs.length >= 60) {
+      let mean = 0;
+      for (const r of rs) mean += r;
+      mean /= rs.length;
+      let ss = 0;
+      for (const r of rs) ss += (r - mean) * (r - mean);
+      vol = Math.sqrt(ss / (rs.length - 1)) * Math.sqrt(365);
+    }
+    const ms = (monthRows || months(model)).filter((m) => m.held && !m.partial && m.s >= s && m.e <= e);
+    let bestM = null;
+    let worstM = null;
+    let up = 0;
+    for (const m of ms) {
+      if (m.twr > 0) up++;
+      if (!bestM || m.twr > bestM.twr) bestM = m;
+      if (!worstM || m.twr < worstM.twr) worstM = m;
+    }
+    return { days: rs.length, vol, bestDay: best, worstDay: worst, months: ms.length, monthsUp: up, bestMonth: bestM, worstMonth: worstM };
+  }
+
+  /**
+   * Where the result of a time-frame came from, with the identity that holds it together:
+   *   gain = price gain - fees + dividends after tax at the source,   price gain = value at the end - value at the start - (bought - sold)
+   * and the price gain is split into realised and not yet realised with a moving average cost per security that starts, at the start of
+   * the time-frame, at the value of the holdings then (what they were "bought" for, as far as this time-frame is concerned) and takes
+   * what is bought at the price paid. This is the performance view, not the tax: the taxable gain is on the Tax tab.
+   */
+  function bridge(model, win) {
+    const T = model.total;
+    const { s, e } = win;
+    let inflow = 0;
+    let outflow = 0;
+    let fees = 0;
+    let divG = 0;
+    let wht = 0;
+    let divN = 0;
+    for (let i = s + 1; i <= e; i++) {
+      inflow += T.inflow[i];
+      outflow += T.outflow[i];
+      fees += T.fees[i];
+      divG += T.divGross[i];
+      wht += T.withheld[i];
+      divN += T.dividends[i];
+    }
+    let bought = 0;
+    let sold = 0;
+    let realized = 0;
+    let unrealized = 0;
+    let costHeld = 0;
+    for (const A of model.per) {
+      let C = A.value[s];
+      for (const t of A.trades) {
+        if (t.i <= s || t.i > e) continue;
+        if (t.buy) {
+          C += t.qty * t.pe;
+          bought += t.qty * t.pe;
+        } else {
+          const proceeds = t.qty * t.pe;
+          sold += proceeds;
+          let removed = 0;
+          if (t.ub > EPS) removed = t.qty >= t.ub - EPS ? C : C * (t.qty / t.ub);
+          C -= removed;
+          realized += proceeds - removed;
+        }
+      }
+      unrealized += A.value[e] - C;
+      if (A.value[e] > 0) costHeld += C;
+    }
+    const valueStart = T.value[s];
+    const valueEnd = T.value[e];
+    const priceGain = valueEnd - valueStart - (bought - sold);
+    const gain = priceGain - fees + divN;
+    const capital = valueStart + inflow;
+    return {
+      from: model.days[s],
+      to: model.days[e],
+      valueStart,
+      valueEnd,
+      bought,
+      sold,
+      fees,
+      inflow,
+      outflow,
+      priceGain,
+      realized,
+      unrealized,
+      costHeld,
+      dividendsGross: divG,
+      withheld: wht,
+      dividendsNet: divN,
+      gain,
+      capital,
+      simple: capital > 0 ? gain / capital : null,
+      check: Math.abs(realized + unrealized - priceGain),
+    };
+  }
+
+  /** The values of the largest securities over a time-frame (the rest as one "Other"), for a stacked chart: { days, series[{ ticker, other, count, values }], total }. */
+  function allocation(model, win, maxPoints, topN) {
+    const { s, e } = win;
+    const ix = thin(s, e, maxPoints || 160);
+    const n = Math.max(1, topN || 6);
+    const ranked = model.per
+      .map((A) => {
+        let sum = 0;
+        for (const i of ix) sum += A.value[i];
+        return { A, sum };
+      })
+      .filter((x) => x.sum > 0)
+      .sort((a, b) => b.sum - a.sum || (a.A.ticker < b.A.ticker ? -1 : 1));
+    const series = ranked.slice(0, n).map((x) => ({ ticker: x.A.ticker, other: false, count: 1, values: ix.map((i) => x.A.value[i]) }));
+    const rest = ranked.slice(n);
+    if (rest.length) series.push({ ticker: "Other", other: true, count: rest.length, values: ix.map((i) => rest.reduce((a, x) => a + x.A.value[i], 0)) });
+    return { days: ix.map((i) => model.days[i]), series, total: ix.map((i) => model.total.value[i]) };
+  }
+
   /** The days to draw for a time-frame: at most maxPoints, always the first and the last. */
   function thin(s, e, maxPoints) {
     const n = e - s + 1;
@@ -9391,11 +10323,12 @@ details.mini > .body { padding-top: 6px; }
       days: ix.map((i) => model.days[i]),
       value: ix.map((i) => T.value[i]),
       invested: ix.map((i) => T.invested[i]),
+      capital: ix.map((i) => T.value[win.s] + T.invested[i] - T.invested[win.s]),
       index: ix.map((i) => (T.index[i] / base) * 100),
     };
   }
 
-  return { VERSION, PRESETS, addMonths, median, xirr, compute, resolve, stats, years, byTicker, thin, chartSeries };
+  return { VERSION, PRESETS, addMonths, median, xirr, compute, resolve, stats, years, byTicker, thin, chartSeries, months, periods, drawdown, risk, bridge, allocation };
 });
 
 /* ---- src/app/perf-input.js ---- */
@@ -9745,7 +10678,9 @@ details.mini > .body { padding-top: 6px; }
    *   categories: ["2020", ...],
    *   series: [{ id, name, color, values: [number...], texts: ["€1.00", ...] }],
    *   mode: "grouped" | "stacked" | "split"   (split: one series, colour by sign: colorPos / colorNeg)
-   *   colorPos, colorNeg, height, ariaLabel, totalTexts (stacked: text of each total), labelMax: true
+   *   colorPos, colorNeg, height, ariaLabel, totalTexts (stacked: text of each total), labelMax: true,
+   *   tickLabels: ["Jan\n2024", "Feb", "", ...] (text under the bars when it should be shorter than the category, which stays the title of
+   *   the tip; "\n" starts a second line; an empty one is left out)
    * }
    */
   function bars(opts) {
@@ -9761,7 +10696,9 @@ details.mini > .body { padding-top: 6px; }
     function draw(W) {
       for (const n of Array.from(wrap.querySelectorAll("svg"))) n.remove();
       const H = opts.height || 220;
-      const ml = 46, mr = 8, mt = 18, mb = 24;
+      // a label with a line break (a month with its year under it) needs a second line of room under the bars
+      const twoLines = !!(opts.tickLabels && opts.tickLabels.some((t) => t && t.indexOf("\n") >= 0));
+      const ml = 46, mr = 8, mt = 18, mb = twoLines ? 36 : 24;
       const pw = W - ml - mr, ph = H - mt - mb;
       const svg = s("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": opts.ariaLabel || "Chart" });
       wrap.insertBefore(svg, wrap.firstChild);
@@ -9823,9 +10760,16 @@ details.mini > .body { padding-top: 6px; }
             acc += v;
           });
         }
-        // x label
-        const xl = s("text", { x: cx, y: H - 7, class: "tick", "text-anchor": "middle" }, svg);
-        xl.textContent = c;
+        // x label (opts.tickLabels: the text under each bar when it is shorter than the category; an empty one is left out)
+        const tl = opts.tickLabels ? opts.tickLabels[i] : c;
+        if (tl) {
+          const parts = tl.split("\n");
+          parts.forEach((part, k) => {
+            // with a second line anywhere, every first line sits on the upper row and the second lines on the lower one
+            const xl = s("text", { x: cx, y: twoLines ? H - 19 + k * 12 : H - 7, class: "tick", "text-anchor": "middle" }, svg);
+            xl.textContent = part;
+          });
+        }
         // direct label on the largest bar
         if (opts.labelMax !== false && i === maxI && maxV > 0) {
           const v = mode === "stacked" ? totals[i] : series[maxS].values[i];
@@ -9920,10 +10864,64 @@ details.mini > .body { padding-top: 6px; }
   // ---------------------------------------------------------------- lines over time
 
   /**
+   * The area between two lines as two paths (where the first is above the second, where it is below), split where they cross.
+   * A, B: the values; xs: the x of each point; y: the scale. Returns { up, down } path texts ("" when there is none).
+   */
+  function bandPaths(A, B, xs, y) {
+    const up = [];
+    const down = [];
+    let run = null;
+    let zero = null;
+    const close = () => {
+      if (run && run.f.length > 1) (run.sg > 0 ? up : down).push("M" + run.f.concat(run.b.reverse()).map((p) => p[0].toFixed(1) + " " + p[1].toFixed(1)).join("L") + "Z");
+      run = null;
+    };
+    for (let i = 0; i < A.length; i++) {
+      const d = A[i] - B[i];
+      const pa = [xs[i], y(A[i])];
+      const pb = [xs[i], y(B[i])];
+      if (d === 0) {
+        if (run) {
+          run.f.push(pa);
+          run.b.push(pb);
+          close();
+        }
+        zero = [pa, pb];
+        continue;
+      }
+      const sg = d > 0 ? 1 : -1;
+      if (run && run.sg !== sg) {
+        // the lines crossed between the two points: this run ends at the crossing and the next begins there
+        const dp = A[i - 1] - B[i - 1];
+        const t = dp / (dp - d);
+        const c = [xs[i - 1] + t * (xs[i] - xs[i - 1]), y(A[i - 1] + t * (A[i] - A[i - 1]))];
+        run.f.push(c);
+        run.b.push(c);
+        close();
+        zero = [c, c];
+      }
+      if (!run) {
+        run = { sg, f: [], b: [] };
+        if (zero) {
+          run.f.push(zero[0]);
+          run.b.push(zero[1]);
+        }
+        zero = null;
+      }
+      run.f.push(pa);
+      run.b.push(pb);
+    }
+    close();
+    return { up: up.join(""), down: down.join("") };
+  }
+
+  /**
    * One to four lines over a stretch of days, many points (the caller thins them): the value of a portfolio, the growth of 100.
    * The pointer, a finger or the arrow keys move a cross hair that shows the exact values of that day.
    * opts: { days: ["YYYY-MM-DD", ...], series: [{ name, color, values: [number...], dash }], format: (number) => text (axis and tooltip),
-   *         zero: true (the axis includes zero), dateText: (iso) => text for the title of the tooltip, height, ariaLabel }
+   *         zero: true (the axis includes zero), dateText: (iso) => text for the title of the tooltip, height, ariaLabel,
+   *         band: { a, b, up, down } shades the gap between series a and series b (colours for a above b and a below b),
+   *         a series can have area: true to shade between its line and zero }
    */
   function timeLines(opts) {
     const days = opts.days;
@@ -9961,6 +10959,16 @@ details.mini > .body { padding-top: 6px; }
         lab.textContent = fmt(t);
       }
       s("line", { x1: ml, x2: W - mr, y1: mt + ph, y2: mt + ph, class: "axis" }, svg);
+      if (opts.band) {
+        const bp = bandPaths(series[opts.band.a].values, series[opts.band.b].values, xs, y);
+        if (bp.up) s("path", { d: bp.up, class: "band" }, svg).style.fill = opts.band.up;
+        if (bp.down) s("path", { d: bp.down, class: "band" }, svg).style.fill = opts.band.down;
+      }
+      series.forEach((x) => {
+        if (!x.area) return;
+        const edge = x.values.map((v, i) => xs[i].toFixed(1) + " " + y(v).toFixed(1)).join("L");
+        s("path", { d: "M" + xs[0].toFixed(1) + " " + y(0).toFixed(1) + "L" + edge + "L" + xs[n - 1].toFixed(1) + " " + y(0).toFixed(1) + "Z", class: "band" }, svg).style.fill = x.color;
+      });
       for (const t of timeTicks(days[0], days[n - 1], Math.max(2, Math.floor(pw / 70)))) {
         const tx = xOf(t.day);
         const lab = s("text", { x: Math.min(Math.max(tx, ml + 14), W - mr - 14), y: H - 7, class: "tick", "text-anchor": "middle" }, svg);
@@ -10044,7 +11052,10 @@ details.mini > .body { padding-top: 6px; }
 
   // ---------------------------------------------------------------- horizontal bars
 
-  /** One series, one bar per item, value at the bar end. opts: { items: [{ label, value, text, tip }], color, ariaLabel } */
+  /**
+   * One series, one bar per item, value at the bar end. opts: { items: [{ label, value, text, tip }], color, ariaLabel,
+   * colorNeg (the colour of the bars below zero, which go to the left of the zero line) }
+   */
   function hbars(opts) {
     const items = opts.items;
     const wrap = h("div", { class: "chart-wrap" });
@@ -10056,27 +11067,33 @@ details.mini > .body { padding-top: 6px; }
       const H = items.length * rowH + 8;
       const labelW = Math.min(150, Math.max(90, W * 0.34));
       const ml = labelW + 8, mr = 70;
-      const pw = Math.max(20, W - ml - mr);
+      const vals = items.map((x) => x.value);
+      const max = Math.max.apply(null, vals.concat([1]));
+      const min = Math.min.apply(null, vals.concat([0]));
+      // below zero the bars go left of the zero line, so the plot starts further right to leave room for their value
+      const pl = ml + (min < 0 ? 64 : 0);
+      const pw = Math.max(20, W - pl - mr);
+      const span = max - min;
+      const x0 = pl + (-min / span) * pw;
       const svg = s("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": opts.ariaLabel || "Chart" });
       wrap.insertBefore(svg, wrap.firstChild);
-      const max = Math.max.apply(null, items.map((x) => x.value).concat([1]));
-      s("line", { x1: ml, x2: ml, y1: 0, y2: H, class: "axis" }, svg);
+      s("line", { x1: x0, x2: x0, y1: 0, y2: H, class: "axis" }, svg);
       items.forEach((it, i) => {
         const cy = 4 + i * rowH;
         const bh = Math.min(MAX_BAR, rowH - 10);
         const by = cy + (rowH - bh) / 2;
-        const w = (it.value / max) * pw;
-        const p = s("path", { d: hBarPath(by, bh, ml, ml + w), class: "bar" }, svg);
-        p.style.fill = opts.color;
+        const w = (it.value / span) * pw;
+        const p = s("path", { d: hBarPath(by, bh, x0, x0 + w), class: "bar" }, svg);
+        p.style.fill = it.value < 0 && opts.colorNeg ? opts.colorNeg : opts.color;
         const lab = s("text", { x: ml - 8, y: by + bh / 2 + 4, class: "tick lab", "text-anchor": "end" }, svg);
         let t = it.label;
         const maxChars = Math.floor(labelW / 7);
         if (t.length > maxChars) t = t.slice(0, maxChars - 1) + "…";
         lab.textContent = t;
-        const val = s("text", { x: ml + w + 6, y: by + bh / 2 + 4, class: "dlabel", "text-anchor": "start" }, svg);
+        const val = s("text", { x: w < 0 ? x0 + w - 6 : x0 + w + 6, y: by + bh / 2 + 4, class: "dlabel", "text-anchor": w < 0 ? "end" : "start" }, svg);
         val.textContent = it.text;
         const hit = s("rect", { x: 0, y: cy, width: W, height: rowH, class: "hit", tabindex: 0, role: "img", "aria-label": it.label + ": " + it.text }, svg);
-        const on = () => tipper.show(it.label, [{ name: it.tip || "Value", color: opts.color, value: it.text }], Math.min(W - 60, ml + w / 2 + 20));
+        const on = () => tipper.show(it.label, [{ name: it.tip || "Value", color: it.value < 0 && opts.colorNeg ? opts.colorNeg : opts.color, value: it.text }], Math.max(40, Math.min(W - 60, x0 + w / 2 + 20)));
         hit.addEventListener("mouseenter", on);
         hit.addEventListener("focus", on);
         hit.addEventListener("mouseleave", () => tipper.hide());
@@ -11773,11 +12790,12 @@ const AutoUI = (function () {
 
 /* ---- src/app/ui-plan.js ---- */
 /*
- * "Plan a sale" on the What-if tab (browser only).
+ * "Plan a sale" and "Plan a move to another broker" on the What-if tab (browser only).
  *
- * The owner types what he is thinking of selling: which depot and security, how many units, the expected price per unit and the day.
- * Convert turns each plan into a planned sale (never part of the filed position) and Model works out what it does to the tax of
- * that year. This file only draws what Convert and Model returned, and writes what the owner typed into his document (host.commit).
+ * The owner types what he is thinking of selling, or of moving to another broker: which depot and security, how many units, the
+ * expected price per unit and the day. Convert turns each plan into a planned event (never part of the filed position) and Model works
+ * out what it does to the tax of that year (a move: the cost to report when the Finanzamt is told in time, and the tax when it is
+ * not). This file only draws what Convert and Model returned, and writes what the owner typed into his document (host.commit).
  * It calculates nothing about tax. Text is always put in with textContent.
  *
  * A plan is kept as typed (text), checked by Convert, and shown with its own messages. A plan that cannot be calculated is listed with
@@ -11839,6 +12857,21 @@ const PlanUI = (function () {
     return el("label", { class: "tick-row", "data-k": "tick:" + key }, el("input", { type: "checkbox", checked, "data-key": key, onchange: (e) => onchange(e.target.checked) }), el("span", { class: "t", text: title }), desc ? el("span", { class: "d", text: desc }) : null);
   }
 
+  /** Two or three choices in a row (radio buttons). An option is [value, text] or [value, text, disabled]. */
+  function seg(name, options, value, onchange, keyPrefix) {
+    return el("div", { class: "seg", role: "radiogroup" }, options.map((o) => el("label", {}, el("input", { type: "radio", name, value: o[0], checked: value === o[0], disabled: o[2] === true, "data-key": keyPrefix + ":" + o[0], onchange: () => onchange(o[0]) }), el("span", { text: o[1] }))));
+  }
+
+  const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  /** "Sat 5 Dec 2026": the day with its weekday, so a weekend is seen at once. */
+  function withWeekday(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso));
+    if (!m) return iso ? String(iso) : "–";
+    return WEEKDAYS[new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))).getUTCDay()] + " " + fd(iso);
+  }
+  const wholeOf = (qty) => String(qty).split(".")[0];
+  const hasFraction = (qty) => /\.\d*[1-9]/.test(String(qty));
+
   function create(host) {
     const st = { open: {}, alt: {} };
     const doc = () => host.doc();
@@ -11869,11 +12902,13 @@ const PlanUI = (function () {
       });
     }
 
-    function addPlan(from) {
+    function addPlan(from, kind) {
       let id = "";
       host.commit((d) => {
         id = newId(d.plans);
-        d.plans.push(from ? Object.assign({}, from, { id }) : { id, kind: "SALE", date: host.today(), depot: "", isin: "", qty: "", price: "", ccy: "", rate: "", fee: "", note: "" });
+        const blank = { id, kind: kind || "SALE", date: host.today(), depot: "", isin: "", qty: "", price: "", ccy: "", rate: "", fee: "", note: "" };
+        if (blank.kind === "MOVE") blank.to = "";
+        d.plans.push(from ? Object.assign({}, from, { id }) : blank);
       });
       requestAnimationFrame(() => {
         const n = document.querySelector('[data-k="plan:' + id + '"]');
@@ -12119,6 +13154,210 @@ const PlanUI = (function () {
         body);
     }
 
+    // ------------------------------------------------------------ a planned move to another broker
+
+    function moveBlockedBlock(pl, res) {
+      const left = M.isZeroText(res.heldQty) ? "no units" : "only " + fq(res.heldQty) + " units";
+      const text = res.blocked.id === "NEGATIVE_POSITION" ? depotLabel(res.depot) + " holds " + left + " of " + secShort(res.isin) + " on " + fd(res.date) + ", so " + fq(res.qty) + " cannot be moved from it." : res.blocked.text;
+      const whole = wholeOf(res.heldQty);
+      const acts = [];
+      if (res.blocked.id === "NEGATIVE_POSITION" && !M.isZeroText(whole)) acts.push(button("Move " + fq(whole) + " instead", () => update(pl.id, { qty: whole }), "small", "plan-" + pl.id + ":fit"));
+      return el("div", { class: "banner bad" }, el("strong", { text: "This move cannot be calculated" }), el("span", { text }), acts.length ? el("div", { class: "btn-row" }, acts) : null);
+    }
+
+    function moveYearTable(res) {
+      const y = res.sold.yearInfo;
+      const f = y.filed;
+      const w = y.with;
+      const d = y.delta;
+      const rows = [
+        ["Result of sales", fm(f.realizedNetEur), fm(w.realizedNetEur), fm(d.realizedNetEur, { plus: true })],
+        ["Taxable base", fm(f.netBaseEur), fm(w.netBaseEur), fm(d.netBaseEur, { plus: true })],
+        ["Losses lost at year-end", fm(f.lossForfeitedEur), fm(w.lossForfeitedEur), fm(d.lossForfeitedEur, { plus: true })],
+        ["KESt", fm(f.kestBeforeCreditEur), fm(w.kestBeforeCreditEur), fm(d.kestBeforeCreditEur, { plus: true })],
+      ];
+      return C.tableOf([res.year, "As filed", "If not notified", "Change"], rows, "Your " + res.year + " as filed and if the move is counted as a sale");
+    }
+
+    /** The reading "the Finanzamt is not told in time": the move is a sale at market value. */
+    function moveSoldBlock(pl, row, res) {
+      const out = [el("h3", { text: "If you do not tell the Finanzamt in time" })];
+      if (!res.valued) {
+        out.push(el("p", { class: "note", text: "Type an expected price per unit to see what a missing notification would cost. The move then counts as a sale at market value." }));
+        return out;
+      }
+      if (!res.sold) {
+        out.push(el("div", { class: "banner bad" }, el("strong", { text: "The move as a sale could not be calculated" }), el("span", { text: res.soldError || "No reason was given." })));
+        return out;
+      }
+      const s = res.sold;
+      const y = s.yearInfo;
+      const d = y.delta.kestBeforeCreditEur;
+      const used = M.num(s.lossUsedEur) > 0;
+      const pct = y.withSpecial ? y.withSpecial.ratePercent : "27.5";
+      let kind;
+      let head;
+      let tail = "";
+      if (M.num(d) > 0) {
+        kind = "";
+        head = "It counts as a sale: " + fm(d) + " of KESt in " + res.year + ".";
+        tail = used ? "It first uses up " + fm(s.lossUsedEur) + " of the losses of " + res.year + "." : "";
+      } else if (M.num(d) < 0) {
+        kind = "ok";
+        head = "It counts as a sale and lowers the KESt of " + res.year + " by " + fm(absText(d)) + ".";
+        tail = "The loss is set against gains of the year.";
+      } else if (M.num(s.gainEur) > 0 && used) {
+        kind = "ok";
+        head = "It counts as a sale, but no extra KESt in " + res.year + ".";
+        tail = "The gain of " + fm(s.gainEur) + " is set against losses of " + res.year + " (" + fm(s.lossUsedEur) + " of " + fm(s.roomEur) + " used).";
+      } else if (M.num(s.gainEur) < 0) {
+        kind = "info";
+        head = "It counts as a sale at a loss of " + fm(absText(s.gainEur)) + ": no KESt.";
+        tail = "A loss only helps against gains, dividends or fund income of the same year; it cannot be carried forward.";
+      } else {
+        kind = "ok";
+        head = "It counts as a sale, but no extra KESt in " + res.year + ".";
+      }
+      out.push(el("div", { class: "banner" + (kind ? " " + kind : "") }, el("strong", { text: head }), tail ? el("span", { text: tail }) : null));
+      out.push(kvList([
+        ["Market value", fm(s.marketValueEur)],
+        ["Cost of the units", fm(s.costRemovedEur)],
+        ["Taxable gain", fm(s.gainEur)],
+        "sep",
+        ["KESt on this gain alone (" + pct + " %)", fm(s.kestAloneEur)],
+        ["Cost at " + res.toLabel + " afterwards", fm(s.newCostEur)],
+      ]));
+      const notes = [];
+      const rn = res.native ? rateNote(pl, row, res.native) : null;
+      if (rn) notes.push(rn);
+      notes.push("Without the notification the move is a taxable sale at market value, declared in your return (§ 27 Abs 6 Z 2 EStG); the units then start at the receiving broker with the market value as their cost.");
+      out.push(el("p", { class: "note", text: notes.join(" ") }));
+      out.push(moveYearTable(res));
+      if (s.kestCentNote) out.push(el("p", { class: "note", text: "The KESt of a year is rounded once for the whole year, so the change in the year can differ by one cent from the KESt on this gain alone." }));
+      if (!y.complete) out.push(el("ul", { class: "list" }, listItem("warn", "The figures of " + res.year + " are not complete: " + (y.reasons.length ? y.reasons.join(" ") : "see the Data tab") + " Other missing inputs are never guessed.")));
+      return out;
+    }
+
+    /** The reading "the Finanzamt is told in time": nothing is taxed; this is what has to be reported. */
+    function moveOkBlock(pl, row, res, pos) {
+      const c = res.carried;
+      const out = [];
+      out.push(el("div", { class: "banner ok" }, el("strong", { text: "No tax if you tell the Finanzamt in time." }), el("span", { text: "The cost of " + fq(res.qty) + " units, " + fm(c.costEur) + ", goes with them." })));
+      out.push(el("h3", { text: "What you report" }));
+      out.push(kvList([
+        ["Security", secShort(res.isin)],
+        ["ISIN", res.isin],
+        ["Units (whole)", fq(c.qty)],
+        ["Total acquisition cost", fm(c.costEur)],
+        ["Per unit, on average", fu(c.avgCostPerUnit)],
+        ["Receiving institution", row.to ? row.to : "Not named yet"],
+        "sep",
+        ["One month after the move", withWeekday(res.deadline)],
+      ]));
+      out.push(el("p", { class: "note", text: "The notification is due within one month of the move (§ 27 Abs 6 Z 2 EStG): the last day is the same day of the next month. If that day is a Saturday, Sunday, public holiday, Good Friday or 24 December, the next working day counts (§ 108 Abs 3 BAO). It is safer to notify early." }));
+      out.push(el("p", { class: "note", text: "In FinanzOnline: Weitere Services, Depotübertragung (form E 27-6). Per security it asks for the ISIN, the whole units and the total acquisition cost in euro, with the indicator “tatsächliche” (cost worked out under Austrian tax law). The cost shown here is your Austrian one, not whatever the sending broker has on record." }));
+      out.push(el("p", { class: "note", text: "Afterwards " + depotLabel(res.depot) + " keeps " + fq(c.leftQty) + " units; " + res.toLabel + " holds " + fq(c.receivingQty) + " units at " + fu(c.receivingAvgPerUnit) + " each as the start of its own average." }));
+      for (const b of moveSoldBlock(pl, row, res)) out.push(b);
+      const hints = [];
+      if (pos && hasFraction(pos.qty) && pl.qty === wholeOf(pos.qty)) hints.push(listItem("info", "The notification takes whole units only, so the fraction of " + fq(pos.qty) + " units stays where it is. How a fraction is handled is not covered here; ask your Steuerberater."));
+      const today = host.today();
+      if (pl.date < today) {
+        if (res.deadline >= today) hints.push(listItem("warn", "This day has already passed. If you really moved on it, you can still notify until " + fd(res.deadline) + " (a weekend or public holiday moves that to the next working day). Then enter the move in your data; this plan only shows what it would do."));
+        else hints.push(listItem("warn", "This day is more than a month back, so the time for the notification has run out. If the move really happened without one, it counts as a sale (see above) and belongs in your data; ask your Steuerberater."));
+      }
+      if (hints.length) out.push(el("ul", { class: "list" }, hints));
+      return out;
+    }
+
+    function moveCard(pl, positions) {
+      const cv = host.conv();
+      const R = host.R();
+      const state = host.state();
+      const row = cv.tables.plans.find((x) => x.id === pl.id);
+      if (!row) return null;
+      const res = R.plans && R.plans.byPlan ? R.plans.byPlan[pl.id] : null;
+      const eventId = "plan:" + pl.id;
+      const posKey = pl.depot && pl.isin ? pl.depot + "|" + pl.isin : "";
+      const pos = positions.find((p) => p.key === posKey) || null;
+      const ccy = row.ccyUsed || (row.currencies.length === 1 ? row.currencies[0] : "");
+
+      const problems = row.problems.slice();
+      const noPos = problems.includes("Choose the depot it is moved from.") && problems.includes("Choose the security.");
+      let shown = noPos ? ["Choose what you move."].concat(problems.filter((t) => t !== "Choose the depot it is moved from." && t !== "Choose the security.")) : problems;
+      if (!pl.depot) shown = shown.filter((t) => t !== "Choose the currency of the price.");
+      const issue = (re) => problems.some((t) => re.test(t) && !isSoft(t));
+      const needCcy = !!pl.depot && problems.includes("Choose the currency of the price.");
+
+      let status;
+      if (res && res.status === "BLOCKED") status = chip("Cannot be moved", "bad");
+      else if (res && res.ok && res.status === "OK") status = !res.sold || res.sold.yearInfo.complete ? chip("Calculated", "ok") : chip("Year incomplete", "warn");
+      else if (!row.ok) status = chip("Needs input", "warn");
+      else status = chip("Not calculated", "bad");
+
+      const title = pos || (pl.isin && pl.depot) ? "Move " + (pl.qty ? pl.qty + " × " : "") + secShort(pl.isin) : "New planned move";
+      const sub = (pl.depot ? depotLabel(pl.depot) + " → " + (pl.to || "another broker") : "") + (pl.date ? (pl.depot ? " · " : "") + fd(pl.date) : "");
+
+      const wholeAll = pos ? wholeOf(pos.qty) : "";
+      const fields = [
+        selectField({ key: "plan-" + pl.id + ":pos", label: "What do you move?", wide: true, children: positionOptions(pl, positions), invalid: issue(/not in your data/), hint: pos && pos.avgTaxPerShare ? "Average cost in this depot: " + fu(pos.avgTaxPerShare) + " per unit." : "", onCommit: (v) => {
+          const i = v.indexOf("|");
+          if (i > 0) update(pl.id, { depot: v.slice(0, i), isin: v.slice(i + 1) });
+        } }),
+        el("div", { class: "field" },
+          el("label", { for: fid("plan-" + pl.id + ":qty"), text: "Units (whole)" }),
+          el("div", { class: "btn-row" },
+            el("input", { type: "text", "data-key": "plan-" + pl.id + ":qty", value: pl.qty, inputmode: "numeric", autocomplete: "off", spellcheck: "false", placeholder: pos ? "up to " + wholeAll : "for example 10", class: "mono" + (issue(/number of units/) ? " invalid" : ""), "aria-invalid": issue(/number of units/) ? "true" : false, onchange: (e) => update(pl.id, { qty: e.target.value.trim() }) }),
+            pos && wholeAll !== "0" ? button("All", () => update(pl.id, { qty: wholeAll }), "small", "plan-" + pl.id + ":all") : null),
+          issue(/number of units/) ? el("span", { class: "err", text: "A whole number above zero (like 10)" }) : null),
+        textField({ key: "plan-" + pl.id + ":to", label: "Receiving broker (optional)", value: pl.to || "", mono: false, maxlength: 60, placeholder: "its name", hint: "Named in the notification; it does not change the calculation.", onCommit: (v) => update(pl.id, { to: v }) }),
+        el("div", { class: "field" },
+          el("label", { for: fid("plan-" + pl.id + ":date"), text: "Day of the move" }),
+          el("input", { type: "date", "data-key": "plan-" + pl.id + ":date", value: pl.date || false, min: host.relocation(), class: issue(/Austrian tax/) ? "invalid" : false, onchange: (e) => update(pl.id, { date: e.target.value }) })),
+        textField({ key: "plan-" + pl.id + ":price", label: "Expected price per unit" + (ccy ? " in " + ccy : "") + " (optional)", value: pl.price, inputmode: "decimal", placeholder: "for example 98.40", error: issue(/expected price/) ? "A number above zero, with a dot" : null, hint: "Only to show what a missing notification would cost.", onCommit: (v) => update(pl.id, { price: v }) }),
+      ];
+      if (needCcy) {
+        const offered = row.currencies.length ? row.currencies : CURRENCIES;
+        fields.push(selectField({ key: "plan-" + pl.id + ":ccy-main", label: "Currency of the price", children: [el("option", { value: "", selected: !pl.ccy, text: "Choose …" })].concat(offered.map((c) => el("option", { value: c, selected: pl.ccy === c, text: c }))), onCommit: (v) => update(pl.id, { ccy: v }) }));
+      }
+
+      const moreKey = "more:" + pl.id;
+      const moreOpen = isOpen(moreKey, !!(pl.rate || pl.ccy || pl.note));
+      const more = [
+        selectField({ key: "plan-" + pl.id + ":ccy", label: "Currency of the price", hint: row.currencies.length ? "Empty: the currency of the depot's account (" + row.currencies.join(", ") + ")." : "", children: [el("option", { value: "", selected: !pl.ccy, text: row.currencies.length === 1 ? "As the account (" + row.currencies[0] + ")" : "Choose …" })].concat(CURRENCIES.map((c) => el("option", { value: c, selected: pl.ccy === c, text: c }))), onCommit: (v) => update(pl.id, { ccy: v }) }),
+      ];
+      if (ccy && ccy !== "EUR" && pl.price) {
+        more.push(textField({ key: "plan-" + pl.id + ":rate", label: ccy + " per euro (optional)", value: pl.rate, inputmode: "decimal", placeholder: row.rateUsed && !row.rateTyped ? row.rateUsed : "latest ECB rate", error: issue(/rate must/) ? "A number above zero, with a dot" : null, hint: "Empty: the ECB rate of the day, or the latest one when the day is still ahead.", onCommit: (v) => update(pl.id, { rate: v }) }));
+      }
+      more.push(textField({ key: "plan-" + pl.id + ":note", label: "Note (optional)", value: pl.note, mono: false, maxlength: 200, wide: true, onCommit: (v) => update(pl.id, { note: v }) }));
+
+      const body = [];
+      body.push(el("div", { class: "fields" }, fields));
+      body.push(fold({ class: "mini", "data-k": "more:" + pl.id }, moreOpen, (v) => setOpen(moreKey, v), "Currency, exchange rate, note", el("div", { class: "fields" }, more)));
+      if (shown.length) body.push(el("ul", { class: "list" }, shown.map((t) => listItem(isSoft(t) ? "info" : "bad", t))));
+      if (shown.some((t) => /ECB rate/.test(t) || /No usable/.test(t))) body.push(el("div", { class: "btn-row" }, button("Open the exchange rates", () => host.openStep("rates"), "small", "plan-" + pl.id + ":rates")));
+      if (res && !res.ok && res.status !== "BLOCKED") body.push(el("div", { class: "banner bad" }, el("strong", { text: "This plan could not be calculated" }), el("span", { text: res.errors.join(" ") })));
+      else if (res && res.status === "BLOCKED") body.push(moveBlockedBlock(pl, res));
+      else if (res && res.status === "OK") for (const b of moveOkBlock(pl, row, res, pos)) body.push(b);
+      else if (R.plans && R.plans.error) body.push(el("div", { class: "banner bad" }, el("strong", { text: "Plans could not be calculated" }), el("span", { text: R.plans.error })));
+
+      if (res && res.ok && state.planned[eventId]) {
+        const mine = state.planned[eventId];
+        body.push(tick("plan-include:" + pl.id, mine.on === true, "Include in the comparison below", "Adds it to “Your selection against the filed position”, next to anything else you tick, to see them together.", (on) => host.setState((s) => { s.planned[eventId].on = on; })));
+        if (mine.on === true) {
+          body.push(el("div", {}, seg("notif-" + eventId, [["yes", "Notified in time"], ["no", "Not notified", !res.valued]], mine.notified === false ? "no" : "yes", (nv) => host.setState((s) => { s.planned[eventId].notified = nv === "yes"; }), "notif:" + eventId),
+            el("p", { class: "note", text: res.valued ? "Notified in time: the cost is carried over and nothing is taxed. Not notified: the move counts as a sale at market value." : "“Not notified” needs an expected price, so the market value is known." })));
+        }
+      }
+      body.push(el("div", { class: "btn-row" },
+        button("Copy this plan", () => addPlan(pl), "small quiet", "plan-" + pl.id + ":copy"),
+        button("Remove", () => removePlan(pl.id), "small quiet", "plan-" + pl.id + ":remove")));
+
+      return el("section", { class: "card", "data-k": "plan:" + pl.id },
+        el("div", { class: "card-head" }, el("h2", { text: title }), sub ? el("span", { class: "sub", text: sub }) : null),
+        el("div", {}, status),
+        body);
+    }
+
     // ------------------------------------------------------------ the whole part
 
     function render() {
@@ -12128,12 +13367,14 @@ const PlanUI = (function () {
       const out = [];
       const full = plans.length >= MAX_PLANS;
       out.push(el("section", { class: "card", "data-k": "plan-intro" },
-        el("div", { class: "card-head" }, el("h2", { text: "Plan a sale" }), plans.length ? el("span", { class: "sub", text: plural(plans.length, "plan") }) : null),
-        el("p", { class: "note", text: "Type what you are thinking of selling. The tracker shows the tax on it, and how it fits with the gains and losses you already have in that year. Nothing is sold or sent anywhere. Plans are saved in this browser with your data, and they never change your filed years." }),
-        !positions.length ? el("p", { class: "note", text: "No position with units is left in your data, so there is nothing to sell yet." }) : null,
+        el("div", { class: "card-head" }, el("h2", { text: "Plan a sale or a move" }), plans.length ? el("span", { class: "sub", text: plural(plans.length, "plan") }) : null),
+        el("p", { class: "note", text: "Type what you are thinking of selling. The tracker shows the tax on it, and how it fits with the gains and losses you already have in that year. Or type a move of units to another broker: it shows what to report to the Finanzamt and what a missing notification would cost. Nothing is sold, moved or sent anywhere. Plans are saved in this browser with your data, and they never change your filed years." }),
+        !positions.length ? el("p", { class: "note", text: "No position with units is left in your data, so there is nothing to sell or move yet." }) : null,
         full ? el("p", { class: "note", text: "You have " + MAX_PLANS + " plans, the most that are kept. Remove one to add another." }) : null,
-        el("div", { class: "btn-row" }, el("button", { type: "button", class: "btn primary", "data-key": "plan-add", disabled: !positions.length || full, onclick: () => addPlan(null), text: "Plan a sale" }))));
-      for (const pl of plans) out.push(planCard(pl, positions));
+        el("div", { class: "btn-row" },
+          el("button", { type: "button", class: "btn primary", "data-key": "plan-add", disabled: !positions.length || full, onclick: () => addPlan(null, "SALE"), text: "Plan a sale" }),
+          el("button", { type: "button", class: "btn", "data-key": "plan-add-move", disabled: !positions.length || full, onclick: () => addPlan(null, "MOVE"), text: "Plan a move to another broker" }))));
+      for (const pl of plans) out.push(pl.kind === "MOVE" ? moveCard(pl, positions) : planCard(pl, positions));
       return out.filter(Boolean);
     }
 
@@ -12666,9 +13907,10 @@ const LedgerUI = (function () {
 /*
  * The Performance tab (browser only).
  *
- * How the portfolio did before Austrian tax, in any time-frame: the figures, the charts, the calendar years and the securities. It
- * draws what Perf returned (perf.js, fed by perf-input.js) and keeps the price book: the daily closing prices, which are not part of
- * the owner's tax document (see pricebook.js). Nothing here calculates a return. Text is always put in with textContent.
+ * How the portfolio did before Austrian tax, in any time-frame (a preset, a calendar year or two dates): the figures, the value against
+ * the money put in, the returns as bars, a heatmap of the months or a line, where the result came from, the ups and downs, and the
+ * securities. It draws what Perf returned (perf.js, fed by perf-input.js) and keeps the price book: the daily closing prices, which
+ * are not part of the owner's tax document (see pricebook.js). Nothing here calculates a return. Text is always put in with textContent.
  *
  * Prices come from three places: the price file next to the page (made by the job of his GitHub repository, read on its own when the
  * tab opens), a price file or pasted text he loads, and a history downloaded by hand from Yahoo for one security.
@@ -12683,6 +13925,9 @@ const PerfUI = (function () {
 
   const KEYS = [["1M", "1M"], ["3M", "3M"], ["6M", "6M"], ["YTD", "YTD"], ["1Y", "1Y"], ["3Y", "3Y"], ["5Y", "5Y"], ["MAX", "Max"], ["CUSTOM", "Custom"]];
   const STATE_CHIP = { OK: ["ok", "Prices loaded"], STALE: ["warn", "Prices are old"], NO_DATA: ["warn", "Nothing loaded yet"], ERROR: ["bad", "Fetch failed"], NO_MAPPING: ["bad", "No symbol yet"] };
+  const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const MONL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const RET_VIEWS = [["bars", "Bars"], ["heat", "Heatmap"], ["line", "Line"], ["table", "Table"]];
   const REASON_TEXT = { NO_MAPPING: "no Yahoo symbol chosen", NO_PRICES: "no prices", NO_FX_RATES: "no ECB rates", PRICE_MISMATCH: "prices do not fit the trades", NO_ROWS: "no usable rows" };
 
   const money = (x, plus) => (Number.isFinite(x) ? M.fmtMoney(x.toFixed(2), plus ? { plus: true } : undefined) : "–");
@@ -12692,6 +13937,7 @@ const PerfUI = (function () {
     const zero = Number(v) === 0;
     return (x < 0 && !zero ? "−" : plus && !zero ? "+" : "") + v + " %";
   }
+  const axisPct = (v) => (v < -0.005 ? "−" : "") + +Math.abs(v).toFixed(2) + " %";
   const num = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const plural = (n, one, many) => num(n) + " " + (n === 1 ? one : many || one + "s");
   const button = (text, onclick, cls, key, extra) => el("button", Object.assign({ type: "button", class: "btn" + (cls ? " " + cls : ""), "data-key": key || false, onclick, text }, extra || {}));
@@ -12712,7 +13958,9 @@ const PerfUI = (function () {
       to: "",
       unpriced: false,
       view: {},
-      open: { setup: null, checks: false, how: false, kit: false, load: false, csv: false },
+      retView: "bars",
+      heatAll: false,
+      open: { setup: null, checks: false, how: false, kit: false, load: false, csv: false, lineNumbers: false },
       loaded: false,
       loading: false,
       book: PriceBook.empty(),
@@ -12890,7 +14138,8 @@ const PerfUI = (function () {
       let w = Perf.resolve(m, st.win === "CUSTOM" ? { from: st.from || m.start, to: st.to || m.end } : st.win);
       let why = "";
       if (!w.available) {
-        why = KEYS.find((k) => k[0] === st.win)[1] + " is not available yet: your history starts on " + fd(m.start) + ".";
+        const name = st.win.charAt(0) === "Y" ? st.win.slice(1) : KEYS.find((k) => k[0] === st.win)[1];
+        why = name + " is not available: your history runs from " + fd(m.start) + " to " + fd(m.end) + ".";
         w = Perf.resolve(m, "MAX");
       } else if (w.error) {
         why = w.error;
@@ -12909,6 +14158,15 @@ const PerfUI = (function () {
       const bC = el("button", { type: "button", "aria-pressed": String(!tableOn), text: "Chart", onclick: () => { st.view[key] = "chart"; host.refresh(); } });
       const bT = el("button", { type: "button", "aria-pressed": String(tableOn), text: "Table", onclick: () => { st.view[key] = "table"; host.refresh(); } });
       return el("section", { class: "card", "data-k": "pc:" + key }, el("div", { class: "card-head" }, el("h2", { text: title }), el("div", { class: "view-switch", role: "group", "aria-label": "Chart or table" }, bC, bT)), sub ? el("p", { class: "note", text: sub }) : null, chart, table);
+    }
+
+    /** The calendar years of the history as chips, newest first: one of them is the time-frame. */
+    function yearBar(m) {
+      const ys = Perf.years(m).map((y) => y.year).reverse();
+      if (!ys.length) return null;
+      return el("div", { class: "yearbar" },
+        el("span", { class: "yearbar-lab", text: "Or one calendar year" }),
+        el("div", { class: "ychips", role: "radiogroup", "aria-label": "Calendar year" }, ys.map((y) => el("label", { class: "ychip" }, el("input", { type: "radio", name: "Calendar year", value: String(y), checked: st.win === "Y" + y, "data-key": "pf-win:Y" + y, onchange: () => { st.win = "Y" + y; host.refresh(); } }), el("span", { text: String(y) })))));
     }
 
     const kpi = (label, value, sub, key) => el("div", { class: "kpi", "data-k": "pk:" + key }, el("span", { class: "label", text: label }), el("span", { class: "value", text: value }), sub ? el("span", { class: "subline", text: sub }) : null);
@@ -12932,6 +14190,7 @@ const PerfUI = (function () {
       return el("section", { class: "card", "data-k": "pf-top" },
         el("div", { class: "card-head" }, el("h2", { text: "Performance" }), el("span", { class: "sub", text: "Before Austrian tax · prices up to " + fd(m.pricesUntil || m.end) })),
         seg("Time-frame", KEYS.map((k) => (k[0] === "CUSTOM" ? k : opts.find((o) => o[0] === k[0]))), st.win, (v) => { st.win = v; host.refresh(); }, "pf-win"),
+        yearBar(m),
         custom,
         wv.why ? el("p", { class: "note", text: wv.why }) : null,
         el("p", { class: "note", text: "From the close of " + fd(w.from) + " to the close of " + fd(w.to) + " (" + plural(w.days, "day") + ")." }),
@@ -12940,38 +14199,194 @@ const PerfUI = (function () {
           kpi("Money-weighted return", mwr[0], mwr[1], "mwr"),
           kpi("Gain", money(s.gain, true), "with dividends of " + money(s.dividends), "gain"),
           kpi("Value", money(s.valueEnd), s.valueStart > 0 ? "at the start " + money(s.valueStart) : "on " + fd(w.to), "value"),
-          kpi("Money put in, net", money(s.net, true), "bought " + money(s.inflow) + " · sold " + money(s.outflow), "net"),
+          kpi("Money put in, net", money(s.net, true), "paid " + money(s.inflow) + " · received " + money(s.outflow), "net"),
           kpi("Dividends", money(s.dividends), "after tax withheld at the source", "div")));
     }
 
-    // ------------------------------------------------------------ charts
+    // ------------------------------------------------------------ the value against the money put in
 
-    function chartsFor(m, w) {
+    function valueCard(m, w) {
       const cs = Perf.chartSeries(m, w, 300);
-      const dateText = (iso) => fd(iso);
-      const valueTexts = cs.value.map((v) => money(v));
-      const investedTexts = cs.invested.map((v) => money(v));
-      const indexTexts = cs.index.map((v) => v.toFixed(2));
-      const rows = Perf.thin(w.s, w.e, 48);
       const T = m.total;
-      const first = T.index[w.s];
-      const valueChart = C.timeLines({ days: cs.days, series: [{ name: "Value", color: "var(--c-filed)", values: cs.value, texts: valueTexts }, { name: "Money put in, net", color: "var(--c-sel)", values: cs.invested, texts: investedTexts, dash: true }], zero: true, dateText, ariaLabel: "Value of the portfolio and the money put in, from " + fd(w.from) + " to " + fd(w.to), height: 230 });
-      const valueTable = C.tableOf(["Date", "Value", "Money put in, net"], rows.map((i) => [fd(m.days[i]), money(T.value[i]), money(T.invested[i])]), "Value of the portfolio and the money put in");
-      const indexChart = C.timeLines({ days: cs.days, series: [{ name: "Growth of 100", color: "var(--c-gain)", values: cs.index, texts: indexTexts }], format: (v) => String(+v.toFixed(1)), dateText, ariaLabel: "Growth of 100 invested at the start of the time-frame, from " + fd(w.from) + " to " + fd(w.to), height: 220 });
-      const indexTable = C.tableOf(["Date", "Growth of 100"], rows.map((i) => [fd(m.days[i]), ((T.index[i] / first) * 100).toFixed(2)]), "Growth of 100");
-      return [
-        chartCard("value", "Value and money put in", "What the holdings were worth on each day, and what you had put in net (purchases less sales).", valueChart, valueTable),
-        chartCard("index", "Growth of 100", "The time-weighted return as a line: 100 at the start of the time-frame. It ignores how much you added or took out.", indexChart, indexTable),
-      ];
+      const rows = Perf.thin(w.s, w.e, 48);
+      const capitalAt = (i) => T.value[w.s] + T.invested[i] - T.invested[w.s];
+      const chart = C.timeLines({
+        days: cs.days,
+        series: [
+          { name: "Value", color: "var(--c-filed)", values: cs.value, texts: cs.value.map((v) => money(v)) },
+          { name: "Money put in", color: "var(--c-sel)", values: cs.capital, texts: cs.capital.map((v) => money(v)), dash: true },
+        ],
+        band: { a: 0, b: 1, up: "var(--c-gain)", down: "var(--c-more)" },
+        zero: true,
+        dateText: fd,
+        ariaLabel: "Value of the portfolio and the money put in, from " + fd(w.from) + " to " + fd(w.to),
+        height: 230,
+      });
+      const table = C.tableOf(["Date", "Value", "Money put in", "Difference"], rows.map((i) => [fd(m.days[i]), money(T.value[i]), money(capitalAt(i)), money(T.value[i] - capitalAt(i), true)]), "Value of the portfolio and the money put in");
+      return chartCard("value", "Value and money put in", "Money put in is what the holdings were worth when the time-frame began plus what you added since (purchases less sales, fees included). The shaded gap is the gain so far, before dividends: green above the line, red below it.", chart, table);
     }
 
-    function yearsCard(m) {
+    // ------------------------------------------------------------ the returns: bars, heatmap, line, table
+
+    /** The class of a heatmap cell: five steps of colour for each sign, the scale set by the typical large month. */
+    function heatClass(r, scale) {
+      if (Math.abs(r) < 0.0005) return "hm-0";
+      return (r > 0 ? "hm-p" : "hm-n") + Math.min(5, Math.ceil((Math.abs(r) / scale) * 5));
+    }
+
+    function heatmap(m, w) {
+      const ms = Perf.months(m);
       const ys = Perf.years(m);
-      if (!ys.length) return null;
-      const cats = ys.map((y) => String(y.year) + (y.partial ? "*" : ""));
-      const bars = C.bars({ categories: cats, series: [{ id: "twr", name: "Time-weighted return", values: ys.map((y) => y.twr * 100), texts: ys.map((y) => pct(y.twr, true)) }], mode: "split", colorPos: "var(--c-gain)", colorNeg: "var(--c-more)", splitLegend: [{ name: "Gain", color: "var(--c-gain)" }, { name: "Loss", color: "var(--c-more)" }], format: (v) => v + " %", ariaLabel: "Time-weighted return per calendar year", height: 220 });
-      const table = C.tableOf(["Year", "Return", "Gain", "Net put in", "Dividends", "Value at the end"], ys.map((y) => [y.year + (y.partial ? "*" : ""), pct(y.twr, true), money(y.gain, true), money(y.net, true), money(y.dividends), money(y.valueEnd)]), "Calendar years");
-      return chartCard("years", "Calendar years", "* a year that is not complete (the first one starts with your first purchase, the last one is not over).", bars, table);
+      const byKey = new Map(ms.map((x) => [x.year + "-" + x.month, x]));
+      const yearsDesc = ys.map((y) => y.year).reverse();
+      const shown = st.heatAll ? yearsDesc : yearsDesc.slice(0, 6);
+      // The colour scale: the 90th percentile of the months' moves (never below 2 %), so a single wild month does not wash out the rest.
+      const abs = ms.filter((x) => x.held).map((x) => Math.abs(x.twr)).sort((a, b) => a - b);
+      const scale = Math.max(0.02, abs.length ? abs[Math.min(abs.length - 1, Math.floor(abs.length * 0.9))] : 0);
+      const cellText = (r) => (r < 0 && Math.abs(r) >= 0.0005 ? "−" : "") + (Math.abs(r) * 100).toFixed(1);
+      const head = el("tr", {}, el("th", { scope: "col", text: "Year" }), el("th", { scope: "col", text: "Total" }), MON.map((n) => el("th", { scope: "col", text: n })));
+      const body = shown.map((y) => {
+        const yr = ys.find((r) => r.year === y);
+        const sel = st.win === "Y" + y;
+        const cells = MON.map((n, k) => {
+          const x = byKey.get(y + "-" + (k + 1));
+          if (!x) return el("td", {}, el("span", { class: "hc hm-void", "aria-hidden": "true" }));
+          const name = MONL[k] + " " + y;
+          if (!x.held) return el("td", {}, el("span", { class: "hc hm-none", title: name + ": nothing held", "aria-label": name + ": nothing held", text: "–" }));
+          const text = pct(x.twr, true);
+          const isSel = st.win === "CUSTOM" && st.from === x.from && st.to === x.to;
+          return el("td", {}, el("button", { type: "button", class: "hc " + heatClass(x.twr, scale) + (x.partial ? " part" : "") + (isSel ? " sel" : ""), "data-key": "hm:" + y + "-" + (k + 1), title: name + ": " + text + (x.partial ? " (not a whole month)" : "") + ". Click to look at this month.", "aria-label": name + ": " + text + (x.partial ? ", not a whole month" : ""), onclick: () => { st.win = "CUSTOM"; st.from = x.from; st.to = x.to; host.refresh(); }, text: cellText(x.twr) }));
+        });
+        const total = yr ? el("td", {}, el("button", { type: "button", class: "hc tot " + heatClass(yr.twr, scale) + (yr.partial ? " part" : ""), "data-key": "hm:" + y + "-year", title: y + ": " + pct(yr.twr, true) + (yr.partial ? " (not a whole year)" : "") + ". Click to look at this year.", "aria-label": y + ", the whole year: " + pct(yr.twr, true) + (yr.partial ? ", not a whole year" : ""), onclick: () => { st.win = "Y" + y; host.refresh(); }, text: cellText(yr.twr) })) : el("td", {});
+        return el("tr", { class: sel ? "sel" : false, "data-k": "hm-row:" + y }, el("th", { scope: "row", text: String(y) }), total, cells);
+      });
+      const legend = el("div", { class: "hlegend", "aria-hidden": "true" },
+        el("span", { text: "Loss" }),
+        [5, 4, 3, 2, 1].map((k) => el("span", { class: "hsw hm-n" + k })),
+        el("span", { class: "hsw hm-0" }),
+        [1, 2, 3, 4, 5].map((k) => el("span", { class: "hsw hm-p" + k })),
+        el("span", { text: "Gain" }));
+      return el("div", { class: "heat-box", "data-k": "heat" },
+        el("div", { class: "heat-wrap" }, el("table", { class: "heat" }, el("caption", { class: "sr-only", text: "Time-weighted return of every calendar month, in percent" }), el("thead", {}, head), el("tbody", {}, body))),
+        el("div", { class: "hfoot" }, legend, el("span", { class: "note", text: "Percent per month, before tax. The strongest colour starts at ±" + (scale * 100).toFixed(scale >= 0.1 ? 0 : 1) + " %. Dashed outline: not a whole month. Click a month or a total to look at it." })),
+        yearsDesc.length > 6 ? el("div", { class: "btn-row" }, button(st.heatAll ? "Show fewer years" : "Show all " + yearsDesc.length + " years", () => { st.heatAll = !st.heatAll; host.refresh(); }, "small", "hm-more")) : null,
+        el("p", { class: "note only-narrow", text: "Slide sideways to see all the months." }));
+    }
+
+    function returnsCard(m, w) {
+      const unit = w.days > 800 ? "year" : "month";
+      const per = Perf.periods(m, w, unit);
+      const name = (r) => (r.unit === "year" ? String(r.year) : MON[r.month - 1] + " " + r.year) + (r.partial ? "*" : "");
+      const view = st.retView;
+      const bT = RET_VIEWS.map(([k, label]) => el("button", { type: "button", "aria-pressed": String(view === k), "data-key": "pr-view:" + k, text: label, onclick: () => { st.retView = k; host.refresh(); } }));
+      let body;
+      let sub;
+      if (view === "heat") {
+        body = heatmap(m, w);
+        sub = "Every month of your history.";
+      } else if (view === "line") {
+        const cs = Perf.chartSeries(m, w, 300);
+        const chart = C.timeLines({ days: cs.days, series: [{ name: "Growth of 100", color: "var(--c-gain)", values: cs.index, texts: cs.index.map((v) => v.toFixed(2)) }], format: (v) => String(+v.toFixed(1)), dateText: fd, ariaLabel: "Growth of 100 invested at the start of the time-frame, from " + fd(w.from) + " to " + fd(w.to), height: 220 });
+        const T = m.total;
+        const rowsAt = Perf.thin(w.s, w.e, 48);
+        const numbers = C.tableOf(["Date", "Growth of 100"], rowsAt.map((i) => [fd(m.days[i]), ((T.index[i] / T.index[w.s]) * 100).toFixed(2)]), "Growth of 100");
+        numbers.classList.add("perf-tbl");
+        body = el("div", { class: "stack" }, chart, fold({ class: "mini", "data-k": "pr-line-numbers" }, st.open.lineNumbers, (o) => { st.open.lineNumbers = o; host.refresh(); }, "Show the numbers", el("div", { class: "body" }, numbers)));
+        sub = "The time-weighted return as a line: 100 at the start of the time-frame. It ignores how much you added or took out.";
+      } else if (view === "table") {
+        body = C.tableOf(["Period", "Return", "Gain", "Net put in", "Dividends", "Value at the end"], per.map((r) => [name(r), r.held ? pct(r.twr, true) : "–", money(r.gain, true), money(r.net, true), money(r.dividends), money(r.valueEnd)]), "Returns per " + unit);
+        body.classList.add("perf-tbl");
+        sub = (unit === "year" ? "Calendar years" : "Calendar months") + " inside the time-frame.";
+      } else if (per.length < 2) {
+        body = el("p", { class: "note", text: "This time-frame is too short for bars: they show one calendar month each. Choose a longer time-frame, or look at the Line." });
+        sub = "";
+      } else {
+        const few = per.length;
+        const showTick = (r, i) => (unit === "year" ? true : few <= 13 || i % Math.ceil(few / 12) === 0 || r.month === 1);
+        const tick = (r, i) => {
+          if (!showTick(r, i)) return "";
+          if (unit === "year") return few > 8 ? "’" + String(r.year).slice(2) : String(r.year);
+          return MON[r.month - 1] + (r.month === 1 || i === 0 ? "\n" + r.year : "");
+        };
+        body = C.bars({ categories: per.map(name), tickLabels: per.map(tick), series: [{ id: "twr", name: "Time-weighted return", values: per.map((r) => (r.held ? r.twr * 100 : 0)), texts: per.map((r) => (r.held ? pct(r.twr, true) : "nothing held")) }], mode: "split", colorPos: "var(--c-gain)", colorNeg: "var(--c-more)", splitLegend: [{ name: "Gain", color: "var(--c-gain)" }, { name: "Loss", color: "var(--c-more)" }], format: axisPct, ariaLabel: "Time-weighted return per calendar " + unit + ", from " + fd(w.from) + " to " + fd(w.to), height: 220 });
+        sub = "Return of each calendar " + unit + " inside the time-frame. Chained together they give the time-weighted return above." + (per.some((r) => r.partial) ? " * not a whole " + unit + " (the time-frame or your history starts or ends inside it, or it is not over)." : "");
+      }
+      return el("section", { class: "card", "data-k": "pf-returns" },
+        el("div", { class: "card-head" }, el("h2", { text: "Returns" }), el("div", { class: "view-switch", role: "group", "aria-label": "How to show the returns" }, bT)),
+        sub ? el("p", { class: "note", text: sub }) : null,
+        body);
+    }
+
+    // ------------------------------------------------------------ where the result came from
+
+    function bridgeRow(r, track) {
+      const kids = [el("div", { class: "br-line" }, el("span", { class: "br-lab", text: r.label }), el("span", { class: "br-val num", text: money(r.v, r.plus !== false) }))];
+      if (r.sub) kids.push(el("div", { class: "br-sub", text: r.sub }));
+      if (track) {
+        const lo = Math.min(0, track.lo);
+        const hi = Math.max(0, track.hi);
+        const span = hi - lo || 1;
+        const t = el("div", { class: "br-track", style: "--z:" + (((0 - lo) / span) * 100).toFixed(2) + "%" }, el("i", { class: r.v < 0 ? "neg" : "pos", style: "left:" + (((Math.min(0, r.v) - lo) / span) * 100).toFixed(2) + "%;width:" + ((Math.abs(r.v) / span) * 100).toFixed(2) + "%" }));
+        kids.push(t);
+      }
+      return el("li", { class: r.total ? "total" : false, "data-k": "br:" + r.k }, kids);
+    }
+
+    function breakdownCard(m, w) {
+      const b = Perf.bridge(m, w);
+      const gainRows = [
+        { k: "unreal", label: "Price gain not yet realised", sub: "what you still hold is worth, minus what it cost", v: b.unrealized },
+        { k: "real", label: "Price gain realised", sub: "what sales brought in, minus what the units sold had cost", v: b.realized },
+        { k: "div", label: "Dividends", sub: "after tax withheld at the source (before: " + money(b.dividendsGross) + (b.withheld ? ", tax " + money(b.withheld) : "") + ")", v: b.dividendsNet },
+        { k: "fees", label: "Fees", sub: "paid on purchases and sales", v: -b.fees },
+      ];
+      const lo = Math.min.apply(null, gainRows.map((r) => r.v));
+      const hi = Math.max.apply(null, gainRows.map((r) => r.v));
+      const valueRows = [
+        { k: "v0", label: "Value at the start", sub: b.valueStart > 0 ? fd(b.from) : "nothing held yet", v: b.valueStart, plus: false },
+        { k: "bought", label: "Bought", sub: "price × units, fees not included", v: b.bought },
+        { k: "sold", label: "Sold", sub: "price × units, fees not taken off", v: -b.sold },
+        { k: "pg", label: "Price gain", sub: "realised and not yet realised", v: b.priceGain },
+        { k: "v1", label: "Value at the end", sub: fd(b.to), v: b.valueEnd, plus: false, total: true },
+      ];
+      return el("section", { class: "card", "data-k": "pf-break" },
+        el("div", { class: "card-head" }, el("h2", { text: "Where the result came from" }), el("span", { class: "sub", text: "same time-frame" })),
+        el("div", { class: "bridge-grid" },
+          el("div", { class: "bridge-col" }, el("h3", { text: "The gain" }),
+            el("ul", { class: "bridge" }, gainRows.map((r) => bridgeRow(r, { lo, hi })), bridgeRow({ k: "gain", label: "Gain", sub: b.simple !== null ? pct(b.simple, true) + " of the capital (" + money(b.capital) + ": value at the start plus what you paid for purchases, fees included)" : "", v: b.gain, total: true }))),
+          el("div", { class: "bridge-col" }, el("h3", { text: "The value" }),
+            el("ul", { class: "bridge" }, valueRows.map((r) => bridgeRow(r, null))))),
+        el("p", { class: "note", text: "This is performance, before Austrian tax, and cash is not tracked. The cost of the units you still hold starts, at the start of the time-frame, at their value then; units bought later cost what you paid. The taxable gain follows other rules and is on the Tax tab." }));
+    }
+
+    // ------------------------------------------------------------ the ups and downs
+
+    function riskCard(m, w) {
+      const dd = Perf.drawdown(m, w, 300);
+      const rk = Perf.risk(m, w, Perf.months(m));
+      const mx = dd.max;
+      const chart = C.timeLines({ days: dd.days, series: [{ name: "Below the previous high", color: "var(--c-more)", values: dd.dd.map((v) => v * 100), texts: dd.dd.map((v) => pct(v)), area: true }], format: axisPct, zero: true, dateText: fd, ariaLabel: "How far the growth line was below its previous high, from " + fd(w.from) + " to " + fd(w.to), height: 190 });
+      const table = C.tableOf(["Date", "Below the previous high"], dd.days.map((d, i) => [fd(d), pct(dd.dd[i])]), "Fall from the previous high");
+      const back = !mx ? ["–", "there was no fall"] : mx.recovered ? [fd(mx.recovered), plural(mx.recoveryDays, "day") + " after the low"] : ["not yet", "still " + pct(Math.abs(dd.current)) + " below the high now"];
+      const kpis = el("div", { class: "kpis six" },
+        kpi("Largest fall", mx ? pct(mx.depth) : "–", mx ? "from " + fd(mx.peak) + " to " + fd(mx.trough) : "no fall in this time-frame", "fall"),
+        kpi("Back at the high", back[0], back[1], "back"),
+        kpi("Volatility", rk.vol !== null ? pct(rk.vol) : "–", rk.vol !== null ? "per year, from daily returns" : "needs 60 days or more", "vol"),
+        kpi("Best day", rk.bestDay ? pct(rk.bestDay.r, true) : "–", rk.bestDay ? fd(rk.bestDay.day) : "", "best"),
+        kpi("Worst day", rk.worstDay ? pct(rk.worstDay.r, true) : "–", rk.worstDay ? fd(rk.worstDay.day) : "", "worst"),
+        kpi("Months with a gain", rk.months ? rk.monthsUp + " of " + rk.months : "–", rk.months ? "best " + MON[rk.bestMonth.month - 1] + " " + rk.bestMonth.year + " " + pct(rk.bestMonth.twr, true) + ", worst " + MON[rk.worstMonth.month - 1] + " " + rk.worstMonth.year + " " + pct(rk.worstMonth.twr, true) : "needs a whole month", "months"));
+      const tableOn = st.view.risk === "table";
+      chart.hidden = tableOn;
+      table.hidden = !tableOn;
+      table.classList.add("perf-tbl");
+      const bC = el("button", { type: "button", "aria-pressed": String(!tableOn), text: "Chart", onclick: () => { st.view.risk = "chart"; host.refresh(); } });
+      const bT = el("button", { type: "button", "aria-pressed": String(tableOn), text: "Table", onclick: () => { st.view.risk = "table"; host.refresh(); } });
+      return el("section", { class: "card", "data-k": "pf-risk" },
+        el("div", { class: "card-head" }, el("h2", { text: "Ups and downs" }), el("div", { class: "view-switch", role: "group", "aria-label": "Chart or table" }, bC, bT)),
+        el("p", { class: "note", text: "How far the growth line was below the highest point it had reached before. Money you add or take out does not hide a fall and does not cause one." }),
+        chart,
+        table,
+        kpis);
     }
 
     function securitiesCard(m, w) {
@@ -12979,11 +14394,14 @@ const PerfUI = (function () {
       if (!rows.length) return null;
       const table = C.tableOf(["Security", "Value", "Share", "Gain", "Return", "Dividends"], rows.map((r) => [r.ticker + (r.held ? "" : " (sold)") + (r.valuedBy === "TRADES" ? " · own prices" : ""), money(r.valueEnd), r.held ? (r.weight * 100).toFixed(1) + " %" : "–", money(r.gain, true), pct(r.twr, true), money(r.dividends)]), "Securities over the time-frame");
       table.classList.add("perf-tbl");
+      // the gain of each security as bars (the ten with the largest gain or loss), the table and the list below hold all of them
+      const big = rows.filter((r) => Math.abs(r.gain) >= 0.005).sort((a, b) => Math.abs(b.gain) - Math.abs(a.gain)).slice(0, 10).sort((a, b) => b.gain - a.gain);
+      const gainChart = big.length ? C.hbars({ items: big.map((r) => ({ label: r.ticker, value: r.gain, text: money(r.gain, true), tip: "Gain" })), color: "var(--c-gain)", colorNeg: "var(--c-more)", ariaLabel: "Gain of each security over the time-frame" }) : null;
       // the same rows as a list for a phone, where six columns do not fit
       const list = el("ul", { class: "sec-list", "aria-label": "Securities over the time-frame" }, rows.map((r) => el("li", { "data-k": "sec:" + r.ticker },
         el("div", { class: "sec-top" }, el("strong", { class: "mono", text: r.ticker }), r.held ? null : chip("sold", "neutral"), r.valuedBy === "TRADES" ? chip("own prices", "warn") : null, el("span", { class: "num sec-value", text: money(r.valueEnd) })),
         el("div", { class: "sec-sub" }, r.held ? el("span", { text: (r.weight * 100).toFixed(1) + " % of the value" }) : null, el("span", { text: "Gain " + money(r.gain, true) }), el("span", { text: "Return " + pct(r.twr, true) }), el("span", { text: "Dividends " + money(r.dividends) })))));
-      return el("section", { class: "card", "data-k": "pf-sec" }, el("div", { class: "card-head" }, el("h2", { text: "Securities" }), el("span", { class: "sub", text: "same time-frame" })), el("div", { class: "sec-table" }, table), list, el("p", { class: "note", text: "The return of a security is its own time-weighted return over the time-frame, from the day you bought it if that was later. A sold security shows what it earned while you held it." }));
+      return el("section", { class: "card", "data-k": "pf-sec" }, el("div", { class: "card-head" }, el("h2", { text: "Securities" }), el("span", { class: "sub", text: "same time-frame" })), gainChart ? el("div", { class: "stack", "data-k": "pf-contrib" }, el("h3", { text: "Gain by security" }), gainChart, rows.length > big.length ? el("p", { class: "note", text: "The " + big.length + " with the largest gain or loss. All of them are listed below." }) : null) : null, el("div", { class: "sec-table" }, table), list, el("p", { class: "note", text: "The return of a security is its own time-weighted return over the time-frame, from the day you bought it if that was later. A sold security shows what it earned while you held it." }));
     }
 
     // ------------------------------------------------------------ checks
@@ -13084,6 +14502,9 @@ const PerfUI = (function () {
         listItem("info", "The daily return is the move of the units you held the day before, plus dividends (after tax withheld at the source), plus the difference between your price and the close and minus fees. The time-weighted return is the chain of these days: it does not depend on how much you added."),
         listItem("info", "The gain of a time-frame is the value at its end, minus the value at its start, minus money put in, plus money out, plus dividends."),
         listItem("info", "The money-weighted return (XIRR) is the yearly rate at which your actual flows on their actual dates would have grown to today's value. It depends on when you added money."),
+        listItem("info", "The bars and the heatmap show the time-weighted return of each calendar month or year. Chained together, the months of a year give the return of the year."),
+        listItem("info", "Where the result came from: price gain = value at the end − value at the start − (bought − sold). It is split into what sales brought in minus the average cost of the units sold, and what you still hold minus its average cost. Fees and dividends (after tax at the source) are added to get the gain."),
+        listItem("info", "A fall is measured from the highest point the growth line had reached before. Volatility is how much the daily returns jump around, scaled to a year (365 calendar days, so a weekend counts as a day of no return); it needs 60 days or more."),
         listItem("warn", "These are figures before Austrian tax. The tax is on the Tax tab. Dividends are counted on the day they were paid, the price drops on the day before: for a few days this can look slightly off."),
         listItem("warn", "Securities without prices, or with prices that do not fit your trades, are left out and listed under Checks. Cash is not tracked.")));
     }
@@ -13123,12 +14544,253 @@ const PerfUI = (function () {
       }
       const wv = windowOf(m);
       root.appendChild(topCard(m, wv));
-      for (const c of chartsFor(m, wv.w)) root.appendChild(c);
-      add(root, yearsCard(m));
+      root.appendChild(valueCard(m, wv.w));
+      root.appendChild(returnsCard(m, wv.w));
+      root.appendChild(breakdownCard(m, wv.w));
+      root.appendChild(riskCard(m, wv.w));
       add(root, securitiesCard(m, wv.w));
       add(root, checksCard(m));
       root.appendChild(setupCard(m));
       root.appendChild(howCard());
+    }
+
+    return { render, state: st };
+  }
+
+  return { create };
+})();
+
+/* ---- src/app/ui-regular.js ---- */
+/*
+ * "Normal tax scale instead?" on the Tax tab (browser only).
+ *
+ * The owner can ask the Finanzamt to tax the capital income of a year with the normal income-tax scale instead of the special rates
+ * (Regelbesteuerungsoption, § 27a Abs 5 EStG). This card asks for the two figures only he knows (his other taxable income of the year and the
+ * tax credits he can use), lets Model/Regular work out both ways, and draws the answer: the verdict, the two columns, the break-even
+ * and a chart of the saving by other income. It calculates nothing about tax itself. Text is always put in with textContent.
+ *
+ * What was typed is kept in the owner's document (host.commit, which saves it); in the demo it is kept in the page only.
+ */
+const RegularUI = (function () {
+  "use strict";
+
+  const { el, chip, listItem, fold } = Dom;
+  const M = Model;
+  const C = Charts;
+  const fm = M.fmtMoney;
+
+  const fid = (key) => "f-" + String(key).replace(/[^A-Za-z0-9_-]/g, "-");
+  const absText = (s) => String(s).replace(/^-/, "");
+  const euro0 = (s) => fm(s).replace(/\.00$/, ""); // "€30,000" for 30000.00; an amount with cents keeps them
+  const floorEuro = (s) => euro0(String(s).replace(/\.\d+$/, "")); // the break-even is shown in whole euros, rounded down
+  const same = (a, b) => a === b;
+
+  function field(o) {
+    const bad = !!o.error;
+    return el("div", { class: "field wide" },
+      el("label", { for: fid(o.key), text: o.label }),
+      el("input", { type: "text", "data-key": o.key, value: o.value === undefined || o.value === null ? "" : o.value, placeholder: o.placeholder || false, maxlength: 20, inputmode: "decimal", autocomplete: "off", autocapitalize: "off", spellcheck: "false", class: "mono" + (bad ? " invalid" : ""), "aria-invalid": bad ? "true" : false, onchange: (e) => o.onCommit(e.target.value.trim()) }),
+      o.hint ? el("span", { class: "hint", text: o.hint }) : null,
+      bad ? el("span", { class: "err", text: o.error }) : null);
+  }
+
+  function create(host) {
+    const st = { open: {}, demo: {} };
+    const isOpen = (k) => !!st.open[k];
+    const setOpen = (k, v) => {
+      st.open[k] = v;
+      host.refresh();
+    };
+
+    function inputsOf(year) {
+      if (!host.mine()) return Object.assign({ otherEur: "", creditsEur: "" }, st.demo[year] || {});
+      const r = host.doc().regular && host.doc().regular[year];
+      return { otherEur: r ? r.otherEur : "", creditsEur: r ? r.creditsEur : "" };
+    }
+
+    function setInput(year, name, value) {
+      if (!host.mine()) {
+        st.demo[year] = Object.assign({ otherEur: "", creditsEur: "" }, st.demo[year] || {}, { [name]: value });
+        host.refresh();
+        return;
+      }
+      host.commit((d) => {
+        const r = Object.assign({ otherEur: "", creditsEur: "" }, d.regular[year] || {});
+        r[name] = value;
+        d.regular[year] = r;
+      });
+    }
+
+    // ------------------------------------------------------------ pieces
+
+    /** "€1,234.50", or "€1,000.00 to €1,200.00" when the two readings of the foreign-tax credit differ. */
+    const range = (low, high, opts) => (same(low, high) ? fm(low, opts) : fm(low, opts) + " to " + fm(high, opts));
+
+    function verdictBanner(r, year) {
+      const a = r.at;
+      const lowAbs = absText(a.savingLowEur);
+      const highAbs = absText(a.savingHighEur);
+      const total = (side) => range(side.totalLowEur, side.totalHighEur);
+      const sub = "Total tax in " + year + ": " + total(a.special) + " with the special rates, " + total(a.option) + " with the normal scale.";
+      if (a.verdict === "OPTION_CHEAPER") {
+        return el("div", { class: "banner ok" }, el("strong", { text: "The normal scale would save about " + (same(a.savingLowEur, a.savingHighEur) ? fm(a.savingLowEur) : fm(a.savingLowEur) + " to " + fm(a.savingHighEur)) + " in " + year + "." }), el("span", { text: sub }), el("span", { text: "You have to ask for it in the return (form E 1, point 8.1, with Beilage E 1kv). It then applies to all your capital income of the year." }));
+      }
+      if (a.verdict === "SPECIAL_CHEAPER") {
+        return el("div", { class: "banner info" }, el("strong", { text: "Stay with the special rates: the normal scale would cost about " + (same(lowAbs, highAbs) ? fm(lowAbs) : fm(highAbs) + " to " + fm(lowAbs)) + " more in " + year + "." }), el("span", { text: sub }));
+      }
+      if (a.verdict === "EQUAL") return el("div", { class: "banner info" }, el("strong", { text: "No difference in " + year + "." }), el("span", { text: sub }));
+      return el("div", { class: "banner" }, el("strong", { text: "Too close to call in " + year + "." }), el("span", { text: "Depending on how foreign tax is credited, the normal scale saves " + fm(a.savingHighEur) + " or costs " + fm(absText(a.savingLowEur)) + " more. " + sub }));
+    }
+
+    /** A list of label and value pairs; a pair [label, text, true] is the strong one. "sep" draws a line. */
+    function kvList(pairs) {
+      const kv = el("dl", { class: "kv" });
+      for (const p of pairs) {
+        if (p === null) continue;
+        if (p === "sep") {
+          kv.appendChild(el("div", { class: "sep" }));
+          continue;
+        }
+        kv.appendChild(el("dt", { class: p[2] ? "strong" : false, text: p[0] }));
+        kv.appendChild(el("dd", { class: p[2] ? "strong" : false, text: p[1] }));
+      }
+      return kv;
+    }
+
+    /** The two ways side by side (stacked on a phone): what the tax is made of with the special rates, and with the normal scale. */
+    function compareBlocks(r) {
+      const a = r.at;
+      const sp = a.special;
+      const op = a.option;
+      const better = a.verdict === "OPTION_CHEAPER" ? "option" : a.verdict === "SPECIAL_CHEAPER" ? "special" : "";
+      const usesCredits = !M.isZeroText(sp.creditsUsedEur) || !M.isZeroText(op.creditsUsedEur);
+      const hasForeign = !M.isZeroText(sp.foreignCreditHighEur) || !M.isZeroText(op.foreignCreditHighEur);
+      const side = (id, title, pairs) => el("div", { class: "cmp-side" + (better === id ? " better" : ""), "data-k": "reg-side:" + id }, el("h3", {}, title, better === id ? chip("cheaper", "ok") : null), kvList(pairs));
+      const specialSide = side("special", "With the special rates", [
+        ["Other income", fm(a.otherEur)],
+        ["Tax on it, normal scale", fm(sp.tariffTaxEur)],
+        usesCredits ? ["Tax credits used", "−" + fm(sp.creditsUsedEur)] : null,
+        ["KESt on the capital income", fm(sp.kestEur)],
+        hasForeign ? ["Foreign tax credit", "−" + range(sp.foreignCreditLowEur, sp.foreignCreditHighEur)] : null,
+        "sep",
+        ["Total tax", range(sp.totalLowEur, sp.totalHighEur), true],
+      ]);
+      const optionSide = side("option", "With the normal scale", [
+        ["Other income + capital income", fm(op.taxableIncomeEur)],
+        ["Tax on it, normal scale", fm(op.tariffTaxEur)],
+        usesCredits ? ["Tax credits used", "−" + fm(op.creditsUsedEur)] : null,
+        hasForeign ? ["Foreign tax credit", "−" + range(op.foreignCreditLowEur, op.foreignCreditHighEur)] : null,
+        "sep",
+        ["Total tax", range(op.totalLowEur, op.totalHighEur), true],
+      ]);
+      return el("div", { class: "cmp" }, specialSide, optionSide);
+    }
+
+    function facts(r) {
+      const a = r.at;
+      const lines = [];
+      lines.push("The capital income of " + fm(r.capital.totalEur) + " raises your tax on the normal scale by " + fm(a.extraTaxEur) + ", which is " + a.extraRatePercent + " % of it. The special rate takes " + a.kestRatePercent + " %.");
+      lines.push("Your next euro of other income is taxed at " + a.marginalOtherPercent + " %; the last euro of the capital income at " + a.marginalTotalPercent + " % (before credits).");
+      if (!M.isZeroText(a.option.creditsUsedEur) || !M.isZeroText(a.special.creditsUsedEur)) lines.push("Tax credits only reduce tax on the normal scale, and only down to zero.");
+      if (!M.isZeroText(a.option.foreignCreditHighEur) || !M.isZeroText(a.special.foreignCreditHighEur)) lines.push("Foreign tax is credited at most with the Austrian tax on that income. On the normal scale that is the average rate (" + a.option.averageRatePercent + " %) times the foreign income.");
+      if (!M.isZeroText(a.kestWithheldEur)) lines.push("KESt already withheld (" + fm(a.kestWithheldEur) + ") is credited either way and does not change the difference.");
+      return el("div", { class: "stack" }, lines.map((t) => el("p", { class: "note", text: t })));
+    }
+
+    function breakEvenText(r) {
+      const be = r.breakEven;
+      const withCredits = r.creditsEntered ? "" : " (without tax credits)";
+      const lowEnd = be.lowEnd;
+      const highEnd = be.highEnd;
+      if (lowEnd.state === "NEVER" && highEnd.state === "NEVER") return "Break-even: the normal scale is not cheaper at any other income" + withCredits + ". Even with none, the tax on this capital income would be higher than the special rate.";
+      if (lowEnd.state === "ABOVE_LIMIT" && highEnd.state === "ABOVE_LIMIT") return "Break-even: the normal scale is cheaper at every other income up to " + euro0(Regular.SEARCH_LIMIT_EUR) + withCredits + ".";
+      const say = (e) => (e.state === "FOUND" ? floorEuro(e.eur) : e.state === "NEVER" ? "nothing" : euro0(Regular.SEARCH_LIMIT_EUR));
+      if (be.same) return "Break-even: with these figures the normal scale is cheaper as long as your other taxable income is at or below about " + say(lowEnd) + withCredits + ". Above that the special rates are cheaper.";
+      return "Break-even: the normal scale is cheaper as long as your other taxable income is at or below about " + say(lowEnd) + " to " + say(highEnd) + withCredits + " (two readings of the foreign-tax credit). Above that the special rates are cheaper.";
+    }
+
+    function chart(r) {
+      const pts = r.curve.points;
+      const stride = Math.max(1, Math.ceil(pts.length / 7));
+      const values = pts.map((p) => Number(p.savingLowEur));
+      const texts = pts.map((p) => (Number(p.savingLowEur) < 0 ? "costs " + fm(absText(p.savingLowEur)) + " more" : Number(p.savingLowEur) === 0 ? "no difference" : "saves " + fm(p.savingLowEur)));
+      const cats = pts.map((p) => "Other income " + euro0(p.otherEur));
+      const chartNode = C.bars({
+        categories: cats,
+        tickLabels: pts.map((p, i) => (i % stride === 0 ? C.compactEuro(Number(p.otherEur)) : "")),
+        series: [{ id: "saving", name: "Normal scale", values, texts }],
+        mode: "split",
+        colorPos: "var(--c-gain)",
+        colorNeg: "var(--c-more)",
+        splitLegend: [{ name: "Normal scale cheaper", color: "var(--c-gain)" }, { name: "Special rates cheaper", color: "var(--c-more)" }],
+        ariaLabel: "What the normal tax scale saves or costs in " + r.year + ", for other taxable incomes from " + euro0(pts[0].otherEur) + " to " + euro0(pts[pts.length - 1].otherEur),
+        height: 210,
+        labelMax: false,
+      });
+      const ranged = pts.some((p) => p.savingLowEur !== p.savingHighEur); // a second column only when the foreign-tax credit has two readings
+      const table = ranged
+        ? C.tableOf(["Other income", "Saving", "Saving (other reading)"], pts.map((p) => [euro0(p.otherEur), fm(p.savingLowEur, { plus: true }), fm(p.savingHighEur, { plus: true })]), "Saving of the normal scale by other taxable income")
+        : C.tableOf(["Other income", "Saving"], pts.map((p) => [euro0(p.otherEur), fm(p.savingLowEur, { plus: true })]), "Saving of the normal scale by other taxable income");
+      const note = r.at ? "Your figure is " + euro0(r.at.otherEur) + "." : "Enter your other taxable income above to see where you are.";
+      return el("div", { class: "stack" },
+        el("p", { class: "note", text: "Green bars: the normal scale is cheaper at that other income. Red bars: the special rates are cheaper. " + note }),
+        chartNode,
+        fold({ class: "mini", "data-k": "reg-table:" + r.year }, isOpen("table:" + r.year), (v) => setOpen("table:" + r.year, v), "Show the numbers as a table", el("div", { class: "body" }, table)));
+    }
+
+    function howItWorks(r) {
+      const scaleRows = r.scale.map((b) => [euro0(b.fromEur), b.toEur === null ? "no limit" : euro0(b.toEur), b.ratePercent + " %"]);
+      const bullets = [
+        "All capital income taxed at a special rate goes into the normal scale together with your other income, or none of it does. You cannot pick single items.",
+        "The income that goes in is the net taxable base of the 27.5 % income (after the losses of the year were set off) plus bank interest. The loss rules do not change with the option (§ 27 Abs 8 EStG): a loss is set against income at the special rate only, and an unused loss is not carried forward.",
+        "No expenses can be deducted from this income, with or without the option (§ 20 Abs 2 EStG).",
+        "Tax credits (Absetzbeträge) are deducted from the tax on the normal scale, not from the 27.5 % tax (§ 33 Abs 2 EStG), and not below zero. That is why the option can make credits useful that would otherwise stay unused.",
+        "Leave out credits that are paid out even when you owe no tax (Alleinverdiener- and Alleinerzieherabsetzbetrag, § 33 Abs 8 Z 1 EStG): they are the same with or without the option. Not covered here: the Kindermehrbetrag and the income limits that decide who can claim which credit. Ask your Steuerberater if you claim these.",
+        "Foreign tax is credited at most with the Austrian tax on that income. On the normal scale this page takes the average rate of your tax (tax before credits divided by total income) times the foreign income. That is an approximation; the Finanzamt may work it out slightly differently.",
+        "The Finanzamt does not compare the two ways for you (there is no automatic Günstigkeitsvergleich); it applies the option only when you ask for it in the return. It rounds the final amount to whole euros; this page shows cents.",
+      ];
+      return fold({ class: "mini", "data-k": "reg-how:" + r.year }, isOpen("how"), (v) => setOpen("how", v), "How this is worked out, and what it does not cover", el("div", { class: "body" },
+        el("ul", { class: "list" }, bullets.map((t) => listItem("info", t))),
+        el("p", { class: "note", text: "Tax scale of " + r.year + " (§ 33 Abs 1 EStG; source: usp.gv.at, Tarifstufen):" }),
+        C.tableOf(["From", "Up to", "Rate"], scaleRows, "Income tax scale " + r.year),
+        el("p", { class: "note", text: "Sources: § 27a Abs 1 and 5, § 27 Abs 8, § 20 Abs 2 and § 33 Abs 1, 2, 8 EStG 1988; the Ministry of Finance explanation of form E 1kv; the tax scales as published by the business service portal (usp.gv.at)." })));
+    }
+
+    // ------------------------------------------------------------ the card
+
+    /** The card for one tax year of a tax summary. Returns a node. */
+    function render(summary, year) {
+      const inputs = inputsOf(year);
+      const r = M.regularView(summary, year, inputs);
+      const head = el("div", { class: "card-head" }, el("h2", { text: "Normal tax scale instead?" }), el("span", { class: "sub", text: String(year) }));
+      const kids = [head];
+      if (!r.ok) {
+        kids.push(el("p", { class: "note", text: r.text }));
+        return el("section", { class: "card", "data-k": "regular:" + year }, kids);
+      }
+      kids.push(el("p", { class: "note", text: "You can ask the Finanzamt to tax all your capital income of " + year + " with the normal income-tax scale instead of 27.5 % (25 % on bank interest). The Finanzamt does not check for you which way is cheaper. This does." }));
+      if (r.nothingToCompare) {
+        kids.push(el("ul", { class: "list" }, r.notes.map((n) => listItem("info", n.text))));
+        return el("section", { class: "card", "data-k": "regular:" + year }, kids);
+      }
+      const problemOf = (name) => {
+        const p = r.problems.find((x) => x.field === name);
+        return p ? p.text : "";
+      };
+      kids.push(el("div", { class: "fields" },
+        field({ key: "reg-other:" + year, label: "Your other taxable income in " + year + " (€)", value: inputs.otherEur, placeholder: "for example 30000", error: problemOf("otherEur"), hint: "What your income-tax notice shows as “Einkommen”, without the capital income here. Enter 0 if there is none.", onCommit: (v) => setInput(year, "otherEur", v) }),
+        field({ key: "reg-credits:" + year, label: "Tax credits you can use (€), optional", value: inputs.creditsEur, placeholder: "for example 2000", error: problemOf("creditsEur"), hint: "Credits that only reduce tax, such as the Familienbonus Plus (your share). Leave empty if unsure; see the notes at the bottom.", onCommit: (v) => setInput(year, "creditsEur", v) })));
+      if (r.at) {
+        kids.push(verdictBanner(r, year));
+        kids.push(compareBlocks(r));
+        kids.push(facts(r));
+      }
+      kids.push(el("p", { class: "note", text: breakEvenText(r) }));
+      kids.push(chart(r));
+      if (r.notes.length) kids.push(el("ul", { class: "list" }, r.notes.map((n) => listItem(n.level === "warn" ? "warn" : "info", n.text))));
+      kids.push(howItWorks(r));
+      if (!host.mine()) kids.push(el("p", { class: "note", text: "Demo: what you type here is not saved." }));
+      return el("section", { class: "card", "data-k": "regular:" + year }, kids);
     }
 
     return { render, state: st };
@@ -13178,6 +14840,7 @@ const PerfUI = (function () {
   let autoUI = null;
   let ledgerUI = null;
   let perfUI = null;
+  let regularUI = null;
 
   const persist = Persist.create({ env: window, navigator: window.navigator });
   // The daily prices are kept apart from the tax document: a price update must not touch the tax data or make the backup out of date.
@@ -13244,6 +14907,18 @@ const PerfUI = (function () {
     ui.mode = "mine";
     rebuild();
     scheduleSave(opts && opts.immediate);
+    render();
+  }
+
+  /**
+   * A change that only touches what was typed for the normal tax scale: nothing has to be converted or calculated again, so only the
+   * checked document is kept, saved and drawn.
+   */
+  function commitLight(fn) {
+    const draft = clone(doc);
+    fn(draft);
+    doc = Store.normalizeDoc(draft).doc;
+    scheduleSave(false);
     render();
   }
 
@@ -13763,6 +15438,8 @@ const PerfUI = (function () {
 
     root.appendChild(card("Tax year " + y, v.label, el("div", {}, chip(st.text, st.kind), " ", yr.provisional ? chip("a transfer has no treatment yet", "warn") : null), yr.reasons.length ? el("ul", { class: "list" }, yr.reasons.map((t) => listItem("warn", t))) : null, el("div", { class: "tbl-wrap" }, tbl)));
 
+    root.appendChild(regularUI.render(v.summary, y));
+
     const reals = M.realizationsOf(v.engine, y);
     root.appendChild(card("Sales in " + y, reals.length + (reals.length === 1 ? " sale" : " sales"), reals.length ? el("div", { class: "rows" }, reals.map(realizationRow)) : el("p", { class: "note", text: "No sales or deemed sales." }), el("p", { class: "note", text: "Open a sale to see how its cost was found: average cost per unit times the units sold, split into purchases, the step-up of 28 Jan 2020 and fund corrections." })));
 
@@ -14256,6 +15933,14 @@ const PerfUI = (function () {
     persist: pricePersist,
     saveFile,
     copyToClipboard,
+  });
+
+  // The comparison with the normal tax scale. What was typed goes through commitLight(); in the demo it stays in the page.
+  regularUI = RegularUI.create({
+    doc: () => doc,
+    mine: () => ui.mode === "mine",
+    commit: commitLight,
+    refresh: () => render(),
   });
 
   const planUI = PlanUI.create({
