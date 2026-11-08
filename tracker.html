@@ -2,23 +2,27 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap">
 <style>
-/* Layout: a sticky tab bar over one column of cards on a phone, two columns from 860 px; figures in a mono face.
-   One deliberate dark look (same as the import-check page): ink-blue neutrals, a periwinkle accent, and status
-   colours kept apart from the series colours. Colours come from tokens. Series colours were checked with the
-   palette validator on the card surface. */
+/* Layout: a sticky tab bar over one column of cards on a phone, two columns from 860 px; big figures in the body face, table figures in a mono face.
+   One deliberate dark look: deep ink-blue neutrals, a periwinkle accent, panels with a lit top edge, and status colours kept apart from
+   the series colours. The one thing that glows is the data: lines and bars have a soft halo (see charts.js); everything around them is quiet.
+   Colours come from tokens. Series colours were checked with the palette validator on the card surface. */
 :root {
-  --bg: #0B0E14;
-  --surface: #121722;
-  --surface-2: #1A2131;
-  --line: #262F43;
-  --grid: #1E2638;
-  --axis: #43506B;
-  --fg: #E8ECF4;
-  --muted: #9AA5BC;
+  --bg: #070A12;
+  --surface: #0E1423;
+  --surface-2: #151D31;
+  --line: #222C44;
+  --line-hi: #314060;
+  --grid: #19223A;
+  --axis: #3F4C6A;
+  --fg: #EDF1FA;
+  --muted: #9CA9C4;
   --accent: #8FA8FF;
-  --accent-ink: #0B0E14;
+  --accent-glow: rgba(143, 168, 255, 0.55);
+  --accent-ink: #070A12;
+  --lit: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0) 48%);
+  --radius: 16px;
   --ok: #4ADE9A;
   --ok-bg: rgba(74, 222, 154, 0.12);
   --warn: #F6C25B;
@@ -34,8 +38,8 @@
   --c-div: #c98500;
   --c-more: #e66767;
   --c-less: #3987e5;
-  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --font-body: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -43,7 +47,7 @@
 html { background: var(--bg); }
 body {
   margin: 0;
-  background: var(--bg);
+  background: transparent;
   color: var(--fg);
   font: 15px/1.55 var(--font-body);
   padding-block: 0 72px;
@@ -53,9 +57,10 @@ body {
 }
 h1, h2, h3, h4, p, ul, ol, dl, dd, figure { margin: 0; padding: 0; }
 ul, ol { list-style: none; }
-h1 { font-size: 24px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em; }
-h2 { font-size: 17px; line-height: 1.3; font-weight: 600; text-wrap: balance; }
-h3 { font-size: 15px; font-weight: 600; }
+body::after { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(900px 420px at 50% -120px, rgba(98, 128, 255, 0.17), transparent 72%), radial-gradient(520px 320px at 100% 8%, rgba(45, 212, 170, 0.06), transparent 70%); }
+h1 { font-size: 26px; line-height: 1.12; font-weight: 800; letter-spacing: -0.025em; }
+h2 { font-size: 17px; line-height: 1.3; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+h3 { font-size: 15px; font-weight: 650; }
 button, input, select, textarea { font: inherit; color: inherit; }
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -77,18 +82,19 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
-.tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; gap: 2px; margin: 14px -16px 0; padding: 8px 12px; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; gap: 2px; margin: 14px -16px 0; padding: 8px 12px; background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(14px) saturate(1.2); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
-.tab { flex: 1 1 auto; background: transparent; border: 1px solid transparent; color: var(--muted); border-radius: 999px; padding: 8px 10px; min-height: 40px; cursor: pointer; font-weight: 500; font-size: 14px; white-space: nowrap; }
+.tab { flex: 1 1 auto; background: transparent; border: 1px solid transparent; color: var(--muted); border-radius: 999px; padding: 8px 10px; min-height: 40px; cursor: pointer; font-weight: 600; font-size: 14px; white-space: nowrap; transition: color 0.15s, background 0.15s, box-shadow 0.2s; }
 @media (min-width: 520px) { .tab { flex: 0 0 auto; padding-inline: 16px; font-size: 15px; } .tabs { gap: 4px; padding-inline: 16px; } }
 .tab:hover { color: var(--fg); }
-.tab[aria-selected="true"] { color: var(--accent-ink); background: var(--accent); }
+.tab[aria-selected="true"] { color: var(--accent-ink); background: linear-gradient(180deg, #AEC0FF, var(--accent)); font-weight: 700; box-shadow: 0 0 0 1px rgba(143, 168, 255, 0.55), 0 6px 22px -6px var(--accent-glow); }
 
 main { display: grid; gap: 16px; padding-top: 16px; }
 .grid2 { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 860px) { .grid2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .span2 { grid-column: 1 / -1; } }
 
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; min-width: 0; display: grid; gap: 12px; align-content: start; }
+.card { background: var(--lit), var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 16px; min-width: 0; display: grid; gap: 14px; align-content: start; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 20px 44px -28px rgba(0, 0, 0, 0.9); }
+@media (min-width: 640px) { .card { padding: 20px; } }
 .card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
 .card-head .sub { color: var(--muted); font-size: 13px; }
 .note { color: var(--muted); font-size: 13px; max-width: 78ch; }
@@ -117,21 +123,22 @@ main { display: grid; gap: 16px; padding-top: 16px; }
 @media (min-width: 860px) { .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 359px) { .kpis { grid-template-columns: minmax(0, 1fr); } }
 @media (min-width: 700px) { .kpis.six { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; display: grid; gap: 2px; align-content: start; }
-.kpi .label { color: var(--muted); font-size: 12px; }
-.kpi .value { font: 500 clamp(15px, 4.3vw, 22px)/1.2 var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+@media (max-width: 699px) { .kpis > .kpi:last-child:nth-child(odd) { grid-column: 1 / -1; } }
+.kpi { background: var(--lit), var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; min-width: 0; display: grid; gap: 3px; align-content: start; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); transition: border-color 0.15s, box-shadow 0.2s; }
+.kpi .label { color: var(--muted); font-size: 12px; font-weight: 500; }
+.kpi .value { font: 700 clamp(17px, 5vw, 26px)/1.15 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -0.025em; overflow-wrap: anywhere; }
 .kpi .subline { color: var(--muted); font-size: 12px; }
 .delta-up::before { content: "\25B2\00a0"; color: var(--c-more); }
 .delta-down::before { content: "\25BC\00a0"; color: var(--c-less); }
 .delta-flat::before { content: "\25AC\00a0"; color: var(--muted); }
 
 /* controls */
-.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface-2); max-width: 100%; flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface-2); max-width: 100%; flex-wrap: wrap; }
 .seg label { position: relative; cursor: pointer; flex: 1 1 auto; }
 .seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
 .seg span { display: block; padding: 8px 12px; min-height: 38px; font-size: 13px; color: var(--muted); text-align: center; }
 .sub-row .seg { flex: 1 1 100%; }
-.seg input:checked + span { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.seg input:checked + span { background: linear-gradient(180deg, #AEC0FF, var(--accent)); color: var(--accent-ink); font-weight: 700; box-shadow: 0 0 18px -4px var(--accent-glow); }
 .seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: -2px; }
 .seg label:has(input:disabled) { cursor: not-allowed; }
 .seg input:disabled { cursor: not-allowed; }
@@ -145,7 +152,7 @@ main { display: grid; gap: 16px; padding-top: 16px; }
 .sub-row .what { font-size: 13px; min-width: 0; }
 .field { display: grid; gap: 4px; align-content: start; min-width: 0; }
 .field label { font-size: 12px; color: var(--muted); }
-.field input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), .field select, .field textarea { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-height: 40px; width: 100%; max-width: 220px; font-family: var(--font-body); font-size: 14px; }
+.field input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), .field select, .field textarea { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-height: 40px; width: 100%; max-width: 220px; font-family: var(--font-body); font-size: 14px; }
 .field input.mono, .field textarea { font-family: var(--font-mono); font-size: 13px; }
 .field input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):hover, .field select:hover, .field textarea:hover { border-color: var(--axis); }
 .field input.invalid, .field select.invalid { border-color: var(--bad); }
@@ -169,7 +176,7 @@ details .body { padding-top: 8px; display: grid; gap: 10px; }
 
 .year-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .year-chip { background: var(--surface-2); border: 1px solid var(--line); color: var(--fg); border-radius: 10px; padding: 8px 12px; min-height: 40px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); }
-.year-chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.year-chip[aria-pressed="true"] { background: linear-gradient(180deg, #AEC0FF, var(--accent)); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; box-shadow: 0 0 16px -4px var(--accent-glow); }
 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--ok); }
 .dot.warn { background: var(--warn); }
 .dot.bad { background: var(--bad); }
@@ -186,7 +193,7 @@ details .body { padding-top: 8px; display: grid; gap: 10px; }
 .tbl td.sign { width: 1.4em; color: var(--muted); text-align: center; padding-inline: 2px; }
 .tbl .why { display: block; color: var(--muted); font-size: 12px; font-weight: 400; margin-top: 2px; max-width: 52ch; }
 .rows { display: grid; gap: 8px; }
-.row-card { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
+.row-card { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; }
 .row-card.flat { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: baseline; }
 .row-card .extra { grid-column: 1 / -1; font-size: 13px; color: var(--muted); margin-top: 4px; }
 .row-card .extra .chip { margin-right: 6px; }
@@ -221,7 +228,12 @@ details .body { padding-top: 8px; display: grid; gap: 10px; }
 .chart svg { display: block; overflow: visible; max-width: 100%; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
 .legend li { display: inline-flex; align-items: center; gap: 7px; }
-.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; flex: 0 0 auto; }
+.legend.toggles { gap: 6px 8px; }
+.legend .lg { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 4px 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; color: var(--fg); font-size: 12.5px; font-weight: 500; cursor: pointer; transition: border-color 0.15s, opacity 0.15s; }
+.legend .lg:hover { border-color: var(--axis); }
+.legend .lg[aria-pressed="false"] { opacity: 0.55; text-decoration: line-through; background: transparent; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+.swatch.dash { background-image: repeating-linear-gradient(90deg, transparent 0 3px, var(--bg) 3px 5px) !important; }
 .grid { stroke: var(--grid); stroke-width: 1; }
 .axis { stroke: var(--axis); stroke-width: 1; }
 .tick { fill: var(--muted); font: 11px var(--font-mono); }
@@ -230,22 +242,58 @@ details .body { padding-top: 8px; display: grid; gap: 10px; }
 .hit { fill: transparent; cursor: default; }
 .hit:hover { fill: rgba(255, 255, 255, 0.035); }
 .hit:focus { outline: none; fill: rgba(143, 168, 255, 0.10); }
-.line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.line { fill: none; stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
+.lineglow { fill: none; stroke-width: 7; stroke-linejoin: round; stroke-linecap: round; opacity: 0.5; pointer-events: none; }
+.barglow { opacity: 0.5; pointer-events: none; }
+.area { stroke: none; pointer-events: none; }
 .marker { stroke: var(--surface); stroke-width: 2; }
-.cross { stroke: var(--axis); stroke-dasharray: 2 3; }
-.tip { position: absolute; top: 4px; z-index: 6; min-width: 150px; max-width: 260px; background: var(--surface-2); border: 1px solid var(--axis); border-radius: 8px; padding: 8px 10px; font-size: 12px; pointer-events: none; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45); }
-.tip-title { font-weight: 600; margin-bottom: 4px; }
+.marker-halo { opacity: 0.28; stroke: none; pointer-events: none; }
+.cross { stroke: rgba(205, 218, 255, 0.55); stroke-width: 1; stroke-dasharray: 2 3; pointer-events: none; }
+.pill-bg { fill: rgba(9, 13, 24, 0.94); stroke-width: 1; }
+.pill-t { fill: var(--fg); font: 600 11px var(--font-mono); }
+.tip, .tipbox { background: color-mix(in srgb, var(--surface-2) 90%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border: 1px solid var(--line-hi); border-radius: 12px; padding: 10px 12px; font-size: 12.5px; line-height: 1.45; pointer-events: none; box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(143, 168, 255, 0.06); }
+.tip { position: absolute; top: 4px; z-index: 6; min-width: 170px; max-width: 280px; }
+.tip-title { font-weight: 700; margin-bottom: 5px; }
 .tip-row { display: flex; align-items: center; gap: 8px; }
+.tip-row.plain { gap: 14px; }
+.tip-row:not(.plain) + .tip-row.plain { margin-top: 5px; padding-top: 6px; border-top: 1px solid var(--line); }
 .tip-name { color: var(--muted); flex: 1 1 auto; }
-.tip-val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.tip-val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12px; text-align: right; }
+.tip-val.pos { color: var(--ok); }
+.tip-val.neg { color: var(--bad); }
+/* the one hover box of the page (tip.js) */
+.tipbox { position: fixed; z-index: 100; left: 0; top: 0; width: max-content; max-width: min(340px, calc(100vw - 16px)); opacity: 1; transition: opacity 0.12s; }
+.tipbox[hidden] { display: none !important; }
+.tip-t { font-weight: 700; font-size: 13px; margin-bottom: 7px; overflow-wrap: anywhere; }
+.tip-rows { display: grid; gap: 4px; }
+.tip-r { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+.tip-l { color: var(--muted); min-width: 0; }
+.tip-v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12px; text-align: right; overflow-wrap: anywhere; }
+.tip-v.pos { color: var(--ok); }
+.tip-v.neg { color: var(--bad); }
+.tip-n { color: var(--muted); font-size: 12px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.tip-t + .tip-n { margin-top: 2px; padding-top: 0; border-top: 0; }
+/* a number or name that has more to tell: the pointer says so, the keyboard can reach it */
+[data-tip] { cursor: help; }
+[data-tip]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.kpi[data-tip]:hover, .kpi[data-tip]:focus-visible { border-color: var(--line-hi); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 1px rgba(143, 168, 255, 0.16), 0 12px 30px -14px var(--accent-glow); }
+.tbl tbody tr[data-tip]:hover, .bridge li[data-tip]:hover, .tipname:hover { background: rgba(143, 168, 255, 0.07); }
+.tipname { border-radius: 6px; text-decoration: underline dotted rgba(156, 169, 196, 0.55); text-underline-offset: 3px; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .tipbox, .kpi, .tab, .legend .lg { transition: none; } }
+/* forced colours and high contrast: the glow is only light, take it away and keep the solid marks */
+@media (forced-colors: active), (prefers-contrast: more) {
+  .lineglow, .barglow, .area, .marker-halo { display: none; }
+  .tabs, .tip, .tipbox { backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .tab[aria-selected="true"], .btn.primary, .seg input:checked + span { box-shadow: none; }
+}
 .view-switch { display: inline-flex; gap: 2px; background: var(--surface-2); border-radius: 8px; padding: 2px; }
 .view-switch button { background: transparent; border: 0; color: var(--muted); border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer; min-height: 28px; }
 .view-switch button[aria-pressed="true"] { background: var(--line); color: var(--fg); }
 
-.btn { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; min-height: 40px; cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; justify-content: center; text-align: center; line-height: 1.25; }
+.btn { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px; min-height: 40px; cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; justify-content: center; text-align: center; line-height: 1.25; }
 .btn:hover { border-color: var(--axis); }
-.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
-.btn.primary:hover { filter: brightness(1.08); }
+.btn.primary { background: linear-gradient(180deg, #AEC0FF, var(--accent)); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; box-shadow: 0 8px 22px -10px var(--accent-glow); }
+.btn.primary:hover { filter: brightness(1.06); box-shadow: 0 10px 26px -8px var(--accent-glow); }
 .btn.danger { color: var(--bad); border-color: rgba(255, 128, 128, 0.4); background: transparent; }
 .btn.danger:hover { background: var(--bad-bg); border-color: var(--bad); }
 .btn.small { min-height: 32px; padding: 4px 10px; font-size: 13px; }
@@ -310,6 +358,9 @@ details.mini > .body { padding-top: 6px; }
 .sec-list li { display: grid; gap: 4px; padding: 10px 12px; background: var(--surface-2); border-radius: 10px; min-width: 0; }
 .sec-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 .sec-top .sec-value { margin-left: auto; font-size: 15px; }
+.sec-top .sec-name { min-width: 0; overflow-wrap: anywhere; font-weight: 650; }
+.card-head.sub-head { margin-top: 6px; }
+.risk-controls { display: grid; gap: 10px; min-width: 0; }
 .sec-sub { display: flex; flex-wrap: wrap; gap: 2px 14px; color: var(--muted); font-size: 13px; }
 @media (min-width: 640px) { .sec-table { display: block; } .sec-list { display: none; } }
 .list.kit { gap: 8px; }
@@ -333,7 +384,7 @@ details.mini > .body { padding-top: 6px; }
 .ychip { position: relative; flex: 0 0 auto; cursor: pointer; }
 .ychip input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
 .ychip span { display: block; padding: 7px 13px; min-height: 38px; font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); font-variant-numeric: tabular-nums; }
-.ychip input:checked + span { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.ychip input:checked + span { background: linear-gradient(180deg, #AEC0FF, var(--accent)); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; box-shadow: 0 0 16px -4px var(--accent-glow); }
 .ychip input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 .band { stroke: none; fill-opacity: 0.22; }
 
@@ -8182,10 +8233,13 @@ span.hc { cursor: default; }
       if (t.name) s.names.push(t.name);
       securities[t.isin] = s;
     }
+    // The name of a fund in the OeKB fund lists (a label for the screens; it never takes part in a calculation).
+    const fundNames = {};
+    for (const inp of oekbInputs) for (const f of inp.funds || []) if (f && typeof f.name === "string" && f.name.trim() !== "" && fundNames[f.isin.trim().toUpperCase()] === undefined) fundNames[f.isin.trim().toUpperCase()] = f.name.trim();
     const metaSecurities = {};
     for (const [isin, s] of Object.entries(securities)) {
       const short = s.tickers.join(" / ");
-      metaSecurities[isin] = { name: s.names[0] || short, short, note: typeOfIsin.get(isin) === "REPORTING_FUND" ? "fund with OeKB reports" : typeOfIsin.get(isin) === "SHARE" ? "share" : typeOfIsin.get(isin) === "NON_REPORTING_FUND" ? "fund without reports" : "" };
+      metaSecurities[isin] = { name: s.names[0] || short, short, tickers: s.tickers.slice(), fundName: fundNames[isin] || "", note: typeOfIsin.get(isin) === "REPORTING_FUND" ? "fund with OeKB reports" : typeOfIsin.get(isin) === "SHARE" ? "share" : typeOfIsin.get(isin) === "NON_REPORTING_FUND" ? "fund without reports" : "" };
     }
     const depots = {};
     for (const a of accountList) {
@@ -9380,7 +9434,7 @@ span.hc { cursor: default; }
 })(typeof self !== "undefined" ? self : this, function (Prices) {
   "use strict";
 
-  const VERSION = "perf-0.2.0";
+  const VERSION = "perf-0.3.0";
   const DAY = 86400000;
   const EPS = 1e-9;
   const dayNumber = Prices.dayNumber;
@@ -9993,6 +10047,10 @@ span.hc { cursor: default; }
       twrAnnual: annual(twr),
       xirr: x !== null && span >= 365 ? x : null,
       moneyWeighted: x !== null ? Math.pow(1 + x, span / 365) - 1 : null,
+      // what the money-weighted return was made from (for the hover box): the dated flows, first and last
+      flows: flows.length,
+      flowFrom: flows.length ? model.days[flows[0].t - model.dn0] : "",
+      flowTo: flows.length ? model.days[flows[flows.length - 1].t - model.dn0] : "",
     };
   }
 
@@ -10169,6 +10227,144 @@ span.hc { cursor: default; }
   }
 
   /**
+   * The falls of the growth index inside a time-frame, one entry per fall. A fall starts on the first day the index is below its latest
+   * high (the high is the day of the first strictly higher level, the first day of the time-frame at the latest) and ends on the first
+   * day it is back at that level; it has a lowest day (the first one with the lowest level) and a depth = low / high - 1 (negative).
+   * opts: { top (default 5): how many of the deepest falls to return, minDepth (default 0.01): falls shallower than that are not listed }.
+   * Returns {
+   *   episodes: the deepest falls of at least minDepth, deepest first (ties: the earlier one), at most top, each
+   *     { peak, trough, recovered ("" while still down), depth, downDays (high to low), recoveryDays (low to back, null while down),
+   *       belowDays (high to back, or to the last day while down), open }
+   *   count: how many falls of at least minDepth there were,
+   *   longest: the fall of any depth that kept the index below a high for the most days (the earliest on a tie), or null,
+   *   current: { depth, since (days since the high was set, 0 when the last day is at the high), high (the first day of that level) }.
+   * }
+   * The deepest fall of drawdown() is the first of these (when it is at least minDepth).
+   */
+  function drawdowns(model, win, opts) {
+    const T = model.total;
+    const { s, e } = win;
+    const top = Math.max(1, Math.floor((opts && opts.top) || 5));
+    const minDepth = opts && opts.minDepth != null ? opts.minDepth : 0.01;
+    const all = [];
+    const done = (c, recI) => ({
+      peak: model.days[c.peakI],
+      trough: model.days[c.troughI],
+      recovered: recI >= 0 ? model.days[recI] : "",
+      depth: c.depth,
+      downDays: c.troughI - c.peakI,
+      recoveryDays: recI >= 0 ? recI - c.troughI : null,
+      belowDays: (recI >= 0 ? recI : e) - c.peakI,
+      open: recI < 0,
+      _p: c.peakI,
+    });
+    let peakI = s;
+    let cur = null;
+    for (let i = s + 1; i <= e; i++) {
+      const x = T.index[i];
+      const p = T.index[peakI];
+      if (x >= p) {
+        if (cur) {
+          all.push(done(cur, i));
+          cur = null;
+        }
+        if (x > p) peakI = i;
+      } else {
+        const d = x / p - 1;
+        if (!cur) cur = { peakI, troughI: i, depth: d };
+        else if (d < cur.depth) {
+          cur.depth = d;
+          cur.troughI = i;
+        }
+      }
+    }
+    if (cur) all.push(done(cur, -1));
+    let longest = null;
+    for (const f of all) if (!longest || f.belowDays > longest.belowDays) longest = f;
+    const listed = all.filter((f) => f.depth <= -minDepth).sort((a, b) => a.depth - b.depth || a._p - b._p);
+    const strip = (f) => {
+      const o = Object.assign({}, f);
+      delete o._p;
+      return o;
+    };
+    let hiI = s;
+    for (let i = s + 1; i <= e; i++) if (T.index[i] > T.index[hiI]) hiI = i;
+    return {
+      episodes: listed.slice(0, top).map(strip),
+      count: listed.length,
+      longest: longest ? strip(longest) : null,
+      current: { depth: T.index[e] / T.index[hiI] - 1, since: T.index[e] >= T.index[hiI] ? 0 : e - hiI, high: model.days[hiI] },
+    };
+  }
+
+  /**
+   * Return per unit of risk over a time-frame, from the daily returns r of the growth index on the days with something held the day
+   * before (the same days as the volatility in risk()), n of them. opts.rf: the risk-free rate per year as a fraction (default 0);
+   * the daily rate is rfd = (1 + rf)^(1/365) - 1.
+   *   Sharpe  = mean(r - rfd) / s * sqrt(365),  s = sample standard deviation of r (divisor n - 1, as the volatility)     from 60 days
+   *   Sortino = mean(r - rfd) / DD * sqrt(365), DD = sqrt( sum of min(0, r - rfd)^2 / n )  (all n days in the divisor)    from 60 days
+   *   Calmar  = time-weighted return per year / size of the largest fall of the time-frame                                 from 365 days
+   * A ratio the history cannot give is null and why[name] says why (no invented number). Nothing is annualised twice: the mean and the
+   * deviations are daily, and the one factor sqrt(365) turns the ratio of daily figures into a yearly one.
+   * Returns { days, rf, rfDaily, mean, stdev, vol, downside (annualised DD), excess (mean(r - rfd) * 365), annual (time-weighted return per
+   * year or null), fall (largest fall as a positive fraction or null), sharpe, sortino, calmar, why: { sharpe, sortino, calmar } }.
+   */
+  function riskAdjusted(model, win, opts) {
+    const T = model.total;
+    const { s, e } = win;
+    const rf = opts && Number.isFinite(opts.rf) ? opts.rf : 0;
+    const rfd = Math.pow(1 + rf, 1 / 365) - 1;
+    const rs = [];
+    for (let i = s + 1; i <= e; i++) {
+      if (!(T.value[i - 1] > 0)) continue;
+      rs.push(T.index[i] / T.index[i - 1] - 1);
+    }
+    const n = rs.length;
+    const out = { days: n, rf, rfDaily: rfd, mean: null, stdev: null, vol: null, downside: null, excess: null, annual: null, fall: null, sharpe: null, sortino: null, calmar: null, why: { sharpe: "", sortino: "", calmar: "" } };
+    const span = e - s;
+    const twr = T.index[e] / T.index[s] - 1;
+    if (span >= 365) out.annual = Math.pow(1 + twr, 365 / span) - 1;
+    const dd = drawdown(model, win, 2).max;
+    out.fall = dd ? -dd.depth : null;
+    if (n >= 1) {
+      let mean = 0;
+      for (const r of rs) mean += r;
+      mean /= n;
+      out.mean = mean;
+      out.excess = (mean - rfd) * 365;
+    }
+    if (n >= 60) {
+      let ss = 0;
+      for (const r of rs) ss += (r - out.mean) * (r - out.mean);
+      out.stdev = Math.sqrt(ss / (n - 1));
+      out.vol = out.stdev * Math.sqrt(365);
+      let down = 0;
+      for (const r of rs) {
+        const x = Math.min(0, r - rfd);
+        down += x * x;
+      }
+      const DD = Math.sqrt(down / n);
+      out.downside = DD * Math.sqrt(365);
+      if (out.stdev > 0) out.sharpe = ((out.mean - rfd) / out.stdev) * Math.sqrt(365);
+      else out.why.sharpe = "The value never moved, so there is no deviation to divide by.";
+      if (DD > 0) out.sortino = ((out.mean - rfd) / DD) * Math.sqrt(365);
+      else out.why.sortino = "No day was below the target, so there is no downside to divide by.";
+    } else {
+      out.why.sharpe = out.why.sortino = "Needs 60 days of history in the time-frame (it has " + n + ").";
+    }
+    if (out.annual === null) out.why.calmar = "Needs a time-frame of at least a year (it has " + span + " days).";
+    else if (out.fall === null) out.why.calmar = "The growth line never fell in this time-frame, so there is no fall to divide by.";
+    else {
+      out.calmar = out.annual / out.fall;
+      if (!Number.isFinite(out.calmar)) {
+        out.calmar = null;
+        out.why.calmar = "The time-frame lost everything, so a return per year cannot be worked out.";
+      }
+    }
+    return out;
+  }
+
+  /**
    * How bumpy the ride was over a time-frame. vol: the standard deviation of the daily returns of the index, times the square root of
    * 365 (calendar days: a weekend is a day of no return, which is how a year of 252 trading days adds up), only with 60 or more days.
    * Months are the complete calendar months inside the time-frame (pass the rows of months() to save the work).
@@ -10208,6 +10404,63 @@ span.hc { cursor: default; }
   }
 
   /**
+   * The moving average replay behind "price gain realised" (used by bridge and realizedSeries, so the two can never drift apart):
+   * per security the cost starts, at the start of the time-frame, at the value of the holdings then; a purchase adds what was paid;
+   * a sale takes out the cost of the units sold (the whole cost when everything is sold) and realises proceeds minus that cost.
+   * Returns the totals and, with daily = true, the realised gain of each day (byDay[0] is the start of the time-frame, always 0).
+   */
+  function replay(model, s, e, daily) {
+    let bought = 0;
+    let sold = 0;
+    let realized = 0;
+    let unrealized = 0;
+    let costHeld = 0;
+    let buys = 0;
+    let sells = 0;
+    const byDay = daily ? new Float64Array(e - s + 1) : null;
+    for (const A of model.per) {
+      let C = A.value[s];
+      for (const t of A.trades) {
+        if (t.i <= s || t.i > e) continue;
+        if (t.buy) {
+          C += t.qty * t.pe;
+          bought += t.qty * t.pe;
+          buys++;
+        } else {
+          const proceeds = t.qty * t.pe;
+          sold += proceeds;
+          sells++;
+          let removed = 0;
+          if (t.ub > EPS) removed = t.qty >= t.ub - EPS ? C : C * (t.qty / t.ub);
+          C -= removed;
+          realized += proceeds - removed;
+          if (byDay) byDay[t.i - s] += proceeds - removed;
+        }
+      }
+      unrealized += A.value[e] - C;
+      if (A.value[e] > 0) costHeld += C;
+    }
+    return { bought, sold, realized, unrealized, costHeld, buys, sells, byDay };
+  }
+
+  /**
+   * The realised price gain so far, day by day, over a time-frame (before tax and fees): cum[k] is the sum of the realised gains of the
+   * days after the start up to day s + k. The last value is the "price gain realised" of bridge() (a test checks that), so the line on
+   * the main chart and the number in the breakdown are one figure. Returns { cum, byDay }.
+   */
+  function realizedSeries(model, win) {
+    const { s, e } = win;
+    const { byDay } = replay(model, s, e, true);
+    const cum = new Float64Array(e - s + 1);
+    let acc = 0;
+    for (let k = 0; k <= e - s; k++) {
+      acc += byDay[k];
+      cum[k] = acc;
+    }
+    return { cum, byDay };
+  }
+
+  /**
    * Where the result of a time-frame came from, with the identity that holds it together:
    *   gain = price gain - fees + dividends after tax at the source,   price gain = value at the end - value at the start - (bought - sold)
    * and the price gain is split into realised and not yet realised with a moving average cost per security that starts, at the start of
@@ -10231,30 +10484,7 @@ span.hc { cursor: default; }
       wht += T.withheld[i];
       divN += T.dividends[i];
     }
-    let bought = 0;
-    let sold = 0;
-    let realized = 0;
-    let unrealized = 0;
-    let costHeld = 0;
-    for (const A of model.per) {
-      let C = A.value[s];
-      for (const t of A.trades) {
-        if (t.i <= s || t.i > e) continue;
-        if (t.buy) {
-          C += t.qty * t.pe;
-          bought += t.qty * t.pe;
-        } else {
-          const proceeds = t.qty * t.pe;
-          sold += proceeds;
-          let removed = 0;
-          if (t.ub > EPS) removed = t.qty >= t.ub - EPS ? C : C * (t.qty / t.ub);
-          C -= removed;
-          realized += proceeds - removed;
-        }
-      }
-      unrealized += A.value[e] - C;
-      if (A.value[e] > 0) costHeld += C;
-    }
+    const { bought, sold, realized, unrealized, costHeld, buys, sells } = replay(model, s, e, false);
     const valueStart = T.value[s];
     const valueEnd = T.value[e];
     const priceGain = valueEnd - valueStart - (bought - sold);
@@ -10267,6 +10497,8 @@ span.hc { cursor: default; }
       valueEnd,
       bought,
       sold,
+      buys,
+      sells,
       fees,
       inflow,
       outflow,
@@ -10274,6 +10506,7 @@ span.hc { cursor: default; }
       realized,
       unrealized,
       costHeld,
+      costSold: sold - realized, // what the units sold had cost (moving average), so that sold - costSold = realized
       dividendsGross: divG,
       withheld: wht,
       dividendsNet: divN,
@@ -10314,21 +10547,36 @@ span.hc { cursor: default; }
     return out.reverse();
   }
 
-  /** What the charts draw for a time-frame: value, net money put in so far, and the index rebased to 100 at the start. */
+  /**
+   * What the charts draw for a time-frame: value, net money put in so far, the index rebased to 100 at the start and the same as a return
+   * so far (twr, a fraction); plus the realised price gain so far (see realizedSeries) and the dividends after tax so far, both counted
+   * from the start of the time-frame.
+   */
   function chartSeries(model, win, maxPoints) {
     const T = model.total;
-    const ix = thin(win.s, win.e, maxPoints || 300);
-    const base = T.index[win.s];
+    const { s, e } = win;
+    const ix = thin(s, e, maxPoints || 300);
+    const base = T.index[s];
+    const real = realizedSeries(model, win).cum;
+    const divs = new Float64Array(e - s + 1);
+    let acc = 0;
+    for (let i = s + 1; i <= e; i++) {
+      acc += T.dividends[i];
+      divs[i - s] = acc;
+    }
     return {
       days: ix.map((i) => model.days[i]),
       value: ix.map((i) => T.value[i]),
       invested: ix.map((i) => T.invested[i]),
-      capital: ix.map((i) => T.value[win.s] + T.invested[i] - T.invested[win.s]),
+      capital: ix.map((i) => T.value[s] + T.invested[i] - T.invested[s]),
       index: ix.map((i) => (T.index[i] / base) * 100),
+      twr: ix.map((i) => T.index[i] / base - 1),
+      realized: ix.map((i) => real[i - s]),
+      dividends: ix.map((i) => divs[i - s]),
     };
   }
 
-  return { VERSION, PRESETS, addMonths, median, xirr, compute, resolve, stats, years, byTicker, thin, chartSeries, months, periods, drawdown, risk, bridge, allocation };
+  return { VERSION, PRESETS, addMonths, median, xirr, compute, resolve, stats, years, byTicker, thin, chartSeries, months, periods, drawdown, drawdowns, risk, riskAdjusted, bridge, realizedSeries, allocation };
 });
 
 /* ---- src/app/perf-input.js ---- */
@@ -10428,6 +10676,662 @@ span.hc { cursor: default; }
   return { VERSION, makeFx, mappingOf, build, run, ecbInfo };
 });
 
+/* ---- src/app/names.js ---- */
+/*
+ * Names: the name to show for a security instead of its ticker, and what the hover over that name tells (Node and browser).
+ *
+ * Where a name comes from, best first:
+ *   1. the name the owner typed (or imported with his ISIN list) on the Data tab,
+ *   2. the name Yahoo Finance gave the security's symbol (it arrives with the daily prices and is kept in the price book),
+ *   3. the name in the OeKB fund list (by ISIN),
+ *   4. none: the ticker as it is in his transaction file is shown.
+ * A name is a label and nothing more: every calculation (tax and performance) keeps working with ISIN and ticker, so a name that is
+ * wrong or changes can never change a figure. Nothing here is stored; it is worked out again from what is already there.
+ *
+ * Two forms of a name:
+ *   full   the whole name, as written by the source
+ *   label  a compact form for tight places (tables, bars, legends): "UCITS" and "ETF", a trailing "(Acc)", "Dist" or currency tag are
+ *          left off. When two different securities would get the same label, their full names are used; when even those are equal,
+ *          the ticker is added in brackets. Two tickers of ONE security (the same ISIN, e.g. two stock exchanges) share the label and
+ *          are told apart by their ticker in brackets wherever they are listed one by one.
+ *
+ * build({ securities, book, funds }) returns a resolver:
+ *   securities  the document's entries { ticker: { isin, name, yahoo } }
+ *   book        the price book ({ store: { symbols: { SYMBOL: { name } } } }) or null
+ *   funds       { ISIN: name } from the OeKB fund list
+ *   ofTicker(ticker), ofIsin(isin) -> { level, ticker, tickers, isin, symbol, symbols, name, source, full, label, hasName }
+ *       level "ticker": one ticker of the file (label with its ticker in brackets when the security has several); level "isin": the security
+ *   label(ticker), labelIsin(isin), full(ticker), fullIsin(isin)
+ *   tip(info) -> { t, r, n }: what the hover shows (the name, ISIN, Yahoo ticker, ticker in the file, where the name came from)
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.Names = factory();
+})(typeof self !== "undefined" ? self : this, function () {
+  "use strict";
+
+  const VERSION = "names-0.1.0";
+  const MAX_NAME = 120;
+  const RANK = { owner: 0, yahoo: 1, oekb: 2, none: 3 };
+  const SOURCE_TEXT = {
+    owner: "Name typed by you.",
+    yahoo: "Name from Yahoo Finance, loaded with the prices.",
+    oekb: "Name from the OeKB fund list.",
+    none: "No name known yet. Type one on the Data tab, or load the prices to get the name from Yahoo Finance.",
+  };
+
+  const isObj = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
+  const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  const clean = (s) => (typeof s === "string" ? s.replace(/\s+/g, " ").trim().slice(0, MAX_NAME) : "");
+  const isinOf = (s) => (typeof s === "string" ? s.trim().toUpperCase() : "");
+
+  // ---------------------------------------------------------------- the compact form
+
+  const DROP_WORD = /^(ucits|etf)$/i;
+  const TAIL_TAGS = [
+    /^(acc|dist|accumulating|distributing|accumulation|distribution|capitalisation|capitalization)$/i, // how it treats income
+    /^(usd|eur|gbp|chf|jpy|cad|aud|sek|nok|dkk|pln|czk|huf)$/i, // the currency of the share class
+    /^\d[cd]$/i, // share class marks such as 1C or 1D
+  ];
+  const bare = (w) => w.replace(/^[(\[]+|[)\]]+$/g, "").replace(/[,;]+$/, "");
+
+  /**
+   * The compact form of a name. "UCITS" and "ETF" are dropped (not from the first word: a name may start with them), then tags at the
+   * END are dropped while there are any: a currency, Acc/Dist/Accumulating/Distributing, a share class mark, with or without brackets.
+   * "Hedged" or anything else at the end stops the dropping, so "… EUR Hedged" keeps its currency. Fewer than 3 letters left: the whole name.
+   */
+  function compact(full) {
+    const text = clean(full);
+    if (!text) return "";
+    const words = text.replace(/,/g, " ").split(/\s+/).filter(Boolean);
+    const kept = words.filter((w, i) => i === 0 || !DROP_WORD.test(bare(w)));
+    while (kept.length > 1 && TAIL_TAGS.some((re) => re.test(bare(kept[kept.length - 1])))) kept.pop();
+    const out = kept.join(" ");
+    if (kept.length === 1 && DROP_WORD.test(bare(kept[0]))) return text; // only "UCITS" or "ETF" would be left
+    const letters = (out.match(/\p{L}/gu) || []).length;
+    return letters >= 3 ? out : text;
+  }
+
+  // ---------------------------------------------------------------- the resolver
+
+  function build(input) {
+    const sec = isObj(input && input.securities) ? input.securities : {};
+    const symbols = input && input.book && input.book.store && isObj(input.book.store.symbols) ? input.book.store.symbols : {};
+    const funds = isObj(input && input.funds) ? input.funds : {};
+    const tickers = Object.keys(sec).sort(cmp);
+
+    // tickers of one security (the same ISIN), sorted
+    const group = new Map();
+    for (const t of tickers) {
+      const i = isinOf(sec[t] && sec[t].isin);
+      if (i) (group.get(i) || group.set(i, []).get(i)).push(t);
+    }
+    const keyOfTicker = (t) => isinOf(sec[t] && sec[t].isin) || "T:" + t;
+    const symbolOf = (t) => (sec[t] && typeof sec[t].yahoo === "string" ? sec[t].yahoo.trim() : "");
+
+    /** The best name known for one ticker and where it came from. */
+    function nameOfTicker(t) {
+      const e = sec[t] || {};
+      const typed = clean(e.name);
+      if (typed) return { name: typed, source: "owner" };
+      const sym = symbolOf(t);
+      const y = sym && isObj(symbols[sym]) ? clean(symbols[sym].name) : "";
+      if (y) return { name: y, source: "yahoo" };
+      const f = clean(funds[isinOf(e.isin)]);
+      if (f) return { name: f, source: "oekb" };
+      return { name: "", source: "none" };
+    }
+
+    /** The best name over the tickers of one security: the best source first, then the order of the tickers. */
+    function nameOfSecurity(ts) {
+      let best = { name: "", source: "none" };
+      for (const t of ts) {
+        const n = nameOfTicker(t);
+        if (n.name && RANK[n.source] < RANK[best.source]) best = n;
+      }
+      return best;
+    }
+
+    // one entry per security (an ISIN, or a ticker that has none)
+    const secs = new Map(); // key -> { key, isin, tickers, name, source, full, label }
+    for (const t of tickers) {
+      const k = keyOfTicker(t);
+      if (!secs.has(k)) {
+        const ts = group.get(k) || [t];
+        const n = nameOfSecurity(ts);
+        secs.set(k, { key: k, isin: group.has(k) ? k : "", tickers: ts, name: n.name, source: n.source, full: n.name || ts[0], label: n.name ? compact(n.name) : ts[0] });
+      }
+    }
+    // Labels that two different securities share: the full names; the ones still equal: the first ticker in brackets.
+    const dupes = () => {
+      const by = new Map();
+      for (const s of secs.values()) {
+        const l = s.label.toLowerCase();
+        (by.get(l) || by.set(l, []).get(l)).push(s);
+      }
+      return Array.from(by.values()).filter((g) => g.length > 1);
+    };
+    for (const g of dupes()) for (const s of g) s.label = s.full;
+    for (const g of dupes()) for (const s of g) s.label = s.full + " (" + s.tickers[0] + ")";
+
+    const infos = new Map();
+    function info(t) {
+      if (infos.has(t)) return infos.get(t);
+      let r;
+      const s = sec[t] === undefined ? null : secs.get(keyOfTicker(t));
+      if (!s) r = { level: "ticker", ticker: t, tickers: [t], isin: "", symbol: "", symbols: [], name: "", source: "none", full: t, label: t, hasName: false };
+      else {
+        const syms = Array.from(new Set(s.tickers.map(symbolOf).filter(Boolean)));
+        r = { level: "ticker", ticker: t, tickers: s.tickers.slice(), isin: s.isin, symbol: symbolOf(t), symbols: syms, name: s.name, source: s.source, full: s.full, label: s.tickers.length > 1 ? s.label + " (" + t + ")" : s.label, hasName: !!s.name };
+      }
+      infos.set(t, r);
+      return r;
+    }
+
+    const byIsin = new Map();
+    function infoIsin(isin) {
+      const i = isinOf(isin);
+      if (byIsin.has(i)) return byIsin.get(i);
+      let r;
+      const s = secs.get(i);
+      if (s && s.isin) r = { level: "isin", ticker: s.tickers[0], tickers: s.tickers.slice(), isin: i, symbol: "", symbols: Array.from(new Set(s.tickers.map(symbolOf).filter(Boolean))), name: s.name, source: s.source, full: s.full, label: s.label, hasName: !!s.name };
+      else {
+        const f = clean(funds[i]);
+        r = { level: "isin", ticker: "", tickers: [], isin: i, symbol: "", symbols: [], name: f, source: f ? "oekb" : "none", full: f || i, label: f ? compact(f) : i, hasName: !!f };
+      }
+      byIsin.set(i, r);
+      return r;
+    }
+
+    /** What the hover shows. Over one ticker (ofTicker): that ticker and its own Yahoo ticker; over a security (ofIsin): all of them. */
+    function tip(x) {
+      const own = x.level === "ticker";
+      const yahoo = own ? (x.symbol ? [x.symbol] : []) : x.symbols;
+      const files = own ? (x.ticker ? [x.ticker] : []) : x.tickers;
+      const rows = [["ISIN", x.isin || "not set yet"], ["Yahoo ticker", yahoo.length ? yahoo.join(" / ") : "not chosen yet"]];
+      if (files.length) rows.push(["Ticker in your file", files.join(" / ")]);
+      return { t: x.full, r: rows, n: SOURCE_TEXT[x.source] };
+    }
+
+    return {
+      VERSION,
+      ofTicker: (t) => info(String(t)),
+      ofIsin: infoIsin,
+      label: (t) => info(String(t)).label,
+      labelIsin: (i) => infoIsin(i).label,
+      full: (t) => info(String(t)).full,
+      fullIsin: (i) => infoIsin(i).full,
+      tip,
+    };
+  }
+
+  return { VERSION, SOURCE_TEXT, compact, build };
+});
+
+/* ---- src/app/tip.js ---- */
+/*
+ * Tip: the one hover box of the whole page (Node for the pure part, browser for the rest).
+ *
+ * Any element can carry a tip: its attribute data-tip holds the text as JSON, made by Tip.attr({ t, r, n }):
+ *   t  the title (one line)             r  rows [label, value] or [label, value, "pos" | "neg"]            n  a note under the rows
+ * The box is shown when the mouse rests on the element (after a short delay), when the element gets the keyboard focus, and, on a touch
+ * screen, when it is tapped; Esc, scrolling, a tap elsewhere and a change of window size hide it. The one exception: a box opened by the
+ * keyboard stays (and moves with its element) when the page scrolls only to bring that element into view, which is what the browser
+ * does when Tab reaches something off screen. It is one element for the page, so it can never be cut off by the card it was opened in,
+ * and it is moved into the window when it would run out of it.
+ *
+ * Text is always put in with textContent; nothing here ever builds HTML. The attribute is read back with Tip.parse(), which refuses
+ * anything that is not the expected shape, so a broken attribute shows nothing instead of failing.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.Tip = factory();
+})(typeof self !== "undefined" ? self : this, function () {
+  "use strict";
+
+  const VERSION = "tip-0.1.0";
+  const LIMIT = { title: 120, label: 60, value: 160, note: 400, rows: 16, attr: 4000 };
+  const TONES = { pos: true, neg: true };
+
+  const clip = (s, n) => {
+    const x = String(s === null || s === undefined ? "" : s).replace(/\s+/g, " ").trim();
+    return x.length > n ? x.slice(0, n - 1) + "…" : x;
+  };
+
+  /** The clean form of a tip: { t, r, n }, everything clipped, or null when there is nothing to show. */
+  function spec(x) {
+    if (!x || typeof x !== "object") return null;
+    const rows = [];
+    for (const row of Array.isArray(x.r) ? x.r : []) {
+      if (!Array.isArray(row) || rows.length >= LIMIT.rows) continue;
+      const label = clip(row[0], LIMIT.label);
+      const value = clip(row[1], LIMIT.value);
+      if (label === "" && value === "") continue;
+      rows.push(TONES[row[2]] ? [label, value, row[2]] : [label, value]);
+    }
+    const out = { t: clip(x.t, LIMIT.title), r: rows, n: clip(x.n, LIMIT.note) };
+    return out.t === "" && out.r.length === 0 && out.n === "" ? null : out;
+  }
+
+  /** The attribute text for el(): JSON, or false (the attribute is left out) when there is nothing to show. */
+  function attr(x) {
+    const s = spec(x);
+    if (!s) return false;
+    let text = JSON.stringify(s);
+    while (text.length > LIMIT.attr && s.r.length > 0) {
+      s.r.pop();
+      text = JSON.stringify(s);
+    }
+    return text.length > LIMIT.attr ? false : text;
+  }
+
+  /** The tip in an attribute text, or null when it is not one. */
+  function parse(text) {
+    if (typeof text !== "string" || text === "") return null;
+    let v;
+    try {
+      v = JSON.parse(text);
+    } catch (e) {
+      return null;
+    }
+    return spec(v); // not an object, an array, a number: spec() refuses them all
+  }
+
+  // ---------------------------------------------------------------- the box (browser only)
+
+  let box = null;
+  let anchor = null;
+  let byFocus = false; // the open box belongs to the element that has the keyboard focus
+  let timer = 0;
+  let installed = false;
+  const DELAY = 140;
+  const GAP = 8;
+
+  const interactive = (n) => !!(n.closest && n.closest("button, a, input, select, textarea, summary, label"));
+
+  function fill(s) {
+    box.textContent = "";
+    const doc = box.ownerDocument;
+    const add = (tag, cls, text) => {
+      const n = doc.createElement(tag);
+      n.className = cls;
+      n.textContent = text;
+      return n;
+    };
+    if (s.t) box.appendChild(add("div", "tip-t", s.t));
+    if (s.r.length) {
+      const rows = doc.createElement("div");
+      rows.className = "tip-rows";
+      for (const r of s.r) {
+        const line = doc.createElement("div");
+        line.className = "tip-r";
+        line.appendChild(add("span", "tip-l", r[0]));
+        line.appendChild(add("span", "tip-v" + (r[2] ? " " + r[2] : ""), r[1]));
+        rows.appendChild(line);
+      }
+      box.appendChild(rows);
+    }
+    if (s.n) box.appendChild(add("div", "tip-n", s.n));
+  }
+
+  function place() {
+    const win = box.ownerDocument.defaultView;
+    const vw = win.innerWidth;
+    const vh = win.innerHeight;
+    box.style.left = "0px";
+    box.style.top = "0px";
+    const w = box.offsetWidth;
+    const h = box.offsetHeight;
+    const r = anchor.getBoundingClientRect();
+    let left = r.left + r.width / 2 - w / 2;
+    left = Math.max(GAP, Math.min(left, vw - w - GAP));
+    let top = r.bottom + GAP;
+    if (top + h > vh - GAP) top = r.top - h - GAP;
+    if (top < GAP) top = Math.max(GAP, Math.min(vh - h - GAP, r.bottom + GAP));
+    box.style.left = Math.round(left) + "px";
+    box.style.top = Math.round(top) + "px";
+  }
+
+  /** Is any part of the element inside the window? */
+  function inWindow(n, win) {
+    const r = n.getBoundingClientRect();
+    return r.bottom > 0 && r.right > 0 && r.top < win.innerHeight && r.left < win.innerWidth;
+  }
+
+  function hide() {
+    clearTimeout(timer);
+    timer = 0;
+    if (!box) return;
+    if (anchor && anchor.removeAttribute && anchor.getAttribute("aria-describedby") === box.id) anchor.removeAttribute("aria-describedby");
+    anchor = null;
+    byFocus = false;
+    box.hidden = true;
+  }
+
+  function show(node, viaFocus) {
+    const s = parse(node.getAttribute("data-tip"));
+    if (!s) return hide();
+    if (anchor && anchor !== node && anchor.getAttribute && anchor.getAttribute("aria-describedby") === box.id) anchor.removeAttribute("aria-describedby");
+    anchor = node;
+    byFocus = !!viaFocus;
+    fill(s);
+    box.hidden = false;
+    node.setAttribute("aria-describedby", box.id);
+    place();
+  }
+
+  /** After the page was drawn again: the text of the open tip follows its element, or the tip closes when the element is gone. */
+  function refresh() {
+    if (!box || !anchor) return;
+    if (!anchor.isConnected || !parse(anchor.getAttribute("data-tip"))) return hide();
+    const s = parse(anchor.getAttribute("data-tip"));
+    fill(s);
+    place();
+  }
+
+  function install(doc) {
+    if (installed) return;
+    installed = true;
+    const win = doc.defaultView;
+    box = doc.createElement("div");
+    box.id = "tip-float";
+    box.className = "tipbox";
+    box.setAttribute("role", "tooltip");
+    box.hidden = true;
+    doc.body.appendChild(box);
+    const noHover = () => !!(win.matchMedia && win.matchMedia("(hover: none)").matches);
+    const owner = (e) => (e.target && e.target.closest ? e.target.closest("[data-tip]") : null);
+
+    doc.addEventListener("mouseover", (e) => {
+      const n = owner(e);
+      if (!n || n === anchor) return;
+      clearTimeout(timer);
+      if (anchor) show(n);
+      else timer = setTimeout(() => show(n), DELAY);
+    });
+    doc.addEventListener("mouseout", (e) => {
+      const n = owner(e);
+      if (!n) return;
+      if (e.relatedTarget && n.contains(e.relatedTarget)) return;
+      hide();
+    });
+    doc.addEventListener("focusin", (e) => {
+      const n = owner(e);
+      if (!n) return;
+      let visible = true;
+      try {
+        visible = n.matches(":focus-visible");
+      } catch (err) {
+        visible = true;
+      }
+      if (visible) show(n, true);
+    });
+    doc.addEventListener("focusout", () => hide());
+    doc.addEventListener("click", (e) => {
+      const n = owner(e);
+      if (!noHover()) return;
+      if (n && !interactive(n) && !(e.target.closest && interactive(e.target))) {
+        if (anchor === n) hide();
+        else show(n);
+      } else hide();
+    });
+    doc.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") hide();
+    });
+    // A scroll closes the box, except for a box the keyboard opened whose element is still in the window: the browser scrolls to a focused
+    // element, and the box must not vanish at the moment it appears. It is moved next to the element again instead.
+    win.addEventListener(
+      "scroll",
+      () => {
+        if (anchor && byFocus && anchor.isConnected && inWindow(anchor, win)) return place();
+        hide();
+      },
+      true
+    );
+    win.addEventListener("resize", hide);
+  }
+
+  return { VERSION, LIMIT, spec, attr, parse, install, hide, refresh, isOpen: () => !!anchor };
+});
+
+/* ---- src/app/perf-tips.js ---- */
+/*
+ * PerfTips: what the hover box says over each number of the Performance tab (Node and browser).
+ *
+ * Every builder takes figures the performance engine (perf.js) has already worked out and puts them in words and rows for Tip.attr():
+ * { t: title, r: [[label, value, tone?]], n: note }. Nothing here calculates a return, a gain or a ratio: a number that is not in the
+ * engine's output is not shown. The only arithmetic is the sign of a figure (for the green/red tone, which is never the only sign: the
+ * text always carries the sign too). Text is made with the screen's own formatters, handed in as F:
+ *   F.money(x, plus)  euro text          F.pct(x, plus)  percent text          F.date(iso)  date text
+ *   F.plural(n, one, many)  "3 sales"    F.units(x)  a number of units (unitsText below)   F.names.* is not used: names are the caller's business
+ *
+ * create(F) returns the builders; see each one for the engine output it reads.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.PerfTips = factory();
+})(typeof self !== "undefined" ? self : this, function () {
+  "use strict";
+
+  const VERSION = "perftips-0.1.0";
+  const MON = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+  /** A number of units as the screen shows it: up to four decimals (float noise cut off), thousands separated. "1234.56789" gives "1,234.5679". */
+  function unitsText(x) {
+    if (!Number.isFinite(x)) return "–";
+    const parts = String(+x.toFixed(4)).split(".");
+    return parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (parts[1] ? "." + parts[1] : "");
+  }
+
+  function create(F) {
+    const tone = (x) => (Number.isFinite(x) && Math.abs(x) >= 0.005 ? (x > 0 ? "pos" : "neg") : undefined);
+    const toneP = (x) => (Number.isFinite(x) && Math.abs(x) >= 0.00005 ? (x > 0 ? "pos" : "neg") : undefined);
+    const row = (label, value, t) => (t ? [label, value, t] : [label, value]);
+    const money = (label, x, plus) => row(label, F.money(x, plus), plus ? tone(x) : undefined);
+    const pct = (label, x, plus) => row(label, Number.isFinite(x) ? F.pct(x, plus) : "–", plus ? toneP(x) : undefined);
+    const span = (a, b) => F.date(a) + " to " + F.date(b);
+
+    // ------------------------------------------------------------ the figures of the main card
+
+    /** stats: Perf.stats of the time-frame. */
+    function twr(s) {
+      return {
+        t: "Time-weighted return",
+        r: [pct("Over the time-frame", s.twr, true), row("Per year", s.twrAnnual !== null ? F.pct(s.twrAnnual, true) : "needs a year or more", s.twrAnnual !== null ? toneP(s.twrAnnual) : undefined), row("From the close of", F.date(s.from)), row("To the close of", F.date(s.to)), row("Days", String(s.days))],
+        n: "The chain of the daily returns of what you held. It does not depend on how much you added or took out, so it shows how the holdings did.",
+      };
+    }
+
+    function mwr(s) {
+      return {
+        t: "Money-weighted return (XIRR)",
+        r: [row("Per year", s.xirr !== null ? F.pct(s.xirr, true) : "needs a year or more", s.xirr !== null ? toneP(s.xirr) : undefined), row("Over the time-frame", s.moneyWeighted !== null ? F.pct(s.moneyWeighted, true) : "not defined here", s.moneyWeighted !== null ? toneP(s.moneyWeighted) : undefined), row("Dated money flows used", s.flows ? F.plural(s.flows, "flow") + ", " + span(s.flowFrom, s.flowTo) : "none")],
+        n: "The yearly rate at which your payments and withdrawals, on their actual dates, would have grown to the value at the end. It depends on when you added money.",
+      };
+    }
+
+    /** stats, bridge of the time-frame. */
+    function gain(s, b) {
+      return {
+        t: "Gain",
+        r: [money("Gain", s.gain, true), money("Price gain not yet realised", b.unrealized, true), money("Price gain realised", b.realized, true), money("Dividends after tax at the source", b.dividendsNet, true), money("Fees", -b.fees, true), b.simple !== null ? pct("Share of the capital", b.simple, true) : row("Share of the capital", "–")],
+        n: "Value at the end, minus the value at the start, minus the money you put in, plus the money you took out, plus dividends. Before Austrian tax.",
+      };
+    }
+
+    function value(s) {
+      return {
+        t: "Value",
+        r: [money("At the end, " + F.date(s.to), s.valueEnd), row("At the start, " + F.date(s.from), s.valueStart > 0 ? F.money(s.valueStart) : "nothing held"), money("Money put in, net", s.net, true), money("Gain", s.gain, true)],
+        n: "What you hold, at the closing prices, converted to euro at the ECB rate of the day. Cash is not tracked.",
+      };
+    }
+
+    function net(s, b) {
+      return {
+        t: "Money put in, net",
+        r: [money("Paid in (purchases and fees)", s.inflow), money("Received (sales less fees)", s.outflow), money("Net", s.net, true), row("Purchases", String(b.buys)), row("Sales", String(b.sells))],
+        n: "A move between two of your own accounts is neither.",
+      };
+    }
+
+    function dividends(b) {
+      return {
+        t: "Dividends",
+        r: [money("After tax at the source", b.dividendsNet), money("Before tax at the source", b.dividendsGross), money("Withheld at the source", b.withheld)],
+        n: "Counted on the day they were paid. The Austrian tax on them is on the Tax tab.",
+      };
+    }
+
+    // ------------------------------------------------------------ where the result came from
+
+    /** key: the row's key in the breakdown; b: Perf.bridge. */
+    function bridge(key, b) {
+      switch (key) {
+        case "unreal":
+          return { t: "Price gain not yet realised", r: [money("What you still hold is worth", b.valueEnd), money("Its average cost", b.costHeld), money("Not yet realised", b.unrealized, true)], n: "The average cost is the value at the start of the time-frame for what you already held, and the price paid for what you bought later." };
+        case "real":
+          return { t: "Price gain realised", r: [money("Sales brought in", b.sold), money("Cost of the units sold", b.costSold), money("Realised", b.realized, true), row("Sales", String(b.sells))], n: "Per security the cost of the units sold is worked out with the moving average cost. This is the performance view; the taxable gain is on the Tax tab." };
+        case "div":
+          return { t: "Dividends", r: [money("Before tax at the source", b.dividendsGross), money("Withheld at the source", b.withheld), money("After tax at the source", b.dividendsNet, true)], n: "Counted on the day they were paid." };
+        case "fees":
+          return { t: "Fees", r: [money("Paid on purchases and sales", b.fees)], n: "They are part of the money you paid in and took out and they lower the gain once." };
+        case "gain":
+          return { t: "Gain", r: [money("Price gain", b.priceGain, true), money("Fees", -b.fees, true), money("Dividends", b.dividendsNet, true), money("Gain", b.gain, true), money("Capital", b.capital), b.simple !== null ? pct("Share of the capital", b.simple, true) : row("Share of the capital", "–")], n: "The capital is the value at the start plus what you paid for purchases, fees included." };
+        case "v0":
+          return { t: "Value at the start", r: [row("Close of", F.date(b.from)), money("Value", b.valueStart)], n: b.valueStart > 0 ? "" : "Nothing was held yet." };
+        case "bought":
+          return { t: "Bought", r: [row("Purchases", String(b.buys)), money("Price × units", b.bought), money("Paid in, fees included", b.inflow)], n: "" };
+        case "sold":
+          return { t: "Sold", r: [row("Sales", String(b.sells)), money("Price × units", b.sold), money("Received, fees taken off", b.outflow)], n: "" };
+        case "pg":
+          return { t: "Price gain", r: [money("Realised", b.realized, true), money("Not yet realised", b.unrealized, true), money("Price gain", b.priceGain, true)], n: "Value at the end, minus value at the start, minus what was bought plus what was sold." };
+        case "v1":
+          return { t: "Value at the end", r: [row("Close of", F.date(b.to)), money("Value", b.valueEnd)], n: "" };
+        default:
+          return null;
+      }
+    }
+
+    // ------------------------------------------------------------ ups and downs
+
+    /** max: the largest fall of Perf.drawdown (or null); cur: the distance below the high now. */
+    function fall(max) {
+      if (!max) return { t: "Largest fall", r: [], n: "The growth line never fell in this time-frame." };
+      return {
+        t: "Largest fall",
+        r: [pct("Fall", max.depth, true), row("From the high of", F.date(max.peak)), row("To the low of", F.date(max.trough)), row("Days down", String(max.downDays)), row("Back at the high", max.recovered ? F.date(max.recovered) + ", " + F.plural(max.recoveryDays, "day") + " after the low" : "not yet")],
+        n: "A fall is measured from the highest point the growth line had reached before. Money you add or take out does not hide a fall and does not cause one.",
+      };
+    }
+
+    /** f: Perf.drawdowns(...) of the time-frame. */
+    function back(max, f) {
+      const r = [];
+      if (max) r.push(row("Low", F.date(max.trough)), row("Back at the high", max.recovered ? F.date(max.recovered) : "not yet"));
+      r.push(pct("Below the high today", f.current.depth, true), row("Highest point", F.date(f.current.high)));
+      if (f.current.since > 0) r.push(row("Days since the high", String(f.current.since)));
+      return { t: "Back at the high", r, n: max ? "The day the growth line first got back to the level it had before its largest fall." : "There was no fall to get back from." };
+    }
+
+    /** rk: Perf.risk. */
+    function vol(rk) {
+      return { t: "Volatility", r: [row("Per year", rk.vol !== null ? F.pct(rk.vol) : "needs 60 days or more"), row("Daily returns used", String(rk.days))], n: "How much the daily returns jump around: their standard deviation times the square root of 365 (calendar days, so a weekend counts as a day of no return)." };
+    }
+
+    function day(label, d) {
+      if (!d) return { t: label, r: [], n: "Needs a day with something held." };
+      return { t: label, r: [pct("Return", d.r, true), row("On", F.date(d.day))], n: "The time-weighted return of that one day." };
+    }
+
+    function months(rk) {
+      if (!rk.months) return { t: "Months with a gain", r: [], n: "Needs at least one whole calendar month inside the time-frame." };
+      return {
+        t: "Months with a gain",
+        r: [row("Whole months", String(rk.months)), row("With a gain", String(rk.monthsUp)), row("Best", MON[rk.bestMonth.month - 1] + " " + rk.bestMonth.year + ", " + F.pct(rk.bestMonth.twr, true), toneP(rk.bestMonth.twr)), row("Worst", MON[rk.worstMonth.month - 1] + " " + rk.worstMonth.year + ", " + F.pct(rk.worstMonth.twr, true), toneP(rk.worstMonth.twr))],
+        n: "Only whole calendar months inside the time-frame count.",
+      };
+    }
+
+    /** one of the three ratios; ra: Perf.riskAdjusted. */
+    function ratio(kind, ra) {
+      const days = row("Daily returns used", String(ra.days));
+      const rate = pct("Risk-free rate per year", ra.rf);
+      if (kind === "sharpe") {
+        return {
+          t: "Sharpe ratio",
+          r: ra.sharpe !== null ? [row("Sharpe ratio", ra.sharpe.toFixed(2)), pct("Return above the risk-free rate, per year", ra.excess, true), pct("Volatility per year", ra.vol), rate, days] : [rate, days],
+          n: ra.sharpe !== null ? "The average daily return above the risk-free rate, divided by the standard deviation of the daily returns, scaled to a year (× √365). Above 0 means you were paid for the ups and downs." : ra.why.sharpe,
+        };
+      }
+      if (kind === "sortino") {
+        return {
+          t: "Sortino ratio",
+          r: ra.sortino !== null ? [row("Sortino ratio", ra.sortino.toFixed(2)), pct("Return above the risk-free rate, per year", ra.excess, true), pct("Downside deviation per year", ra.downside), rate, days] : [rate, days],
+          n: ra.sortino !== null ? "Like the Sharpe ratio, but only days below the risk-free rate count as risk (the root of the average squared shortfall, × √365). Good days are not punished." : ra.why.sortino,
+        };
+      }
+      return {
+        t: "Calmar ratio",
+        r: ra.calmar !== null ? [row("Calmar ratio", ra.calmar.toFixed(2)), pct("Return per year", ra.annual, true), pct("Largest fall", -ra.fall, true)] : [],
+        n: ra.calmar !== null ? "The time-weighted return per year divided by the largest fall of the time-frame. It says how much return you got for the worst stretch you sat through." : ra.why.calmar,
+      };
+    }
+
+    /** one fall of Perf.drawdowns().episodes; title: another heading than "Fall of …" (for the longest stretch below a high). */
+    function episode(e, title) {
+      return {
+        t: title || "Fall of " + F.pct(e.depth),
+        r: [pct("Fall", e.depth, true), row("From the high of", F.date(e.peak)), row("To the low of", F.date(e.trough)), row("Days down", String(e.downDays)), row("Back at the high", e.recovered ? F.date(e.recovered) : "not yet"), row("Days to recover", e.recoveryDays !== null ? String(e.recoveryDays) : "–"), row("Days below the high", String(e.belowDays))],
+        n: e.open ? "Not over yet: the growth line is still below that high." : "",
+      };
+    }
+
+    /** f: Perf.drawdowns(...): where the growth line stands on the last day of the time-frame. */
+    function now(f) {
+      const r = [pct("Below the high", f.current.depth, true), row("Highest point", F.date(f.current.high))];
+      if (f.current.since > 0) r.push(row("Days since the high", String(f.current.since)));
+      return { t: "Below the high today", r, n: f.current.since > 0 ? "How far the growth line is below the highest point it has reached, on the last day of the time-frame." : "The last day of the time-frame is at the highest point the growth line has reached." };
+    }
+
+    /** f: Perf.drawdowns(...): how many falls there were. */
+    function count(f) {
+      return { t: "Falls of 1 % or more", r: [row("Number of falls", String(f.count)), row("Listed below", String(f.episodes.length))], n: "A fall starts on the first day the growth line is below its latest high and ends on the day it is back there. Shallower falls are not counted, and only the deepest ones are listed." };
+    }
+
+    // ------------------------------------------------------------ periods, months, securities
+
+    /** The rows of a period without its return (a chart shows that already): what the tooltip of a bar adds. r: a row of Perf.periods(). */
+    function periodRows(r) {
+      return [row("From the close of", F.date(r.from)), row("To the close of", F.date(r.to)), money("Gain", r.gain, true), money("Money put in, net", r.net, true), money("Dividends", r.dividends), money("Value at the end", r.valueEnd)];
+    }
+
+    /** r: a row of Perf.periods(), Perf.months() or Perf.years(); title: "March 2024". */
+    function period(r, title, hint) {
+      const rows = periodRows(r);
+      rows.splice(2, 0, r.held === false ? row("Return", "nothing held") : pct("Return", r.twr, true));
+      return {
+        t: title,
+        r: rows,
+        n: [r.partial ? "Not a whole " + (r.unit === "year" || r.month === undefined ? "year" : "month") + "." : "", hint || ""].filter(Boolean).join(" "),
+      };
+    }
+
+    /** r: a row of Perf.byTicker(); name: the security's name; ids: more rows (ISIN, Yahoo ticker) the caller has, put last. */
+    function security(r, name, ids) {
+      return {
+        t: name,
+        r: [row("Units held", r.held ? F.units(r.units) : "sold"), money("Value at the end", r.valueEnd), row("Share of the value", r.held ? (r.weight * 100).toFixed(1) + " %" : "–"), money("Value at the start", r.valueStart), money("Paid in", r.inflow), money("Received", r.outflow), money("Dividends", r.dividends), money("Gain", r.gain, true), pct("Return", r.twr, true), row("Prices in", r.currency || "–")].concat(Array.isArray(ids) ? ids : []),
+        n: r.valuedBy === "TRADES" ? "No market prices: its value changes only on the days you traded." : "The return is the security's own time-weighted return over the time-frame, from the day you bought it if that was later.",
+      };
+    }
+
+    return { twr, mwr, gain, value, net, dividends, bridge, fall, back, vol, day, months, ratio, episode, now, count, periodRows, period, security };
+  }
+
+  return { VERSION, create, unitsText };
+});
+
 /* ---- src/app/charts.js ---- */
 /*
  * Charts: small SVG charts for the tracker, drawn without a library.
@@ -10436,6 +11340,10 @@ span.hc { cursor: default; }
  * the baseline, a 2 px gap between neighbours, 2 px lines with ringed markers, hairline grid, one axis only, a legend
  * whenever there are two or more series, text in ink colours (never the series colour), hover and keyboard focus show
  * the exact values, and every chart has a table twin (see tableOf). All colours come from CSS variables of the page.
+ *
+ * The look: lines and bars have a soft glow (a blurred copy under them), bars are lit at the data end, an area fades out, the value at the
+ * right end of each line sits in a small pill, and the legend of several lines is a row of buttons that hide and show them (the axis follows).
+ * The glow is only light: it is switched off for forced colours and high contrast (CSS), and every mark keeps its own solid colour.
  *
  * Drawing uses plain numbers; the exact amounts shown in tooltips and tables are passed in as text.
  * Runs in a browser (needs `document`); the pure helpers (niceScale, barPath) also run in Node for tests.
@@ -10599,6 +11507,8 @@ span.hc { cursor: default; }
 
   // ---------------------------------------------------------------- DOM helpers
 
+  let uid = 0; // makes the ids of the gradients and filters of the charts of one page different
+
   function h(tag, attrs, kids) {
     const n = document.createElement(tag);
     for (const k of Object.keys(attrs || {})) {
@@ -10617,15 +11527,67 @@ span.hc { cursor: default; }
     return n;
   }
 
-  function legend(series) {
-    return h("ul", { class: "legend", "aria-label": "Legend" }, series.map((x) => {
-      const sw = h("span", { class: "swatch" });
-      sw.style.background = x.color;
-      return h("li", {}, [sw, h("span", { text: x.name })]);
-    }));
+  /**
+   * The definitions of one drawing: the glow filter (a blurred copy under a line or a bar; its region is the whole drawing, so that a
+   * flat line, which has no height, is not cut away) and the gradients. Every id carries the number of the drawing.
+   */
+  function defsOf(svg, W, H) {
+    const id = "ch" + ++uid;
+    const defs = s("defs", {}, svg);
+    const f = s("filter", { id: id + "-glow", filterUnits: "userSpaceOnUse", x: -24, y: -24, width: W + 48, height: H + 48 }, defs);
+    s("feGaussianBlur", { stdDeviation: 4.5 }, f);
+    let n = 0;
+    return {
+      glow: "url(#" + id + "-glow)",
+      /** A gradient of one colour from opacity a0 to a1: dir "v" (top to bottom) or "h" (left to right); box { x1, y1, x2, y2 } in drawing units instead of the shape's own box. */
+      gradient(color, a0, a1, dir, box) {
+        const gid = id + "-g" + ++n;
+        const g = s("linearGradient", box ? { id: gid, gradientUnits: "userSpaceOnUse", x1: box.x1, y1: box.y1, x2: box.x2, y2: box.y2 } : { id: gid, x1: 0, y1: 0, x2: dir === "h" ? 1 : 0, y2: dir === "h" ? 0 : 1 }, defs);
+        for (const [off, a] of [[0, a0], [1, a1]]) {
+          const e = s("stop", { offset: off, "stop-opacity": a }, g);
+          e.style.stopColor = color;
+        }
+        return "url(#" + gid + ")";
+      },
+    };
   }
 
-  /** Tooltip that follows keyboard focus and the pointer. Text only (textContent), never markup. */
+  /**
+   * The legend. With opts.toggle it is a row of buttons that hide and show lines (the axis follows what is shown); the state of a button is
+   * aria-pressed, and a hidden one is also struck through, so it never rests on colour alone. sync() puts the state of opts.hidden on them.
+   */
+  function legend(series, opts) {
+    const toggle = opts && opts.toggle;
+    const ul = h("ul", { class: "legend" + (toggle ? " toggles" : ""), "aria-label": "Legend" }, series.map((x) => {
+      const sw = h("span", { class: "swatch" + (x.dash ? " dash" : "") });
+      sw.style.background = x.color;
+      if (!toggle) return h("li", {}, [sw, h("span", { text: x.name })]);
+      const b = h("button", { type: "button", class: "lg", "data-name": x.name, "aria-pressed": "true", title: "Show or hide: " + x.name }, [sw, h("span", { text: x.name })]);
+      b.addEventListener("click", () => toggle(x.name));
+      return h("li", {}, [b]);
+    }));
+    return ul;
+  }
+
+  function syncLegend(ul, hidden) {
+    for (const b of Array.from(ul.querySelectorAll("button.lg"))) b.setAttribute("aria-pressed", String(!hidden.has(b.getAttribute("data-name"))));
+  }
+
+  // what the owner switched off in a legend stays off when the chart is drawn again (a redraw of the page makes new charts)
+  const hiddenMemo = new Map();
+  function hiddenFor(key, names) {
+    const set = (key && hiddenMemo.get(key)) || new Set();
+    for (const nm of Array.from(set)) if (names.indexOf(nm) < 0) set.delete(nm);
+    if (set.size >= names.length) set.clear();
+    if (key) {
+      hiddenMemo.delete(key);
+      hiddenMemo.set(key, set);
+      if (hiddenMemo.size > 40) hiddenMemo.delete(hiddenMemo.keys().next().value);
+    }
+    return set;
+  }
+
+  /** Tooltip that follows keyboard focus and the pointer. Text only (textContent), never markup. Rows: { name, value, color?, tone?, plain? }. */
   function makeTip(wrap) {
     const tip = h("div", { class: "tip", role: "status", hidden: "" });
     wrap.appendChild(tip);
@@ -10634,14 +11596,14 @@ span.hc { cursor: default; }
         tip.textContent = "";
         tip.appendChild(h("div", { class: "tip-title", text: title }));
         for (const r of rows) {
-          const line = h("div", { class: "tip-row" });
+          const line = h("div", { class: "tip-row" + (r.plain ? " plain" : "") });
           if (r.color) {
             const sw = h("span", { class: "swatch" });
             sw.style.background = r.color;
             line.appendChild(sw);
           }
           line.appendChild(h("span", { class: "tip-name", text: r.name }));
-          line.appendChild(h("span", { class: "tip-val", text: r.value }));
+          line.appendChild(h("span", { class: "tip-val" + (r.tone ? " " + r.tone : ""), text: r.value }));
           tip.appendChild(line);
         }
         tip.hidden = false;
@@ -10655,18 +11617,20 @@ span.hc { cursor: default; }
     };
   }
 
-  /** Re-draws when the container width changes. */
+  const plainRows = (list) => (list || []).map((r) => ({ name: r[0], value: r[1], tone: r[2], plain: true }));
+
+  /** Re-draws when the container width changes. The function it returns draws at once (force: also when the width is the same). */
   function responsive(wrap, draw) {
     let last = -1;
-    const go = () => {
+    const go = (force) => {
       const w = Math.floor(wrap.clientWidth);
-      if (w < 40 || w === last) return;
+      if (w < 40 || (w === last && force !== true)) return;
       last = w;
       draw(w);
     };
     // Drawn in the next frame: drawing inside the observer callback can change the size it watches and the browser then reports a loop.
-    if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => (typeof requestAnimationFrame === "function" ? requestAnimationFrame(go) : go())).observe(wrap);
-    else if (typeof window !== "undefined") window.addEventListener("resize", go);
+    if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => (typeof requestAnimationFrame === "function" ? requestAnimationFrame(() => go()) : go())).observe(wrap);
+    else if (typeof window !== "undefined") window.addEventListener("resize", () => go());
     go();
     return go;
   }
@@ -10680,8 +11644,10 @@ span.hc { cursor: default; }
    *   mode: "grouped" | "stacked" | "split"   (split: one series, colour by sign: colorPos / colorNeg)
    *   colorPos, colorNeg, height, ariaLabel, totalTexts (stacked: text of each total), labelMax: true,
    *   tickLabels: ["Jan\n2024", "Feb", "", ...] (text under the bars when it should be shorter than the category, which stays the title of
-   *   the tip; "\n" starts a second line; an empty one is left out)
+   *   the tip; "\n" starts a second line; an empty one is left out),
+   *   details: [[["Gain", "+€5.00", "pos"], ...], ...] (rows under the values of each category in the tooltip: label, text, tone)
    * }
+   * Grouped and split bars are lit at the data end and have a soft glow; stacked segments are flat (neighbours of different colours).
    */
   function bars(opts) {
     const series = opts.series;
@@ -10702,6 +11668,7 @@ span.hc { cursor: default; }
       const pw = W - ml - mr, ph = H - mt - mb;
       const svg = s("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": opts.ariaLabel || "Chart" });
       wrap.insertBefore(svg, wrap.firstChild);
+      const defs = defsOf(svg, W, H);
 
       // value range
       let lo = 0, hi = 0;
@@ -10726,6 +11693,21 @@ span.hc { cursor: default; }
       const groupW = bw * k + GAP * (k - 1);
       const zero = y(0);
 
+      // the glow layer lies under the bars; every bar adds a blurred copy of itself to it
+      const lit = mode !== "stacked";
+      const glowLayer = lit ? s("g", { class: "barglow", filter: defs.glow }, svg) : null;
+      const grads = {};
+      const bar = (g, d, color, up) => {
+        const p = s("path", { d, class: "bar" }, g);
+        if (lit) {
+          const key = color + (up ? "u" : "d");
+          const gr = grads[key] || (grads[key] = up ? defs.gradient(color, 1, 0.62, "v") : defs.gradient(color, 0.62, 1, "v"));
+          p.style.fill = gr;
+          s("path", { d }, glowLayer).style.fill = color;
+        } else p.style.fill = color;
+        return p;
+      };
+
       // direct label: the largest bar only
       let maxI = 0, maxS = 0, maxV = 0;
       series.forEach((x, si) => x.values.forEach((v, i) => { const a = mode === "stacked" ? totals[i] : Math.abs(v); if (a > maxV) { maxV = a; maxI = i; maxS = si; } }));
@@ -10738,13 +11720,11 @@ span.hc { cursor: default; }
           series.forEach((x, si) => {
             const v = x.values[i] || 0;
             const bx = gx + si * (bw + GAP);
-            const p = s("path", { d: barPath(bx, bw, zero, y(v)), class: "bar" }, g);
-            p.style.fill = x.color;
+            bar(g, barPath(bx, bw, zero, y(v)), x.color, v >= 0);
           });
         } else if (mode === "split") {
           const v = series[0].values[i] || 0;
-          const p = s("path", { d: barPath(gx, bw, zero, y(v)), class: "bar" }, g);
-          p.style.fill = v < 0 ? opts.colorNeg : opts.colorPos;
+          bar(g, barPath(gx, bw, zero, y(v)), v < 0 ? opts.colorNeg : opts.colorPos, v >= 0);
         } else {
           let acc = 0;
           const lastNonZero = series.reduce((m, x, si) => ((x.values[i] || 0) > 0 ? si : m), -1);
@@ -10755,8 +11735,7 @@ span.hc { cursor: default; }
             const gap = acc === 0 ? 0 : GAP;
             const top = si === lastNonZero;
             const d = top ? barPath(gx, bw, y0 - gap, y1) : "M" + gx + " " + (y0 - gap) + "V" + (y1 + 0) + "H" + (gx + bw) + "V" + (y0 - gap) + "Z";
-            const p = s("path", { d, class: "bar" }, g);
-            p.style.fill = x.color;
+            bar(g, d, x.color, true);
             acc += v;
           });
         }
@@ -10764,9 +11743,9 @@ span.hc { cursor: default; }
         const tl = opts.tickLabels ? opts.tickLabels[i] : c;
         if (tl) {
           const parts = tl.split("\n");
-          parts.forEach((part, k) => {
+          parts.forEach((part, kk) => {
             // with a second line anywhere, every first line sits on the upper row and the second lines on the lower one
-            const xl = s("text", { x: cx, y: twoLines ? H - 19 + k * 12 : H - 7, class: "tick", "text-anchor": "middle" }, svg);
+            const xl = s("text", { x: cx, y: twoLines ? H - 19 + kk * 12 : H - 7, class: "tick", "text-anchor": "middle" }, svg);
             xl.textContent = part;
           });
         }
@@ -10784,8 +11763,9 @@ span.hc { cursor: default; }
         // hit area: the whole band, keyboard focusable
         const rows = series.map((x) => ({ name: x.name, color: mode === "split" ? (x.values[i] < 0 ? opts.colorNeg : opts.colorPos) : x.color, value: (x.texts && x.texts[i]) || String(x.values[i]) }));
         if (mode === "stacked" && opts.totalTexts) rows.push({ name: "Total", value: opts.totalTexts[i] });
-        const hit = s("rect", { x: ml + band * i, y: mt, width: band, height: ph + mb, class: "hit", tabindex: 0, role: "img", "aria-label": c + ": " + rows.map((r) => r.name + " " + r.value).join(", ") }, svg);
-        const on = () => tipper.show(c, rows, cx);
+        const more = plainRows(opts.details && opts.details[i]);
+        const hit = s("rect", { x: ml + band * i, y: mt, width: band, height: ph + mb, class: "hit", tabindex: 0, role: "img", "aria-label": c + ": " + rows.concat(more).map((r) => r.name + " " + r.value).join(", ") }, svg);
+        const on = () => tipper.show(c, rows.concat(more), cx);
         hit.addEventListener("mouseenter", on);
         hit.addEventListener("focus", on);
         hit.addEventListener("mouseleave", () => tipper.hide());
@@ -10814,6 +11794,7 @@ span.hc { cursor: default; }
       const pw = W - ml - mr, ph = H - mt - mb;
       const svg = s("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": opts.ariaLabel || "Chart" });
       wrap.insertBefore(svg, wrap.firstChild);
+      const defs = defsOf(svg, W, H);
       const sc = niceScale(Math.min.apply(null, opts.values), Math.max.apply(null, opts.values), 4);
       const y = (v) => mt + ph - ((v - sc.min) / (sc.max - sc.min)) * ph;
       const band = pw / cats.length;
@@ -10824,6 +11805,7 @@ span.hc { cursor: default; }
         lab.textContent = compactEuro(t);
       }
       const d = opts.values.map((v, i) => (i ? "L" : "M") + xs[i] + " " + y(v)).join("");
+      s("path", { d, class: "lineglow", filter: defs.glow }, svg).style.stroke = opts.color;
       const path = s("path", { d, class: "line" }, svg);
       path.style.stroke = opts.color;
       const cross = s("line", { class: "cross", y1: mt, y2: mt + ph, x1: 0, x2: 0, style: "display:none" }, svg);
@@ -10918,10 +11900,14 @@ span.hc { cursor: default; }
   /**
    * One to four lines over a stretch of days, many points (the caller thins them): the value of a portfolio, the growth of 100.
    * The pointer, a finger or the arrow keys move a cross hair that shows the exact values of that day.
-   * opts: { days: ["YYYY-MM-DD", ...], series: [{ name, color, values: [number...], dash }], format: (number) => text (axis and tooltip),
-   *         zero: true (the axis includes zero), dateText: (iso) => text for the title of the tooltip, height, ariaLabel,
+   * opts: { days: ["YYYY-MM-DD", ...], series: [{ name, color, values: [number...], dash, texts, area, fade }], format: (number) => text (axis and
+   *         tooltip), zero: true (the axis includes zero), dateText: (iso) => text for the title of the tooltip, height, ariaLabel,
    *         band: { a, b, up, down } shades the gap between series a and series b (colours for a above b and a below b),
-   *         a series can have area: true to shade between its line and zero }
+   *         a series with area: true shades between its line and zero (stronger the further from zero), with fade: true under its line,
+   *         key: a name that keeps what the owner switched off in the legend when the chart is drawn again,
+   *         rows: (index) => [[label, text, tone?], ...] more rows for the tooltip of a day }
+   * With two or more lines the legend is a row of buttons that hide and show a line; the axis follows what is shown (the last line stays).
+   * Every line has a soft glow under it, the value of each line at its right end sits in a small pill, and the cross hair rings the points.
    */
   function timeLines(opts) {
     const days = opts.days;
@@ -10930,7 +11916,22 @@ span.hc { cursor: default; }
     const n = days.length;
     const wrap = h("div", { class: "chart-wrap" });
     const box = h("figure", { class: "chart" }, []);
-    if (series.length > 1) box.appendChild(legend(series));
+    const hidden = hiddenFor(opts.key, series.map((x) => x.name));
+    let legendNode = null;
+    let redraw = () => {};
+    if (series.length > 1) {
+      legendNode = legend(series, {
+        toggle: (name) => {
+          if (hidden.has(name)) hidden.delete(name);
+          else if (series.length - hidden.size > 1) hidden.add(name);
+          else return;
+          syncLegend(legendNode, hidden);
+          redraw(true);
+        },
+      });
+      syncLegend(legendNode, hidden);
+      box.appendChild(legendNode);
+    }
     box.appendChild(wrap);
     const tipper = makeTip(wrap);
     let current = n - 1;
@@ -10939,14 +11940,18 @@ span.hc { cursor: default; }
     function draw(W) {
       for (const x of Array.from(wrap.querySelectorAll("svg"))) x.remove();
       const H = opts.height || 220;
+      const vis = series.map((x, i) => i).filter((i) => !hidden.has(series[i].name));
       const mt = 14, mb = 24, ml = 50;
       const endTexts = series.map((x) => fmt(x.values[n - 1]));
-      const mr = series.length <= 4 ? Math.min(78, Math.max(14, Math.round(endTexts.reduce((m, t) => Math.max(m, t.length), 0) * 7 + 10))) : 14;
+      const pills = vis.length <= 4;
+      const pillW = (i) => Math.round(endTexts[i].length * 6.8 + 24);
+      const mr = pills ? Math.min(100, Math.max(14, Math.max.apply(null, vis.map(pillW)) + 12)) : 14;
       const pw = W - ml - mr, ph = H - mt - mb;
       const svg = s("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H, role: "group", "aria-label": (opts.ariaLabel || "Chart") + ". Use the left and right arrow keys to read the values of each day." });
       wrap.insertBefore(svg, wrap.firstChild);
+      const defs = defsOf(svg, W, H);
       let lo = Infinity, hi = -Infinity;
-      for (const x of series) for (const v of x.values) { if (v < lo) lo = v; if (v > hi) hi = v; }
+      for (const i of vis) for (const v of series[i].values) { if (v < lo) lo = v; if (v > hi) hi = v; }
       if (opts.zero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
       const sc = niceScaleFree(lo, hi, 4);
       const y = (v) => mt + ph - ((v - sc.min) / (sc.max - sc.min)) * ph;
@@ -10959,57 +11964,88 @@ span.hc { cursor: default; }
         lab.textContent = fmt(t);
       }
       s("line", { x1: ml, x2: W - mr, y1: mt + ph, y2: mt + ph, class: "axis" }, svg);
-      if (opts.band) {
+      if (opts.band && vis.indexOf(opts.band.a) >= 0 && vis.indexOf(opts.band.b) >= 0) {
         const bp = bandPaths(series[opts.band.a].values, series[opts.band.b].values, xs, y);
         if (bp.up) s("path", { d: bp.up, class: "band" }, svg).style.fill = opts.band.up;
         if (bp.down) s("path", { d: bp.down, class: "band" }, svg).style.fill = opts.band.down;
       }
-      series.forEach((x) => {
-        if (!x.area) return;
-        const edge = x.values.map((v, i) => xs[i].toFixed(1) + " " + y(v).toFixed(1)).join("L");
-        s("path", { d: "M" + xs[0].toFixed(1) + " " + y(0).toFixed(1) + "L" + edge + "L" + xs[n - 1].toFixed(1) + " " + y(0).toFixed(1) + "Z", class: "band" }, svg).style.fill = x.color;
-      });
+      for (const i of vis) {
+        const x = series[i];
+        if (!x.area && !x.fade) continue;
+        const edge = x.values.map((v, k) => xs[k].toFixed(1) + " " + y(v).toFixed(1)).join("L");
+        let base;
+        let fill;
+        if (x.fade) {
+          base = mt + ph;
+          const top = Math.min.apply(null, x.values.map(y));
+          fill = defs.gradient(x.color, 0.34, 0, "v", { x1: 0, y1: top, x2: 0, y2: base });
+        } else {
+          base = y(0);
+          let ext = 0;
+          for (const v of x.values) if (Math.abs(v) > Math.abs(ext)) ext = v;
+          fill = ext === 0 ? x.color : defs.gradient(x.color, 0.05, 0.42, "v", { x1: 0, y1: base, x2: 0, y2: y(ext) });
+        }
+        s("path", { d: "M" + xs[0].toFixed(1) + " " + base.toFixed(1) + "L" + edge + "L" + xs[n - 1].toFixed(1) + " " + base.toFixed(1) + "Z", class: "area" }, svg).style.fill = fill;
+      }
       for (const t of timeTicks(days[0], days[n - 1], Math.max(2, Math.floor(pw / 70)))) {
         const tx = xOf(t.day);
         const lab = s("text", { x: Math.min(Math.max(tx, ml + 14), W - mr - 14), y: H - 7, class: "tick", "text-anchor": "middle" }, svg);
         lab.textContent = t.label;
       }
-      series.forEach((x) => {
-        const d = x.values.map((v, i) => (i ? "L" : "M") + xs[i].toFixed(1) + " " + y(v).toFixed(1)).join("");
+      for (const i of vis) {
+        const x = series[i];
+        const d = x.values.map((v, k) => (k ? "L" : "M") + xs[k].toFixed(1) + " " + y(v).toFixed(1)).join("");
+        const gl = s("path", { d, class: "lineglow", filter: defs.glow }, svg);
+        gl.style.stroke = x.color;
+        if (x.dash) gl.setAttribute("stroke-dasharray", "6 4");
+      }
+      for (const i of vis) {
+        const x = series[i];
+        const d = x.values.map((v, k) => (k ? "L" : "M") + xs[k].toFixed(1) + " " + y(v).toFixed(1)).join("");
         const p = s("path", { d, class: "line" }, svg);
         p.style.stroke = x.color;
         if (x.dash) p.setAttribute("stroke-dasharray", "6 4");
-      });
-      // the value at the right end of every line (at most four lines), pushed apart where they would touch
-      if (series.length <= 4) {
-        const ends = series.map((x, i) => ({ i, y: y(x.values[n - 1]) })).sort((p, q) => p.y - q.y);
-        for (let k = 1; k < ends.length; k++) if (ends[k].y - ends[k - 1].y < 14) ends[k].y = ends[k - 1].y + 14;
+      }
+      // the value at the right end of every line (at most four lines) in a small pill, pushed apart where they would touch
+      if (pills) {
+        const ends = vis.map((i) => ({ i, y: y(series[i].values[n - 1]) })).sort((p, q) => p.y - q.y);
+        for (let k = 1; k < ends.length; k++) if (ends[k].y - ends[k - 1].y < 22) ends[k].y = ends[k - 1].y + 22;
         for (const e of ends) {
-          const lab = s("text", { x: xs[n - 1] + 8, y: e.y + 4, class: "dlabel", "text-anchor": "start" }, svg);
-          lab.textContent = endTexts[e.i];
+          const g = s("g", { class: "pill", transform: "translate(" + (xs[n - 1] + 8).toFixed(1) + " " + (Math.min(e.y, mt + ph + 6) - 10).toFixed(1) + ")" }, svg);
+          s("rect", { width: pillW(e.i), height: 20, rx: 10, class: "pill-bg" }, g).style.stroke = series[e.i].color;
+          s("circle", { cx: 10, cy: 10, r: 3.5 }, g).style.fill = series[e.i].color;
+          s("text", { x: 19, y: 14.2, class: "pill-t" }, g).textContent = endTexts[e.i];
         }
       }
       const cross = s("line", { class: "cross", y1: mt, y2: mt + ph, x1: 0, x2: 0, style: "display:none" }, svg);
+      const rings = series.map((x) => {
+        const r = s("circle", { r: 9, class: "marker-halo", style: "display:none" }, svg);
+        r.style.fill = x.color;
+        return r;
+      });
       const marks = series.map((x) => {
-        const m = s("circle", { r: 4, class: "marker", style: "display:none" }, svg);
+        const m = s("circle", { r: 4.5, class: "marker", style: "display:none" }, svg);
         m.style.fill = x.color;
         return m;
       });
-      const show = (i) => {
-        current = Math.max(0, Math.min(n - 1, i));
+      const show = (k) => {
+        current = Math.max(0, Math.min(n - 1, k));
         cross.setAttribute("x1", xs[current]);
         cross.setAttribute("x2", xs[current]);
         cross.style.display = "";
-        series.forEach((x, k) => {
-          marks[k].setAttribute("cx", xs[current]);
-          marks[k].setAttribute("cy", y(x.values[current]));
-          marks[k].style.display = "";
-        });
-        tipper.show((opts.dateText || String)(days[current]), series.map((x) => ({ name: x.name, color: x.color, value: x.texts && x.texts[current] ? x.texts[current] : fmt(x.values[current]) })), xs[current]);
+        for (const i of vis) {
+          for (const node of [marks[i], rings[i]]) {
+            node.setAttribute("cx", xs[current]);
+            node.setAttribute("cy", y(series[i].values[current]));
+            node.style.display = "";
+          }
+        }
+        const rows = vis.map((i) => ({ name: series[i].name, color: series[i].color, value: series[i].texts && series[i].texts[current] ? series[i].texts[current] : fmt(series[i].values[current]) }));
+        tipper.show((opts.dateText || String)(days[current]), rows.concat(plainRows(opts.rows ? opts.rows(current) : null)), xs[current]);
       };
       const hide = () => {
         cross.style.display = "none";
-        for (const m of marks) m.style.display = "none";
+        for (const m of marks.concat(rings)) m.style.display = "none";
         tipper.hide();
       };
       const hit = s("rect", { x: ml, y: mt, width: Math.max(1, pw), height: ph + mb, class: "hit", tabindex: 0, role: "img", "aria-label": (opts.ariaLabel || "Chart") + ". Use the left and right arrow keys to read the values of each day.", style: "touch-action: pan-y" }, svg);
@@ -11046,15 +12082,16 @@ span.hc { cursor: default; }
         show(i);
       });
     }
-    responsive(wrap, draw);
+    redraw = responsive(wrap, draw);
     return box;
   }
 
   // ---------------------------------------------------------------- horizontal bars
 
   /**
-   * One series, one bar per item, value at the bar end. opts: { items: [{ label, value, text, tip }], color, ariaLabel,
-   * colorNeg (the colour of the bars below zero, which go to the left of the zero line) }
+   * One series, one bar per item, value at the bar end. opts: { items: [{ label, value, text, tip, title, details }], color, ariaLabel,
+   * colorNeg (the colour of the bars below zero, which go to the left of the zero line) }.
+   * label: the text at the bar (cut to fit); title: the head of the tooltip (default the label); details: [[label, text, tone?], ...] more rows for it.
    */
   function hbars(opts) {
     const items = opts.items;
@@ -11065,7 +12102,7 @@ span.hc { cursor: default; }
       for (const n of Array.from(wrap.querySelectorAll("svg"))) n.remove();
       const rowH = 34;
       const H = items.length * rowH + 8;
-      const labelW = Math.min(150, Math.max(90, W * 0.34));
+      const labelW = Math.min(200, Math.max(90, W * 0.4));
       const ml = labelW + 8, mr = 70;
       const vals = items.map((x) => x.value);
       const max = Math.max.apply(null, vals.concat([1]));
@@ -11077,14 +12114,22 @@ span.hc { cursor: default; }
       const x0 = pl + (-min / span) * pw;
       const svg = s("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": opts.ariaLabel || "Chart" });
       wrap.insertBefore(svg, wrap.firstChild);
+      const defs = defsOf(svg, W, H);
       s("line", { x1: x0, x2: x0, y1: 0, y2: H, class: "axis" }, svg);
+      const glowLayer = s("g", { class: "barglow", filter: defs.glow }, svg);
+      const grads = {};
       items.forEach((it, i) => {
         const cy = 4 + i * rowH;
         const bh = Math.min(MAX_BAR, rowH - 10);
         const by = cy + (rowH - bh) / 2;
         const w = (it.value / span) * pw;
-        const p = s("path", { d: hBarPath(by, bh, x0, x0 + w), class: "bar" }, svg);
-        p.style.fill = it.value < 0 && opts.colorNeg ? opts.colorNeg : opts.color;
+        const color = it.value < 0 && opts.colorNeg ? opts.colorNeg : opts.color;
+        const d = hBarPath(by, bh, x0, x0 + w);
+        const p = s("path", { d, class: "bar" }, svg);
+        // lit at the data end: the end of the bar is the strong one, whichever way it points
+        const key = color + (w < 0 ? "l" : "r");
+        p.style.fill = grads[key] || (grads[key] = w < 0 ? defs.gradient(color, 0.62, 1, "h") : defs.gradient(color, 1, 0.62, "h"));
+        s("path", { d }, glowLayer).style.fill = color;
         const lab = s("text", { x: ml - 8, y: by + bh / 2 + 4, class: "tick lab", "text-anchor": "end" }, svg);
         let t = it.label;
         const maxChars = Math.floor(labelW / 7);
@@ -11092,8 +12137,9 @@ span.hc { cursor: default; }
         lab.textContent = t;
         const val = s("text", { x: w < 0 ? x0 + w - 6 : x0 + w + 6, y: by + bh / 2 + 4, class: "dlabel", "text-anchor": w < 0 ? "end" : "start" }, svg);
         val.textContent = it.text;
-        const hit = s("rect", { x: 0, y: cy, width: W, height: rowH, class: "hit", tabindex: 0, role: "img", "aria-label": it.label + ": " + it.text }, svg);
-        const on = () => tipper.show(it.label, [{ name: it.tip || "Value", color: it.value < 0 && opts.colorNeg ? opts.colorNeg : opts.color, value: it.text }], Math.max(40, Math.min(W - 60, x0 + w / 2 + 20)));
+        const more = plainRows(it.details);
+        const hit = s("rect", { x: 0, y: cy, width: W, height: rowH, class: "hit", tabindex: 0, role: "img", "aria-label": (it.title || it.label) + ": " + it.text + more.map((r) => ", " + r.name + " " + r.value).join("") }, svg);
+        const on = () => tipper.show(it.title || it.label, [{ name: it.tip || "Value", color, value: it.text }].concat(more), Math.max(40, Math.min(W - 60, x0 + w / 2 + 20)));
         hit.addEventListener("mouseenter", on);
         hit.addEventListener("focus", on);
         hit.addEventListener("mouseleave", () => tipper.hide());
@@ -11106,12 +12152,33 @@ span.hc { cursor: default; }
 
   // ---------------------------------------------------------------- table twin
 
-  /** The same numbers as a table. cols: ["Year", "Filed", ...]; rows: arrays of text. */
+  /**
+   * The same numbers as a table. cols: ["Year", "Filed", ...]; rows: arrays of cells, or { cells, tip } where tip is the text for data-tip of the
+   * whole row (made with Tip.attr); a cell is a text, or { text, tip } to carry a tip of its own (the name of a security).
+   */
   function tableOf(cols, rows, caption) {
     const t = h("table", { class: "tbl" }, []);
     if (caption) t.appendChild(h("caption", { class: "sr-only", text: caption }));
     t.appendChild(h("thead", {}, [h("tr", {}, cols.map((c, i) => h("th", { scope: "col", class: i ? "r" : "", text: c })))]));
-    t.appendChild(h("tbody", {}, rows.map((r) => h("tr", {}, r.map((c, i) => h(i ? "td" : "th", i ? { class: "r num", text: c } : { scope: "row", text: c }))))));
+    // a row can carry a hover tip for the whole row (the keyboard reaches it), a cell one of its own (hover only)
+    const tipOf = (tip, focus) => (tip ? (focus ? { "data-tip": tip, tabindex: "0" } : { "data-tip": tip }) : {});
+    t.appendChild(
+      h(
+        "tbody",
+        {},
+        rows.map((r) => {
+          const plain = Array.isArray(r);
+          return h(
+            "tr",
+            plain ? {} : tipOf(r.tip, true),
+            (plain ? r : r.cells).map((c, i) => {
+              const o = c !== null && typeof c === "object" ? c : { text: c };
+              return h(i ? "td" : "th", Object.assign(i ? { class: "r num", text: o.text } : { scope: "row", text: o.text }, tipOf(o.tip, false), !i && o.tip ? { class: "tipname" } : {}));
+            })
+          );
+        })
+      )
+    );
     return h("div", { class: "tbl-wrap" }, [t]);
   }
 
@@ -11994,8 +13061,16 @@ const DataUI = (function () {
         } }));
       }
       const meta = plural(t.trades, "trade") + (t.dividends ? " · " + plural(t.dividends, "dividend row") : "") + " · " + (t.first ? fd(t.first) + " to " + fd(t.last) : "no dates") + " · " + t.currencies.join("/");
+      // the name when one is known (the owner's, Yahoo's or the OeKB's), with the ISIN and Yahoo ticker on hover; the ticker of the file stays, it is the key
+      const nm = host.names ? host.names() : null;
+      const ni = nm ? nm.ofTicker(t.ticker) : null;
+      const idTip = ni ? Tip.attr(nm.tip(ni)) : false;
+      const tipAttrs = (extra) => (idTip ? Object.assign({ "data-tip": idTip, tabindex: "0" }, extra) : extra);
+      const heading = ni && ni.hasName
+        ? [el("span", tipAttrs({ class: "rc-title tipname", text: ni.full })), el("span", { class: "muted mono", text: t.ticker })]
+        : [el("span", tipAttrs({ class: "rc-title mono", text: t.ticker }))];
       return el("div", { class: "sec", "data-k": "sec:" + t.ticker },
-        el("div", { class: "sec-head" }, el("span", { class: "rc-title mono", text: t.ticker }), isinChip, t.typeAuto ? chip("type found", "info") : t.isinStatus === "OK" && t.type === "" ? chip("type needed", "bad") : null),
+        el("div", { class: "sec-head" }, heading, isinChip, t.typeAuto ? chip("type found", "info") : t.isinStatus === "OK" && t.type === "" ? chip("type needed", "bad") : null),
         el("div", { class: "rc-sub", text: meta }),
         el("div", { class: "fields" }, fields),
         fold({ class: "mini", "data-k": "sec-more:" + t.ticker }, !!st.open["secmore:" + t.ticker], (v) => setOpen("secmore:" + t.ticker, v), t.dividends > 0 ? "Name, country and treaty rate" : "Name", el("div", { class: "fields" }, more)));
@@ -13803,6 +14878,11 @@ const LedgerUI = (function () {
       const overlap = typed ? info().overlaps[l.entry] : undefined;
       const repeat = typed ? info().repeats[l.entry] : undefined;
       const title = l.kind === "CASH" ? "Cash" : (l.ticker || "–") + (l.name ? " · " + l.name : "");
+      // a security with a known name shows the name (its ISIN and Yahoo ticker on hover) and the ticker of the file next to the date
+      const nm = host.names && l.kind !== "CASH" && l.ticker ? host.names() : null;
+      const ni = nm ? nm.ofTicker(l.ticker) : null;
+      const named = ni && ni.hasName;
+      const titleNode = named ? el("span", { class: "tipname", "data-tip": Tip.attr(nm.tip(ni)) || false, tabindex: "0", text: ni.label }) : title;
       const chips = [];
       if (typed) chips.push(chip("Typed in by you", "info"));
       if (l.status === "NOT_NEEDED") chips.push(chip("Not needed for the tax", "neutral"));
@@ -13825,8 +14905,8 @@ const LedgerUI = (function () {
         : null;
       return el("div", { class: "row-card flat tx" + (st.flash === l.entry && typed ? " flash" : ""), "data-k": "tx:" + l.key },
         el("div", { class: "rc-main" },
-          el("div", { class: "rc-title" }, chip(KIND_TEXT[l.kind] || "Other", "neutral"), " ", title),
-          el("div", { class: "rc-sub", text: [l.date ? fd(l.date) : "no day", l.account].filter(Boolean).join(" · ") })),
+          el("div", { class: "rc-title" }, chip(KIND_TEXT[l.kind] || "Other", "neutral"), " ", titleNode),
+          el("div", { class: "rc-sub", text: [l.date ? fd(l.date) : "no day", l.account, named ? l.ticker : ""].filter(Boolean).join(" · ") })),
         el("div", { class: "rc-val", text: valueText(l) }),
         el("div", { class: "extra" }, detailLine(l) !== "" ? el("div", { text: detailLine(l) }) : null, chips.length ? el("div", {}, chips) : null, notes.length ? el("div", { text: notes.join(" ") }) : null),
         actions);
@@ -13942,6 +15022,36 @@ const PerfUI = (function () {
   const plural = (n, one, many) => num(n) + " " + (n === 1 ? one : many || one + "s");
   const button = (text, onclick, cls, key, extra) => el("button", Object.assign({ type: "button", class: "btn" + (cls ? " " + cls : ""), "data-key": key || false, onclick, text }, extra || {}));
 
+  const toneOf = (x) => (Number.isFinite(x) && Math.abs(x) >= 0.005 ? (x > 0 ? "pos" : "neg") : undefined);
+  const toneP = (x) => (Number.isFinite(x) && Math.abs(x) >= 0.00005 ? (x > 0 ? "pos" : "neg") : undefined);
+  // What the hover box says over each number: PerfTips only puts into words what the engine worked out.
+  const Tips = PerfTips.create({ money, pct, date: fd, plural, units: PerfTips.unitsText });
+
+  // The risk-free rate for the Sharpe and Sortino ratios is the one setting of this tab that is kept (it is not part of the owner's tax document).
+  const RF_KEY = "att-perf-rf-v1";
+  function readRf() {
+    try {
+      const v = window.localStorage.getItem(RF_KEY);
+      return typeof v === "string" && v.length > 0 && v.length <= 8 ? v : "0";
+    } catch (e) {
+      return "0"; // storage can be blocked: 0 % is the default
+    }
+  }
+  function saveRf(v) {
+    try {
+      window.localStorage.setItem(RF_KEY, v);
+    } catch (e) {
+      /* the rate then holds for this visit only */
+    }
+  }
+  /** The risk-free rate in the box as a fraction: a number from −5 to 25 percent (a comma or a % sign is fine), or null when it is not one. */
+  function rfOf(text) {
+    const t = String(text === undefined || text === null ? "" : text).trim().replace(",", ".").replace(/\s*%$/, "").replace("−", "-");
+    if (!/^[-+]?\d+(\.\d+)?$/.test(t)) return null;
+    const v = Number(t) / 100;
+    return v >= -0.05 && v <= 0.25 ? v : null;
+  }
+
   /** A fold in the look of the steps of the Data tab: a round mark, a title with a line below it, a chip. */
   function stepFold(key, cls, no, title, sub, chipNode, open, onToggle, body) {
     return fold({ class: "step " + cls, "data-k": key }, open, onToggle, [el("span", { class: "step-no", text: no }), el("span", { class: "step-main" }, el("span", { class: "rc-title", text: title }), sub ? el("span", { class: "rc-sub", text: sub }) : null), chipNode], el("div", { class: "body step-body" }, body));
@@ -13972,6 +15082,8 @@ const PerfUI = (function () {
       paste: "",
       triedAuto: false,
       note: "",
+      riskWin: "SAME",
+      rf: readRf(),
     };
     const doc = () => host.doc();
     const cv = () => host.conv();
@@ -13980,7 +15092,8 @@ const PerfUI = (function () {
 
     // ------------------------------------------------------------ the price book: loading, saving, updating
 
-    async function ensureLoaded() {
+    /** Reads the saved price book (no network). Done at the start of the page, so that the names Yahoo gave show on every tab. */
+    async function readBook() {
       if (st.loaded || st.loading) return;
       st.loading = true;
       try {
@@ -13994,7 +15107,19 @@ const PerfUI = (function () {
       st.loaded = true;
       st.loading = false;
       host.refresh();
-      checkNow(true);
+    }
+
+    /** On opening the tab: the book is read (if that is not done yet) and, once, the price file next to the page is looked at. */
+    async function ensureLoaded() {
+      if (!st.loaded) {
+        if (st.loading) return;
+        await readBook();
+      }
+      // later, not now: this is called while the tab is being drawn, and the check redraws the page
+      if (!st.triedAuto && st.busy !== "auto") {
+        st.triedAuto = true;
+        setTimeout(() => checkNow(true), 0);
+      }
     }
 
     async function savePrices() {
@@ -14148,6 +15273,28 @@ const PerfUI = (function () {
       return { w, why };
     }
 
+    // ------------------------------------------------------------ names and hover tips
+
+    const nm = () => (host.names ? host.names() : Names.build({}));
+    /** The attributes of an element with a hover tip: the text and, unless it is a control that has the keyboard anyway, a place in the tab order. */
+    const tipped = (spec, extra, focus) => {
+      const a = spec ? Tip.attr(spec) : false;
+      if (!a) return extra || {};
+      return Object.assign({ "data-tip": a }, focus === false ? {} : { tabindex: "0" }, extra || {});
+    };
+    /** A security in a sentence: its name with the ticker of the file in brackets, or the ticker alone when no name is known. */
+    function inText(ticker, name) {
+      const i = nm().ofTicker(ticker);
+      const n = i.hasName ? i.full : name || "";
+      return n ? n + " (" + ticker + ")" : ticker;
+    }
+    // Perf.bridge replays every trade: once for each time-frame is enough
+    let bridgeMemo = { m: null, w: null, b: null };
+    function bridgeOf(m, w) {
+      if (bridgeMemo.m !== m || bridgeMemo.w !== w) bridgeMemo = { m, w, b: Perf.bridge(m, w) };
+      return bridgeMemo.b;
+    }
+
     // ------------------------------------------------------------ small pieces
 
     function chartCard(key, title, sub, chart, table) {
@@ -14157,7 +15304,7 @@ const PerfUI = (function () {
       table.classList.add("perf-tbl");
       const bC = el("button", { type: "button", "aria-pressed": String(!tableOn), text: "Chart", onclick: () => { st.view[key] = "chart"; host.refresh(); } });
       const bT = el("button", { type: "button", "aria-pressed": String(tableOn), text: "Table", onclick: () => { st.view[key] = "table"; host.refresh(); } });
-      return el("section", { class: "card", "data-k": "pc:" + key }, el("div", { class: "card-head" }, el("h2", { text: title }), el("div", { class: "view-switch", role: "group", "aria-label": "Chart or table" }, bC, bT)), sub ? el("p", { class: "note", text: sub }) : null, chart, table);
+      return el("section", { class: "card", "data-k": "pc:" + key }, el("div", { class: "card-head" }, el("h2", { text: title }), el("div", { class: "view-switch", role: "group", "aria-label": "Chart or table" }, bC, bT)), chart, table, sub ? el("p", { class: "note", text: sub }) : null);
     }
 
     /** The calendar years of the history as chips, newest first: one of them is the time-frame. */
@@ -14169,13 +15316,14 @@ const PerfUI = (function () {
         el("div", { class: "ychips", role: "radiogroup", "aria-label": "Calendar year" }, ys.map((y) => el("label", { class: "ychip" }, el("input", { type: "radio", name: "Calendar year", value: String(y), checked: st.win === "Y" + y, "data-key": "pf-win:Y" + y, onchange: () => { st.win = "Y" + y; host.refresh(); } }), el("span", { text: String(y) })))));
     }
 
-    const kpi = (label, value, sub, key) => el("div", { class: "kpi", "data-k": "pk:" + key }, el("span", { class: "label", text: label }), el("span", { class: "value", text: value }), sub ? el("span", { class: "subline", text: sub }) : null);
+    const kpi = (label, value, sub, key, spec) => el("div", tipped(spec, { class: "kpi", "data-k": "pk:" + key }), el("span", { class: "label", text: label }), el("span", { class: "value", text: value }), sub ? el("span", { class: "subline", text: sub }) : null);
 
     // ------------------------------------------------------------ the main card: time-frame and figures
 
     function topCard(m, wv) {
       const w = wv.w;
       const s = Perf.stats(m, w);
+      const b = bridgeOf(m, w);
       const opts = KEYS.map(([k, label]) => {
         if (k === "CUSTOM") return [k, label];
         const r = Perf.resolve(m, k);
@@ -14195,35 +15343,41 @@ const PerfUI = (function () {
         wv.why ? el("p", { class: "note", text: wv.why }) : null,
         el("p", { class: "note", text: "From the close of " + fd(w.from) + " to the close of " + fd(w.to) + " (" + plural(w.days, "day") + ")." }),
         el("div", { class: "kpis six" },
-          kpi("Time-weighted return", pct(s.twr, true), s.twrAnnual !== null ? pct(s.twrAnnual, true) + " per year" : "how the holdings did, whatever you added", "twr"),
-          kpi("Money-weighted return", mwr[0], mwr[1], "mwr"),
-          kpi("Gain", money(s.gain, true), "with dividends of " + money(s.dividends), "gain"),
-          kpi("Value", money(s.valueEnd), s.valueStart > 0 ? "at the start " + money(s.valueStart) : "on " + fd(w.to), "value"),
-          kpi("Money put in, net", money(s.net, true), "paid " + money(s.inflow) + " · received " + money(s.outflow), "net"),
-          kpi("Dividends", money(s.dividends), "after tax withheld at the source", "div")));
+          kpi("Time-weighted return", pct(s.twr, true), s.twrAnnual !== null ? pct(s.twrAnnual, true) + " per year" : "how the holdings did, whatever you added", "twr", Tips.twr(s)),
+          kpi("Money-weighted return", mwr[0], mwr[1], "mwr", Tips.mwr(s)),
+          kpi("Gain", money(s.gain, true), "with dividends of " + money(s.dividends), "gain", Tips.gain(s, b)),
+          kpi("Value", money(s.valueEnd), s.valueStart > 0 ? "at the start " + money(s.valueStart) : "on " + fd(w.to), "value", Tips.value(s)),
+          kpi("Money put in, net", money(s.net, true), "paid " + money(s.inflow) + " · received " + money(s.outflow), "net", Tips.net(s, b)),
+          kpi("Dividends", money(s.dividends), "after tax withheld at the source", "div", Tips.dividends(b))));
     }
 
     // ------------------------------------------------------------ the value against the money put in
 
     function valueCard(m, w) {
       const cs = Perf.chartSeries(m, w, 300);
-      const T = m.total;
-      const rows = Perf.thin(w.s, w.e, 48);
-      const capitalAt = (i) => T.value[w.s] + T.invested[i] - T.invested[w.s];
+      const t = Perf.chartSeries(m, w, 48);
+      const sold = cs.realized.some((v) => v !== 0);
+      const gainAt = (k) => cs.value[k] - cs.capital[k];
+      const series = [
+        { name: "Value", color: "var(--c-filed)", values: cs.value, texts: cs.value.map((v) => money(v)) },
+        { name: "Money put in", color: "var(--c-sel)", values: cs.capital, texts: cs.capital.map((v) => money(v)), dash: true },
+      ];
+      if (sold) series.push({ name: "Realised gain", color: "var(--c-gain)", values: cs.realized, texts: cs.realized.map((v) => money(v, true)) });
       const chart = C.timeLines({
         days: cs.days,
-        series: [
-          { name: "Value", color: "var(--c-filed)", values: cs.value, texts: cs.value.map((v) => money(v)) },
-          { name: "Money put in", color: "var(--c-sel)", values: cs.capital, texts: cs.capital.map((v) => money(v)), dash: true },
-        ],
+        series,
         band: { a: 0, b: 1, up: "var(--c-gain)", down: "var(--c-more)" },
         zero: true,
         dateText: fd,
-        ariaLabel: "Value of the portfolio and the money put in, from " + fd(w.from) + " to " + fd(w.to),
-        height: 230,
+        key: "value",
+        rows: (i) => [["Gain so far, before dividends", money(gainAt(i), true), toneOf(gainAt(i))], ["Dividends so far", money(cs.dividends[i])]],
+        ariaLabel: "Value of the portfolio, the money put in" + (sold ? " and the realised gain" : "") + ", from " + fd(w.from) + " to " + fd(w.to),
+        height: 240,
       });
-      const table = C.tableOf(["Date", "Value", "Money put in", "Difference"], rows.map((i) => [fd(m.days[i]), money(T.value[i]), money(capitalAt(i)), money(T.value[i] - capitalAt(i), true)]), "Value of the portfolio and the money put in");
-      return chartCard("value", "Value and money put in", "Money put in is what the holdings were worth when the time-frame began plus what you added since (purchases less sales, fees included). The shaded gap is the gain so far, before dividends: green above the line, red below it.", chart, table);
+      const table = C.tableOf(["Date", "Value", "Money put in", "Gain so far", "Realised gain", "Dividends so far"], t.days.map((d, k) => [fd(d), money(t.value[k]), money(t.capital[k]), money(t.value[k] - t.capital[k], true), money(t.realized[k], true), money(t.dividends[k])]), "Value of the portfolio, the money put in, the gain so far, the realised gain and the dividends");
+      const note = "Money put in is what the holdings were worth when the time-frame began plus what you added since (purchases less sales, fees included). The shaded gap is the gain so far, before dividends: green above the line, red below it. "
+        + (sold ? "Realised gain is the price gain you made by selling, counted from the start of the time-frame (before tax)." : "No units were sold in this time-frame, so there is no realised gain to show.");
+      return chartCard("value", "Value and money put in", note, chart, table);
     }
 
     // ------------------------------------------------------------ the returns: bars, heatmap, line, table
@@ -14252,12 +15406,12 @@ const PerfUI = (function () {
           const x = byKey.get(y + "-" + (k + 1));
           if (!x) return el("td", {}, el("span", { class: "hc hm-void", "aria-hidden": "true" }));
           const name = MONL[k] + " " + y;
-          if (!x.held) return el("td", {}, el("span", { class: "hc hm-none", title: name + ": nothing held", "aria-label": name + ": nothing held", text: "–" }));
+          if (!x.held) return el("td", {}, el("span", { class: "hc hm-none", "data-tip": Tip.attr({ t: name, n: "Nothing was held in this month." }), "aria-label": name + ": nothing held", text: "–" }));
           const text = pct(x.twr, true);
           const isSel = st.win === "CUSTOM" && st.from === x.from && st.to === x.to;
-          return el("td", {}, el("button", { type: "button", class: "hc " + heatClass(x.twr, scale) + (x.partial ? " part" : "") + (isSel ? " sel" : ""), "data-key": "hm:" + y + "-" + (k + 1), title: name + ": " + text + (x.partial ? " (not a whole month)" : "") + ". Click to look at this month.", "aria-label": name + ": " + text + (x.partial ? ", not a whole month" : ""), onclick: () => { st.win = "CUSTOM"; st.from = x.from; st.to = x.to; host.refresh(); }, text: cellText(x.twr) }));
+          return el("td", {}, el("button", { type: "button", class: "hc " + heatClass(x.twr, scale) + (x.partial ? " part" : "") + (isSel ? " sel" : ""), "data-key": "hm:" + y + "-" + (k + 1), "data-tip": Tip.attr(Tips.period(x, name, "Click to look at this month.")), "aria-label": name + ": " + text + (x.partial ? ", not a whole month" : ""), onclick: () => { st.win = "CUSTOM"; st.from = x.from; st.to = x.to; host.refresh(); }, text: cellText(x.twr) }));
         });
-        const total = yr ? el("td", {}, el("button", { type: "button", class: "hc tot " + heatClass(yr.twr, scale) + (yr.partial ? " part" : ""), "data-key": "hm:" + y + "-year", title: y + ": " + pct(yr.twr, true) + (yr.partial ? " (not a whole year)" : "") + ". Click to look at this year.", "aria-label": y + ", the whole year: " + pct(yr.twr, true) + (yr.partial ? ", not a whole year" : ""), onclick: () => { st.win = "Y" + y; host.refresh(); }, text: cellText(yr.twr) })) : el("td", {});
+        const total = yr ? el("td", {}, el("button", { type: "button", class: "hc tot " + heatClass(yr.twr, scale) + (yr.partial ? " part" : ""), "data-key": "hm:" + y + "-year", "data-tip": Tip.attr(Tips.period(yr, String(y), "Click to look at this year.")), "aria-label": y + ", the whole year: " + pct(yr.twr, true) + (yr.partial ? ", not a whole year" : ""), onclick: () => { st.win = "Y" + y; host.refresh(); }, text: cellText(yr.twr) })) : el("td", {});
         return el("tr", { class: sel ? "sel" : false, "data-k": "hm-row:" + y }, el("th", { scope: "row", text: String(y) }), total, cells);
       });
       const legend = el("div", { class: "hlegend", "aria-hidden": "true" },
@@ -14276,6 +15430,7 @@ const PerfUI = (function () {
     function returnsCard(m, w) {
       const unit = w.days > 800 ? "year" : "month";
       const per = Perf.periods(m, w, unit);
+      const title = (r) => (r.unit === "year" ? String(r.year) : MONL[r.month - 1] + " " + r.year);
       const name = (r) => (r.unit === "year" ? String(r.year) : MON[r.month - 1] + " " + r.year) + (r.partial ? "*" : "");
       const view = st.retView;
       const bT = RET_VIEWS.map(([k, label]) => el("button", { type: "button", "aria-pressed": String(view === k), "data-key": "pr-view:" + k, text: label, onclick: () => { st.retView = k; host.refresh(); } }));
@@ -14286,7 +15441,7 @@ const PerfUI = (function () {
         sub = "Every month of your history.";
       } else if (view === "line") {
         const cs = Perf.chartSeries(m, w, 300);
-        const chart = C.timeLines({ days: cs.days, series: [{ name: "Growth of 100", color: "var(--c-gain)", values: cs.index, texts: cs.index.map((v) => v.toFixed(2)) }], format: (v) => String(+v.toFixed(1)), dateText: fd, ariaLabel: "Growth of 100 invested at the start of the time-frame, from " + fd(w.from) + " to " + fd(w.to), height: 220 });
+        const chart = C.timeLines({ days: cs.days, series: [{ name: "Growth of 100", color: "var(--c-gain)", values: cs.index, texts: cs.index.map((v) => v.toFixed(2)) }], format: (v) => String(+v.toFixed(1)), dateText: fd, key: "growth", rows: (i) => [["Return so far", pct(cs.twr[i], true), toneP(cs.twr[i])]], ariaLabel: "Growth of 100 invested at the start of the time-frame, from " + fd(w.from) + " to " + fd(w.to), height: 220 });
         const T = m.total;
         const rowsAt = Perf.thin(w.s, w.e, 48);
         const numbers = C.tableOf(["Date", "Growth of 100"], rowsAt.map((i) => [fd(m.days[i]), ((T.index[i] / T.index[w.s]) * 100).toFixed(2)]), "Growth of 100");
@@ -14294,7 +15449,7 @@ const PerfUI = (function () {
         body = el("div", { class: "stack" }, chart, fold({ class: "mini", "data-k": "pr-line-numbers" }, st.open.lineNumbers, (o) => { st.open.lineNumbers = o; host.refresh(); }, "Show the numbers", el("div", { class: "body" }, numbers)));
         sub = "The time-weighted return as a line: 100 at the start of the time-frame. It ignores how much you added or took out.";
       } else if (view === "table") {
-        body = C.tableOf(["Period", "Return", "Gain", "Net put in", "Dividends", "Value at the end"], per.map((r) => [name(r), r.held ? pct(r.twr, true) : "–", money(r.gain, true), money(r.net, true), money(r.dividends), money(r.valueEnd)]), "Returns per " + unit);
+        body = C.tableOf(["Period", "Return", "Gain", "Net put in", "Dividends", "Value at the end"], per.map((r) => ({ cells: [name(r), r.held ? pct(r.twr, true) : "–", money(r.gain, true), money(r.net, true), money(r.dividends), money(r.valueEnd)], tip: Tip.attr(Tips.period(r, title(r))) })), "Returns per " + unit);
         body.classList.add("perf-tbl");
         sub = (unit === "year" ? "Calendar years" : "Calendar months") + " inside the time-frame.";
       } else if (per.length < 2) {
@@ -14308,7 +15463,7 @@ const PerfUI = (function () {
           if (unit === "year") return few > 8 ? "’" + String(r.year).slice(2) : String(r.year);
           return MON[r.month - 1] + (r.month === 1 || i === 0 ? "\n" + r.year : "");
         };
-        body = C.bars({ categories: per.map(name), tickLabels: per.map(tick), series: [{ id: "twr", name: "Time-weighted return", values: per.map((r) => (r.held ? r.twr * 100 : 0)), texts: per.map((r) => (r.held ? pct(r.twr, true) : "nothing held")) }], mode: "split", colorPos: "var(--c-gain)", colorNeg: "var(--c-more)", splitLegend: [{ name: "Gain", color: "var(--c-gain)" }, { name: "Loss", color: "var(--c-more)" }], format: axisPct, ariaLabel: "Time-weighted return per calendar " + unit + ", from " + fd(w.from) + " to " + fd(w.to), height: 220 });
+        body = C.bars({ categories: per.map(name), tickLabels: per.map(tick), series: [{ id: "twr", name: "Time-weighted return", values: per.map((r) => (r.held ? r.twr * 100 : 0)), texts: per.map((r) => (r.held ? pct(r.twr, true) : "nothing held")) }], mode: "split", colorPos: "var(--c-gain)", colorNeg: "var(--c-more)", splitLegend: [{ name: "Gain", color: "var(--c-gain)" }, { name: "Loss", color: "var(--c-more)" }], format: axisPct, details: per.map((r) => Tips.periodRows(r)), ariaLabel: "Time-weighted return per calendar " + unit + ", from " + fd(w.from) + " to " + fd(w.to), height: 220 });
         sub = "Return of each calendar " + unit + " inside the time-frame. Chained together they give the time-weighted return above." + (per.some((r) => r.partial) ? " * not a whole " + unit + " (the time-frame or your history starts or ends inside it, or it is not over)." : "");
       }
       return el("section", { class: "card", "data-k": "pf-returns" },
@@ -14319,7 +15474,7 @@ const PerfUI = (function () {
 
     // ------------------------------------------------------------ where the result came from
 
-    function bridgeRow(r, track) {
+    function bridgeRow(r, track, b) {
       const kids = [el("div", { class: "br-line" }, el("span", { class: "br-lab", text: r.label }), el("span", { class: "br-val num", text: money(r.v, r.plus !== false) }))];
       if (r.sub) kids.push(el("div", { class: "br-sub", text: r.sub }));
       if (track) {
@@ -14329,11 +15484,11 @@ const PerfUI = (function () {
         const t = el("div", { class: "br-track", style: "--z:" + (((0 - lo) / span) * 100).toFixed(2) + "%" }, el("i", { class: r.v < 0 ? "neg" : "pos", style: "left:" + (((Math.min(0, r.v) - lo) / span) * 100).toFixed(2) + "%;width:" + ((Math.abs(r.v) / span) * 100).toFixed(2) + "%" }));
         kids.push(t);
       }
-      return el("li", { class: r.total ? "total" : false, "data-k": "br:" + r.k }, kids);
+      return el("li", tipped(Tips.bridge(r.k, b), { class: r.total ? "total" : false, "data-k": "br:" + r.k }), kids);
     }
 
     function breakdownCard(m, w) {
-      const b = Perf.bridge(m, w);
+      const b = bridgeOf(m, w);
       const gainRows = [
         { k: "unreal", label: "Price gain not yet realised", sub: "what you still hold is worth, minus what it cost", v: b.unrealized },
         { k: "real", label: "Price gain realised", sub: "what sales brought in, minus what the units sold had cost", v: b.realized },
@@ -14353,28 +15508,73 @@ const PerfUI = (function () {
         el("div", { class: "card-head" }, el("h2", { text: "Where the result came from" }), el("span", { class: "sub", text: "same time-frame" })),
         el("div", { class: "bridge-grid" },
           el("div", { class: "bridge-col" }, el("h3", { text: "The gain" }),
-            el("ul", { class: "bridge" }, gainRows.map((r) => bridgeRow(r, { lo, hi })), bridgeRow({ k: "gain", label: "Gain", sub: b.simple !== null ? pct(b.simple, true) + " of the capital (" + money(b.capital) + ": value at the start plus what you paid for purchases, fees included)" : "", v: b.gain, total: true }))),
+            el("ul", { class: "bridge" }, gainRows.map((r) => bridgeRow(r, { lo, hi }, b)), bridgeRow({ k: "gain", label: "Gain", sub: b.simple !== null ? pct(b.simple, true) + " of the capital (" + money(b.capital) + ": value at the start plus what you paid for purchases, fees included)" : "", v: b.gain, total: true }, null, b))),
           el("div", { class: "bridge-col" }, el("h3", { text: "The value" }),
-            el("ul", { class: "bridge" }, valueRows.map((r) => bridgeRow(r, null))))),
+            el("ul", { class: "bridge" }, valueRows.map((r) => bridgeRow(r, null, b))))),
         el("p", { class: "note", text: "This is performance, before Austrian tax, and cash is not tracked. The cost of the units you still hold starts, at the start of the time-frame, at their value then; units bought later cost what you paid. The taxable gain follows other rules and is on the Tax tab." }));
     }
 
     // ------------------------------------------------------------ the ups and downs
 
+    // The time-frames of the risk figures: the one above, or one of its own (the falls and ratios of the last year are not those of the whole history).
+    const RISK_KEYS = [["SAME", "As above"], ["1M", "1M"], ["3M", "3M"], ["6M", "6M"], ["YTD", "YTD"], ["1Y", "1Y"], ["3Y", "3Y"], ["5Y", "5Y"], ["MAX", "Max"]];
+
+    function riskWindow(m, w) {
+      if (st.riskWin === "SAME") return { rw: w, why: "" };
+      const r = Perf.resolve(m, st.riskWin);
+      if (!r.available || r.error) return { rw: w, why: (RISK_KEYS.find((k) => k[0] === st.riskWin) || [0, st.riskWin])[1] + " is not available: your history starts on " + fd(m.start) + ". The time-frame above is used." };
+      return { rw: r, why: "" };
+    }
+
     function riskCard(m, w) {
-      const dd = Perf.drawdown(m, w, 300);
-      const rk = Perf.risk(m, w, Perf.months(m));
+      const { rw, why } = riskWindow(m, w);
+      const rfIn = rfOf(st.rf);
+      const rf = rfIn === null ? 0 : rfIn;
+      const dd = Perf.drawdown(m, rw, 300);
+      const ds = Perf.drawdowns(m, rw, { top: 5, minDepth: 0.01 });
+      const rk = Perf.risk(m, rw, Perf.months(m));
+      const ra = Perf.riskAdjusted(m, rw, { rf });
       const mx = dd.max;
-      const chart = C.timeLines({ days: dd.days, series: [{ name: "Below the previous high", color: "var(--c-more)", values: dd.dd.map((v) => v * 100), texts: dd.dd.map((v) => pct(v)), area: true }], format: axisPct, zero: true, dateText: fd, ariaLabel: "How far the growth line was below its previous high, from " + fd(w.from) + " to " + fd(w.to), height: 190 });
+      const cur = ds.current;
+      const opts = RISK_KEYS.map(([k, label]) => {
+        if (k === "SAME") return [k, label];
+        const r = Perf.resolve(m, k);
+        return [k, label, r.available, r.available ? false : "Your history starts on " + fd(m.start)];
+      });
+      const controls = el("div", { class: "risk-controls" },
+        seg("Time-frame for the risk figures", opts, st.riskWin, (v) => { st.riskWin = v; host.refresh(); }, "pf-rwin"),
+        el("div", { class: "fields tight" }, el("div", { class: "field" }, el("label", { for: "f-pf-rf", text: "Risk-free rate per year, in %" }), el("input", { type: "text", inputmode: "decimal", "data-key": "pf-rf", value: st.rf, maxlength: 8, autocomplete: "off", spellcheck: "false", onchange: (e) => { st.rf = e.target.value.trim(); saveRf(st.rf); host.refresh(); } }))));
+      // the ratios
+      const ratios = el("div", { class: "kpis", "data-k": "risk-ratios" },
+        kpi("Sharpe ratio", ra.sharpe !== null ? ra.sharpe.toFixed(2) : "–", ra.sharpe !== null ? "return above the risk-free rate for each unit of ups and downs" : ra.why.sharpe, "sharpe", Tips.ratio("sharpe", ra)),
+        kpi("Sortino ratio", ra.sortino !== null ? ra.sortino.toFixed(2) : "–", ra.sortino !== null ? "like Sharpe, but only the days that fell short count" : ra.why.sortino, "sortino", Tips.ratio("sortino", ra)),
+        kpi("Calmar ratio", ra.calmar !== null ? ra.calmar.toFixed(2) : "–", ra.calmar !== null ? pct(ra.annual, true) + " per year ÷ " + pct(ra.fall) + " largest fall" : ra.why.calmar, "calmar", Tips.ratio("calmar", ra)),
+        kpi("Volatility", rk.vol !== null ? pct(rk.vol) : "–", rk.vol !== null ? "per year, from daily returns" : "needs 60 days or more", "vol", Tips.vol(rk)));
+      // the falls
+      const back = !mx ? ["–", "there was no fall"] : mx.recovered ? [fd(mx.recovered), plural(mx.recoveryDays, "day") + " after the low"] : ["not yet", "still " + pct(-cur.depth) + " below the high now"];
+      const falls = el("div", { class: "kpis", "data-k": "risk-falls" },
+        kpi("Largest fall", mx ? pct(mx.depth) : "–", mx ? "from " + fd(mx.peak) + " to " + fd(mx.trough) : "no fall in this time-frame", "fall", Tips.fall(mx)),
+        kpi("Back at the high", back[0], back[1], "back", Tips.back(mx, ds)),
+        kpi("Below the high today", cur.since > 0 ? pct(cur.depth) : "At the high", cur.since > 0 ? plural(cur.since, "day") + " since " + fd(cur.high) : "on " + fd(rw.to), "now", Tips.now(ds)),
+        kpi("Longest time below a high", ds.longest ? plural(ds.longest.belowDays, "day") : "–", ds.longest ? "from " + fd(ds.longest.peak) + (ds.longest.recovered ? " to " + fd(ds.longest.recovered) : ", not over yet") : "no fall in this time-frame", "longest", ds.longest ? Tips.episode(ds.longest, "Longest time below a high") : { t: "Longest time below a high", n: "The growth line never fell in this time-frame." }));
+      const fallTable = ds.episodes.length
+        ? C.tableOf(["Fall", "High", "Low", "Back at the high", "Days below the high"], ds.episodes.map((e) => ({ cells: [pct(e.depth), fd(e.peak), fd(e.trough), e.recovered ? fd(e.recovered) : "not yet", String(e.belowDays)], tip: Tip.attr(Tips.episode(e)) })), "The deepest falls of the time-frame")
+        : null;
+      if (fallTable) fallTable.classList.add("perf-tbl");
+      // the same falls as a list for a phone, where five columns of dates do not fit
+      const fallList = ds.episodes.length
+        ? el("ul", { class: "sec-list fall-list", "aria-label": "The deepest falls of the time-frame" }, ds.episodes.map((e) => el("li", tipped(Tips.episode(e), { "data-k": "fall:" + e.peak }),
+            el("div", { class: "sec-top" }, el("strong", { class: "num", text: pct(e.depth) }), el("span", { class: "muted", text: fd(e.peak) + " to " + fd(e.trough) }), e.recovered ? null : chip("not over yet", "warn")),
+            el("div", { class: "sec-sub" }, el("span", { text: e.recovered ? "Back at the high " + fd(e.recovered) : "Not back at the high yet" }), el("span", { text: plural(e.belowDays, "day") + " below the high" })))))
+        : null;
+      // the days and months
+      const days = el("div", { class: "kpis six", "data-k": "risk-days" },
+        kpi("Best day", rk.bestDay ? pct(rk.bestDay.r, true) : "–", rk.bestDay ? fd(rk.bestDay.day) : "", "best", Tips.day("Best day", rk.bestDay)),
+        kpi("Worst day", rk.worstDay ? pct(rk.worstDay.r, true) : "–", rk.worstDay ? fd(rk.worstDay.day) : "", "worst", Tips.day("Worst day", rk.worstDay)),
+        kpi("Months with a gain", rk.months ? rk.monthsUp + " of " + rk.months : "–", rk.months ? "best " + MON[rk.bestMonth.month - 1] + " " + rk.bestMonth.year + " " + pct(rk.bestMonth.twr, true) + ", worst " + MON[rk.worstMonth.month - 1] + " " + rk.worstMonth.year + " " + pct(rk.worstMonth.twr, true) : "needs a whole month", "months", Tips.months(rk)));
+      // the chart of how far below the high, and its table
+      const chart = C.timeLines({ days: dd.days, series: [{ name: "Below the previous high", color: "var(--c-more)", values: dd.dd.map((v) => v * 100), texts: dd.dd.map((v) => pct(v)), area: true }], format: axisPct, zero: true, dateText: fd, key: "dd", ariaLabel: "How far the growth line was below its previous high, from " + fd(rw.from) + " to " + fd(rw.to), height: 190 });
       const table = C.tableOf(["Date", "Below the previous high"], dd.days.map((d, i) => [fd(d), pct(dd.dd[i])]), "Fall from the previous high");
-      const back = !mx ? ["–", "there was no fall"] : mx.recovered ? [fd(mx.recovered), plural(mx.recoveryDays, "day") + " after the low"] : ["not yet", "still " + pct(Math.abs(dd.current)) + " below the high now"];
-      const kpis = el("div", { class: "kpis six" },
-        kpi("Largest fall", mx ? pct(mx.depth) : "–", mx ? "from " + fd(mx.peak) + " to " + fd(mx.trough) : "no fall in this time-frame", "fall"),
-        kpi("Back at the high", back[0], back[1], "back"),
-        kpi("Volatility", rk.vol !== null ? pct(rk.vol) : "–", rk.vol !== null ? "per year, from daily returns" : "needs 60 days or more", "vol"),
-        kpi("Best day", rk.bestDay ? pct(rk.bestDay.r, true) : "–", rk.bestDay ? fd(rk.bestDay.day) : "", "best"),
-        kpi("Worst day", rk.worstDay ? pct(rk.worstDay.r, true) : "–", rk.worstDay ? fd(rk.worstDay.day) : "", "worst"),
-        kpi("Months with a gain", rk.months ? rk.monthsUp + " of " + rk.months : "–", rk.months ? "best " + MON[rk.bestMonth.month - 1] + " " + rk.bestMonth.year + " " + pct(rk.bestMonth.twr, true) + ", worst " + MON[rk.worstMonth.month - 1] + " " + rk.worstMonth.year + " " + pct(rk.worstMonth.twr, true) : "needs a whole month", "months"));
       const tableOn = st.view.risk === "table";
       chart.hidden = tableOn;
       table.hidden = !tableOn;
@@ -14382,26 +15582,59 @@ const PerfUI = (function () {
       const bC = el("button", { type: "button", "aria-pressed": String(!tableOn), text: "Chart", onclick: () => { st.view.risk = "chart"; host.refresh(); } });
       const bT = el("button", { type: "button", "aria-pressed": String(tableOn), text: "Table", onclick: () => { st.view.risk = "table"; host.refresh(); } });
       return el("section", { class: "card", "data-k": "pf-risk" },
-        el("div", { class: "card-head" }, el("h2", { text: "Ups and downs" }), el("div", { class: "view-switch", role: "group", "aria-label": "Chart or table" }, bC, bT)),
-        el("p", { class: "note", text: "How far the growth line was below the highest point it had reached before. Money you add or take out does not hide a fall and does not cause one." }),
+        el("div", { class: "card-head" }, el("h2", { text: "Risk and falls" }), el("span", { class: "sub", text: "its own time-frame" })),
+        el("p", { class: "note", text: "Choose how far back to look. These figures use the time-weighted growth line, so money you add or take out does not hide a fall and does not cause one." }),
+        controls,
+        why ? el("p", { class: "note", text: why }) : null,
+        el("p", { class: "note", text: "From the close of " + fd(rw.from) + " to the close of " + fd(rw.to) + " (" + plural(rw.days, "day") + ")." }),
+        rfIn === null ? el("p", { class: "note", "data-k": "rf-bad", text: "That is not a rate between −5 and 25 percent, so 0 % is used for the Sharpe and Sortino ratios." }) : null,
+        el("h3", { text: "Return for the risk taken" }),
+        ratios,
+        el("p", { class: "note", text: "Sharpe and Sortino measure the return above a risk-free rate of " + pct(rf) + " per year (set it above; 0 % keeps it simple, a savings rate is a fairer yardstick). Calmar divides the return per year by the largest fall. They look back at how it went: they say nothing about what comes next." }),
+        el("div", { class: "card-head sub-head" }, el("h3", { text: "How far below the previous high" }), el("div", { class: "view-switch", role: "group", "aria-label": "Chart or table" }, bC, bT)),
         chart,
         table,
-        kpis);
+        falls,
+        el("h3", { text: ds.count ? "The deepest falls (" + ds.count + " of 1 % or more)" : "The deepest falls" }),
+        fallTable ? el("div", { class: "sec-table" }, fallTable) : null,
+        fallList,
+        fallTable ? null : el("p", { class: "note", text: "There was no fall of 1 % or more in this time-frame." }),
+        el("h3", { text: "Days and months" }),
+        days);
     }
 
     function securitiesCard(m, w) {
       const rows = Perf.byTicker(m, w);
       if (!rows.length) return null;
-      const table = C.tableOf(["Security", "Value", "Share", "Gain", "Return", "Dividends"], rows.map((r) => [r.ticker + (r.held ? "" : " (sold)") + (r.valuedBy === "TRADES" ? " · own prices" : ""), money(r.valueEnd), r.held ? (r.weight * 100).toFixed(1) + " %" : "–", money(r.gain, true), pct(r.twr, true), money(r.dividends)]), "Securities over the time-frame");
+      const n = nm();
+      const info = (r) => n.ofTicker(r.ticker);
+      const nameSpec = (r) => n.tip(info(r));
+      const ids = (r) => nameSpec(r).r; // ISIN, Yahoo ticker, ticker in your file
+      const rowSpec = (r) => Tips.security(r, info(r).full, ids(r));
+      const table = C.tableOf(
+        ["Security", "Value", "Share", "Gain", "Return", "Dividends"],
+        rows.map((r) => ({
+          cells: [{ text: info(r).label + (r.held ? "" : " (sold)") + (r.valuedBy === "TRADES" ? " · own prices" : ""), tip: Tip.attr(nameSpec(r)) }, money(r.valueEnd), r.held ? (r.weight * 100).toFixed(1) + " %" : "–", money(r.gain, true), pct(r.twr, true), money(r.dividends)],
+          tip: Tip.attr(rowSpec(r)),
+        })),
+        "Securities over the time-frame"
+      );
       table.classList.add("perf-tbl");
       // the gain of each security as bars (the ten with the largest gain or loss), the table and the list below hold all of them
       const big = rows.filter((r) => Math.abs(r.gain) >= 0.005).sort((a, b) => Math.abs(b.gain) - Math.abs(a.gain)).slice(0, 10).sort((a, b) => b.gain - a.gain);
-      const gainChart = big.length ? C.hbars({ items: big.map((r) => ({ label: r.ticker, value: r.gain, text: money(r.gain, true), tip: "Gain" })), color: "var(--c-gain)", colorNeg: "var(--c-more)", ariaLabel: "Gain of each security over the time-frame" }) : null;
+      const gainChart = big.length
+        ? C.hbars({
+            items: big.map((r) => ({ label: info(r).label, title: info(r).full, value: r.gain, text: money(r.gain, true), tip: "Gain", details: [["Return", pct(r.twr, true), toneP(r.twr)], ["Value at the end", money(r.valueEnd)]].concat(ids(r)) })),
+            color: "var(--c-gain)",
+            colorNeg: "var(--c-more)",
+            ariaLabel: "Gain of each security over the time-frame",
+          })
+        : null;
       // the same rows as a list for a phone, where six columns do not fit
-      const list = el("ul", { class: "sec-list", "aria-label": "Securities over the time-frame" }, rows.map((r) => el("li", { "data-k": "sec:" + r.ticker },
-        el("div", { class: "sec-top" }, el("strong", { class: "mono", text: r.ticker }), r.held ? null : chip("sold", "neutral"), r.valuedBy === "TRADES" ? chip("own prices", "warn") : null, el("span", { class: "num sec-value", text: money(r.valueEnd) })),
+      const list = el("ul", { class: "sec-list", "aria-label": "Securities over the time-frame" }, rows.map((r) => el("li", tipped(rowSpec(r), { "data-k": "sec:" + r.ticker }),
+        el("div", { class: "sec-top" }, el("strong", tipped(nameSpec(r), { class: "sec-name tipname", text: info(r).label }, false)), r.held ? null : chip("sold", "neutral"), r.valuedBy === "TRADES" ? chip("own prices", "warn") : null, el("span", { class: "num sec-value", text: money(r.valueEnd) })),
         el("div", { class: "sec-sub" }, r.held ? el("span", { text: (r.weight * 100).toFixed(1) + " % of the value" }) : null, el("span", { text: "Gain " + money(r.gain, true) }), el("span", { text: "Return " + pct(r.twr, true) }), el("span", { text: "Dividends " + money(r.dividends) })))));
-      return el("section", { class: "card", "data-k": "pf-sec" }, el("div", { class: "card-head" }, el("h2", { text: "Securities" }), el("span", { class: "sub", text: "same time-frame" })), gainChart ? el("div", { class: "stack", "data-k": "pf-contrib" }, el("h3", { text: "Gain by security" }), gainChart, rows.length > big.length ? el("p", { class: "note", text: "The " + big.length + " with the largest gain or loss. All of them are listed below." }) : null) : null, el("div", { class: "sec-table" }, table), list, el("p", { class: "note", text: "The return of a security is its own time-weighted return over the time-frame, from the day you bought it if that was later. A sold security shows what it earned while you held it." }));
+      return el("section", { class: "card", "data-k": "pf-sec" }, el("div", { class: "card-head" }, el("h2", { text: "Securities" }), el("span", { class: "sub", text: "same time-frame · hover a name for its ISIN and Yahoo ticker" })), gainChart ? el("div", { class: "stack", "data-k": "pf-contrib" }, el("h3", { text: "Gain by security" }), gainChart, rows.length > big.length ? el("p", { class: "note", text: "The " + big.length + " with the largest gain or loss. All of them are listed below." }) : null) : null, el("div", { class: "sec-table" }, table), list, el("p", { class: "note", text: "The return of a security is its own time-weighted return over the time-frame, from the day you bought it if that was later. A sold security shows what it earned while you held it." }));
     }
 
     // ------------------------------------------------------------ checks
@@ -14415,8 +15648,8 @@ const PerfUI = (function () {
       // The switch is there as long as something is left out or valued at its own prices, so it can always be turned back.
       const body = el("div", { class: "stack" },
         excluded.length || own.length ? el("div", { class: "stack" },
-          excluded.length ? el("div", {}, el("strong", { text: "Left out of every figure" }), el("ul", { class: "list" }, excluded.map((t) => listItem("bad", t.ticker + (t.name ? " (" + t.name + ")" : "") + ": " + (t.text || REASON_TEXT[t.reason] || t.reason))))) : null,
-          own.length ? el("div", {}, el("strong", { text: "Valued at your own transaction prices" }), el("ul", { class: "list" }, own.map((t) => listItem("warn", t.ticker + (t.name ? " (" + t.name + ")" : "") + ": no market prices, so its value changes only on the days you traded")))) : null,
+          excluded.length ? el("div", {}, el("strong", { text: "Left out of every figure" }), el("ul", { class: "list" }, excluded.map((t) => listItem("bad", inText(t.ticker, t.name) + ": " + (t.text || REASON_TEXT[t.reason] || t.reason))))) : null,
+          own.length ? el("div", {}, el("strong", { text: "Valued at your own transaction prices" }), el("ul", { class: "list" }, own.map((t) => listItem("warn", inText(t.ticker, t.name) + ": no market prices, so its value changes only on the days you traded")))) : null,
           el("div", { class: "btn-row" }, button(st.unpriced ? "Leave them out again" : "Include them at my own transaction prices", () => { st.unpriced = !st.unpriced; host.refresh(); }, "small", "pf-unpriced"))) : null,
         probs.length ? el("ul", { class: "list" }, probs.map((p) => listItem(p.level === "bad" ? "bad" : p.level === "warn" ? "warn" : "info", p.text + (p.count > 1 && !/\d+ (rows?|withholding)/.test(p.text) ? " (" + p.count + " times)" : "")))) : null);
       return stepFold("pf-checks", n ? "warn" : "ok", n ? "!" : "✓", "Checks", "what is left out, and what to look at", chip(n ? plural(n, "thing") + " to look at" : "all fine", n ? "warn" : "ok"), st.open.checks || excluded.length > 0 || own.length > 0, (o) => { st.open.checks = o; host.refresh(); }, body);
@@ -14426,11 +15659,14 @@ const PerfUI = (function () {
 
     function symbolRow(c) {
       const t = tickerRows().find((x) => x.ticker === c.ticker);
+      const info = nm().ofTicker(c.ticker);
+      const nameText = info.hasName ? info.full : (t && t.name) || "";
+      const idTip = nm().tip(info);
       const chipInfo = STATE_CHIP[c.state] || ["neutral", c.state];
       const sym = c.symbol;
       const have = c.rows > 0;
       return el("div", { class: "sym-row", "data-k": "sym:" + c.ticker },
-        el("div", { class: "sym-line" }, el("strong", { class: "mono", text: c.ticker }), t && t.name ? el("span", { class: "muted", text: t.name }) : null, chip(chipInfo[1], chipInfo[0])),
+        el("div", { class: "sym-line" }, el("strong", tipped(idTip, { class: "mono", text: c.ticker })), nameText ? el("span", tipped(idTip, { class: "muted tipname", text: nameText }, false)) : null, chip(chipInfo[1], chipInfo[0])),
         el("div", { class: "sym-line" },
           el("div", { class: "field" }, el("label", { for: "f-sym-" + c.ticker, class: "sr-only", text: "Yahoo symbol of " + c.ticker }), el("input", { type: "text", class: "mono", "data-key": "sym-" + c.ticker, value: sym, placeholder: c.suggestion || "Yahoo symbol", maxlength: 40, autocomplete: "off", autocapitalize: "characters", spellcheck: "false", onchange: (e) => setSymbol(c.ticker, e.target.value) })),
           !sym && c.suggestion ? button("Use " + c.suggestion, () => setSymbol(c.ticker, c.suggestion), "small", "use-" + c.ticker) : null,
@@ -14522,7 +15758,7 @@ const PerfUI = (function () {
       const counts = [["NO_MAPPING", "no Yahoo symbol chosen yet"], ["NO_PRICES", "no prices loaded yet"]].map(([r, text]) => [common.filter((t) => t.reason === r).length, text]).filter((x) => x[0] > 0);
       return card("Performance needs prices", null,
         el("p", { class: "note", text: m.reason === "NO_SECURITIES" && items.length ? "No security can be valued yet. Choose the Yahoo symbol of each security below and load its prices." : m.text }),
-        counts.length || special.length ? el("ul", { class: "list" }, counts.map((x) => listItem("bad", plural(x[0], "security", "securities") + ": " + x[1])).concat(special.map((t) => listItem("bad", t.ticker + ": " + (t.text || REASON_TEXT[t.reason] || t.reason))))) : null);
+        counts.length || special.length ? el("ul", { class: "list" }, counts.map((x) => listItem("bad", plural(x[0], "security", "securities") + ": " + x[1])).concat(special.map((t) => listItem("bad", inText(t.ticker, t.name) + ": " + (t.text || REASON_TEXT[t.reason] || t.reason))))) : null);
     }
 
     function render(root) {
@@ -14554,7 +15790,7 @@ const PerfUI = (function () {
       root.appendChild(howCard());
     }
 
-    return { render, state: st };
+    return { render, state: st, preload: readBook, book: () => (st.loaded ? st.book : null) };
   }
 
   return { create };
@@ -15183,8 +16419,38 @@ const RegularUI = (function () {
     const e = eventsById[String(id).split("#")[0]];
     return e ? e.date : null;
   };
-  const secName = (isin) => ((meta.securities || {})[isin] || {}).name || isin;
-  const secShort = (isin) => ((meta.securities || {})[isin] || {}).short || isin;
+  // The names of the securities: what is shown instead of the ticker (a label only, every calculation keeps ISIN and ticker). In the demo the
+  // invented names of the demo data are used as they are.
+  let namesMemo = { doc: null, meta: null, store: null, r: null };
+  function names() {
+    const book = perfUI && perfUI.book ? perfUI.book() : null;
+    const store = book ? book.store : null;
+    if (namesMemo.r && namesMemo.doc === doc && namesMemo.meta === meta && namesMemo.store === store) return namesMemo.r;
+    const funds = {};
+    for (const [isin, s] of Object.entries((meta && meta.securities) || {})) if (s.fundName) funds[isin] = s.fundName;
+    const r = Names.build({ securities: doc.securities, book, funds });
+    namesMemo = { doc, meta, store, r };
+    return r;
+  }
+  const metaSec = (isin) => ((meta && meta.securities) || {})[isin] || {};
+  const secName = (isin) => {
+    if (ui.mode === "demo") return metaSec(isin).name || isin;
+    const i = names().ofIsin(isin);
+    return i.hasName ? i.full : metaSec(isin).name || i.full;
+  };
+  const secShort = (isin) => {
+    if (ui.mode === "demo") return metaSec(isin).short || isin;
+    const i = names().ofIsin(isin);
+    return i.hasName ? i.label : metaSec(isin).short || i.label;
+  };
+  /** What the hover over a security's name says (the name, ISIN, Yahoo ticker, ticker in the file, where the name came from); false in the demo. */
+  const nameTip = (isin) => (ui.mode === "demo" ? false : Tip.attr(names().tip(names().ofIsin(isin))));
+  /** The same as rows for the tooltip of a chart. */
+  const nameDetails = (isin) => {
+    if (ui.mode === "demo") return [];
+    const x = names().ofIsin(isin);
+    return [["ISIN", x.isin || "not set yet"], ["Yahoo ticker", x.symbols.length ? x.symbols.join(" / ") : "not chosen yet"]];
+  };
   const depotLabel = (d) => ((meta.depots || {})[d] || {}).label || d;
 
   // ---------------------------------------------------------------- shared pieces
@@ -15357,7 +16623,7 @@ const RegularUI = (function () {
     const compTable = C.tableOf(["Year", "Gains", "agE", "Dividends and other", "Total"], cats.map((y, i) => [y, compSeries[0].texts[i], compSeries[1].texts[i], compSeries[2].texts[i], fm(comp[i].t)]), "Taxable income by type");
 
     const hold = M.holdings(v.pools, meta);
-    const holdChart = C.hbars({ items: hold.map((g) => ({ label: secShort(g.isin), value: M.num(g.taxCostText), text: fm(g.taxCostText), tip: "Tax cost" })), color: "var(--c-filed)", ariaLabel: "Tax cost of holdings by security" });
+    const holdChart = C.hbars({ items: hold.map((g) => ({ label: secShort(g.isin), title: secName(g.isin), value: M.num(g.taxCostText), text: fm(g.taxCostText), tip: "Tax cost", details: nameDetails(g.isin) })), color: "var(--c-filed)", ariaLabel: "Tax cost of holdings by security" });
     const holdTable = C.tableOf(["Security", "Tax cost"], hold.map((g) => [secName(g.isin), fm(g.taxCostText)]), "Tax cost by security");
 
     root.appendChild(el("div", { class: "grid2" },
@@ -15396,7 +16662,7 @@ const RegularUI = (function () {
       kv("What you really made (fees in)", fm(r.econGainEur, { plus: true }));
       if (r.avgTaxPerShareBefore) kv("Average tax cost per unit before", M.fmtUnit(r.avgTaxPerShareBefore));
     }
-    return el("div", { class: "row-card", "data-k": "real:" + r.id }, el("details", { "data-k": "real-d:" + r.id }, el("summary", {}, el("span", { class: "rc-main" }, el("span", { class: "rc-title", text: title }), el("br"), el("span", { class: "rc-sub", text: sub })), val), body));
+    return el("div", { class: "row-card", "data-k": "real:" + r.id }, el("details", { "data-k": "real-d:" + r.id }, el("summary", {}, el("span", { class: "rc-main" }, el("span", { class: "rc-title", text: title, "data-tip": nameTip(r.isin), tabindex: nameTip(r.isin) ? "0" : false }), el("br"), el("span", { class: "rc-sub", text: sub })), val), body));
   }
 
   function renderTax(root) {
@@ -15845,6 +17111,7 @@ const RegularUI = (function () {
     const isHard = hard === true || ui.lastKey !== key;
     ui.lastKey = key;
     Dom.paint($("#view"), buildView, isHard);
+    Tip.refresh();
     const f = R && R.filed ? R.filed.engine : null;
     $("#fingerprint").textContent = f ? "engine " + f.engine.version + " · input " + String(f.inputHash).slice(0, 12) + " · output " + String(f.outputHash).slice(0, 12) + (conv && conv.hashes && conv.hashes.events ? " · events " + String(conv.hashes.events).slice(0, 12) : "") : "";
   }
@@ -15880,6 +17147,7 @@ const RegularUI = (function () {
     today: todayIso,
     commit,
     refresh: () => render(),
+    names: () => names(),
     go: goTab,
     provisional: () => { ui.provisional = true; goTab("overview"); },
     demo: () => { ui.mode = "demo"; rebuild(); render(true); },
@@ -15916,6 +17184,7 @@ const RegularUI = (function () {
     today: todayIso,
     commit,
     refresh: () => render(),
+    names: () => names(),
     go: goTab,
   });
 
@@ -15933,6 +17202,7 @@ const RegularUI = (function () {
     persist: pricePersist,
     saveFile,
     copyToClipboard,
+    names: () => names(),
   });
 
   // The comparison with the normal tax scale. What was typed goes through commitLight(); in the demo it stays in the page.
@@ -15960,6 +17230,7 @@ const RegularUI = (function () {
 
   async function init() {
     loadPrefs();
+    Tip.install(document);
     render(true);
     let r = null;
     try {
@@ -15978,6 +17249,8 @@ const RegularUI = (function () {
     ui.loaded = true;
     rebuild();
     render(true);
+    // The names Yahoo gave the securities are in the price book; read it now (no network) so that the names show on every tab.
+    if (perfUI && perfUI.preload) perfUI.preload();
     persist.requestPersistent().then(() => paintHeader());
     autoUI.onStart();
   }
