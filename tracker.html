@@ -32,10 +32,10 @@
   --info: #86B6FF;
   --info-bg: rgba(134, 182, 255, 0.13);
   --c-filed: #3987e5;
-  --c-sel: #199e70; /* the owner's selection on the Tax tab: not orange or red, those colours mean a loss and nothing else */
+  --c-sel: #d95926; /* the owner's selection on the Tax tab (orange; he said on 10 Nov that orange is fine, red is for a loss) */
   --c-gain: #199e70;
-  --c-put: #E6ECF8; /* the money put in: a light neutral, never red or orange */
-  --c-real: #4ADE9A; /* the realised gain: a lighter green than the value line (--c-gain) */
+  --c-put: #E6ECF8; /* the money put in: a light neutral (white), never red */
+  --c-real: #FFB366; /* the realised gain: a light orange (his choice, 10 Nov); a realised loss is red (--c-more) */
   --c-age: #9085e9;
   --c-div: #c98500;
   --c-more: #e66767;
@@ -394,7 +394,7 @@ details.mini > .body { padding-top: 6px; }
 .ychip input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 .band { stroke: none; fill-opacity: 0.22; }
 .band.soft { fill-opacity: 0.13; } /* the gain so far between the value and the money put in: the realised band on top of it is stronger */
-.band.real { fill-opacity: 0.34; }
+.band.real { fill-opacity: 0.9; } /* a light orange has to stay orange on the dark card: at a low opacity it turns brown */
 
 .heat-box { display: grid; gap: 10px; min-width: 0; }
 .heat-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
@@ -11604,7 +11604,7 @@ span.hc { cursor: default; }
   function keyOf(x) {
     const sw = h("span", { class: "swatch" + (x.kind === "line" ? " ln" : x.kind === "band" ? " bd" : "") + (x.dash ? " dash" : "") });
     sw.style.setProperty("--sw", x.color);
-    sw.style.background = x.kind === "band" ? "linear-gradient(180deg, " + x.color + " 0 2px, color-mix(in srgb, " + x.color + " 34%, transparent) 2px 100%)" : x.color;
+    sw.style.background = x.kind === "band" ? "linear-gradient(180deg, " + x.color + " 0 2px, color-mix(in srgb, " + x.color + " 90%, transparent) 2px 100%)" : x.color;
     return sw;
   }
 
@@ -15494,7 +15494,7 @@ const PerfUI = (function () {
       const openAt = (k) => cs.value[k] - cs.stack[k]; // the part of it that is not realised, after fees (see the note of chartSeries in perf.js)
       const short = (v) => C.compactEuro(v, 100); // "€457", "€11.4k": the end of a line; the exact figure is in the hover and the table
       const signed = (v) => (v > 0 ? "+" : "") + short(v);
-      // The lines: the value is the green one (the main thing), the money put in a thin light-neutral one, the realised gain a lighter green band
+      // The lines: the value is the green one (the main thing), the money put in a thin light-neutral one, the realised gain a light orange band (his choice, 10 Nov)
       // stacked on the money put in (its figures are the gain itself; the line is drawn at money put in plus that gain). Red stays for a loss.
       const series = [
         { name: "Value", color: "var(--c-gain)", kind: "line", width: 2.6, front: true, values: cs.value, texts: cs.value.map((v) => money(v)), endText: short(cs.value[last]) },
@@ -15502,7 +15502,7 @@ const PerfUI = (function () {
       ];
       if (sold) series.push({ name: "Realised gain", tipName: "Realised gain, added on top", color: "var(--c-real)", downColor: "var(--c-more)", kind: "band", width: 1.3, glow: false, stackOn: 1, values: cs.realized, texts: cs.realized.map((v) => money(v, true)), endText: signed(cs.realized[last]) });
       // the shading: the gain so far between the value and the money put in (green above the white line, red below), and on top of it, stronger,
-      // the realised band between the white line and its own upper edge (green above, red below); the two lie one inside the other and never blur
+      // the realised band between the white line and its own upper edge (orange above, red below); the two lie one inside the other and never blur
       const bands = [{ a: 0, b: 1, up: "var(--c-gain)", down: "var(--c-more)", cls: "soft" }];
       if (sold) bands.push({ a: 2, b: 1, up: "var(--c-real)", down: "var(--c-more)", cls: "real", show: [2] });
       const chart = C.timeLines({
@@ -15519,7 +15519,7 @@ const PerfUI = (function () {
       const table = C.tableOf(["Date", "Value", "Money put in", "Realised gain", "Not yet realised, after fees", "Gain so far", "Dividends so far"], t.days.map((d, k) => [fd(d), money(t.value[k]), money(t.capital[k]), money(t.realized[k], true), money(t.value[k] - t.stack[k], true), money(t.value[k] - t.capital[k], true), money(t.dividends[k])]), "Value of the portfolio, the money put in, the realised gain, the gain not yet realised, the gain so far and the dividends");
       const note = "White: the money put in (what the holdings were worth when the time-frame began, plus purchases less sales, fees included). Green: the value. "
         + (sold
-          ? "The band on the white line is the gain you have already realised by selling, before tax (the hover shows it as a figure); between the band and the green line is what is not yet realised, after fees. Red is a loss."
+          ? "The orange band on the white line is the gain you have already realised by selling, before tax (the hover shows it as a figure); between the band and the green line is what is not yet realised, after fees. Red is a loss."
           : "No units were sold in this time-frame, so there is no realised gain. The shaded gap is the gain so far, before dividends: green above the white line, red below it.");
       return chartCard("value", "Value and money put in", note, chart, table);
     }
