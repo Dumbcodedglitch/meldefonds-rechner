@@ -32,8 +32,10 @@
   --info: #86B6FF;
   --info-bg: rgba(134, 182, 255, 0.13);
   --c-filed: #3987e5;
-  --c-sel: #d95926;
+  --c-sel: #199e70; /* the owner's selection on the Tax tab: not orange or red, those colours mean a loss and nothing else */
   --c-gain: #199e70;
+  --c-put: #E6ECF8; /* the money put in: a light neutral, never red or orange */
+  --c-real: #4ADE9A; /* the realised gain: a lighter green than the value line (--c-gain) */
   --c-age: #9085e9;
   --c-div: #c98500;
   --c-more: #e66767;
@@ -231,8 +233,11 @@ details .body { padding-top: 8px; display: grid; gap: 10px; }
 .legend.toggles { gap: 6px 8px; }
 .legend .lg { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 4px 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; color: var(--fg); font-size: 12.5px; font-weight: 500; cursor: pointer; transition: border-color 0.15s, opacity 0.15s; }
 .legend .lg:hover { border-color: var(--axis); }
-.legend .lg[aria-pressed="false"] { opacity: 0.55; text-decoration: line-through; background: transparent; }
+.legend .lg[aria-pressed="false"] { opacity: 0.55; background: transparent; }
+.legend .lg[aria-pressed="false"] .swatch { background: transparent !important; box-shadow: inset 0 0 0 1.5px var(--sw, var(--muted)); }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+.swatch.ln { width: 16px; height: 4px; border-radius: 2px; }
+.swatch.bd { width: 16px; height: 11px; border-radius: 2px; }
 .swatch.dash { background-image: repeating-linear-gradient(90deg, transparent 0 3px, var(--bg) 3px 5px) !important; }
 .grid { stroke: var(--grid); stroke-width: 1; }
 .axis { stroke: var(--axis); stroke-width: 1; }
@@ -250,6 +255,7 @@ details .body { padding-top: 8px; display: grid; gap: 10px; }
 .marker-halo { opacity: 0.28; stroke: none; pointer-events: none; }
 .cross { stroke: rgba(205, 218, 255, 0.55); stroke-width: 1; stroke-dasharray: 2 3; pointer-events: none; }
 .pill-bg { fill: rgba(9, 13, 24, 0.94); stroke-width: 1; }
+.pill-link { fill: none; stroke-width: 1; opacity: 0.6; pointer-events: none; }
 .pill-t { fill: var(--fg); font: 600 11px var(--font-mono); }
 .tip, .tipbox { background: color-mix(in srgb, var(--surface-2) 90%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border: 1px solid var(--line-hi); border-radius: 12px; padding: 10px 12px; font-size: 12.5px; line-height: 1.45; pointer-events: none; box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(143, 168, 255, 0.06); }
 .tip { position: absolute; top: 4px; z-index: 6; min-width: 170px; max-width: 280px; }
@@ -258,7 +264,7 @@ details .body { padding-top: 8px; display: grid; gap: 10px; }
 .tip-row.plain { gap: 14px; }
 .tip-row:not(.plain) + .tip-row.plain { margin-top: 5px; padding-top: 6px; border-top: 1px solid var(--line); }
 .tip-name { color: var(--muted); flex: 1 1 auto; }
-.tip-val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12px; text-align: right; }
+.tip-val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12px; text-align: right; white-space: nowrap; flex: none; }
 .tip-val.pos { color: var(--ok); }
 .tip-val.neg { color: var(--bad); }
 /* the one hover box of the page (tip.js) */
@@ -387,6 +393,8 @@ details.mini > .body { padding-top: 6px; }
 .ychip input:checked + span { background: linear-gradient(180deg, #AEC0FF, var(--accent)); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; box-shadow: 0 0 16px -4px var(--accent-glow); }
 .ychip input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 .band { stroke: none; fill-opacity: 0.22; }
+.band.soft { fill-opacity: 0.13; } /* the gain so far between the value and the money put in: the realised band on top of it is stronger */
+.band.real { fill-opacity: 0.34; }
 
 .heat-box { display: grid; gap: 10px; min-width: 0; }
 .heat-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
@@ -9434,7 +9442,7 @@ span.hc { cursor: default; }
 })(typeof self !== "undefined" ? self : this, function (Prices) {
   "use strict";
 
-  const VERSION = "perf-0.3.0";
+  const VERSION = "perf-0.4.0";
   const DAY = 86400000;
   const EPS = 1e-9;
   const dayNumber = Prices.dayNumber;
@@ -10551,11 +10559,31 @@ span.hc { cursor: default; }
    * What the charts draw for a time-frame: value, net money put in so far, the index rebased to 100 at the start and the same as a return
    * so far (twr, a fraction); plus the realised price gain so far (see realizedSeries) and the dividends after tax so far, both counted
    * from the start of the time-frame.
+   *
+   * stack is the top of the realised band on the main chart: money put in (capital) plus the realised gain so far. It is what the units
+   * still held cost (moving average, the value at the start of the time-frame for what was held then) plus all fees paid since the start,
+   * because money put in counts fees and the realised gain does not. So value - stack is the price gain not yet realised minus those fees,
+   * and value - capital = realised + (value - stack): the gain so far before dividends (a test checks both against bridge()).
+   *
+   * With opts.exact the days with money going in or out are kept as well, each with the day before it. Money put in and the realised gain
+   * change only on such days, so between two kept days they are flat and the lines drawn through the points are exact steps (a purchase is
+   * a step on its day, not a slope over the days that were left out). The series is then longer than maxPoints by up to two points per
+   * such day; the table of a chart, which should stay short, does not ask for it.
    */
-  function chartSeries(model, win, maxPoints) {
+  function chartSeries(model, win, maxPoints, opts) {
     const T = model.total;
     const { s, e } = win;
-    const ix = thin(s, e, maxPoints || 300);
+    let ix = thin(s, e, maxPoints || 300);
+    if (opts && opts.exact) {
+      const keep = new Set(ix);
+      for (let i = s + 1; i <= e; i++) {
+        if (T.inflow[i] !== 0 || T.outflow[i] !== 0) {
+          keep.add(i);
+          keep.add(i - 1);
+        }
+      }
+      ix = Array.from(keep).sort((a, b) => a - b);
+    }
     const base = T.index[s];
     const real = realizedSeries(model, win).cum;
     const divs = new Float64Array(e - s + 1);
@@ -10572,6 +10600,7 @@ span.hc { cursor: default; }
       index: ix.map((i) => (T.index[i] / base) * 100),
       twr: ix.map((i) => T.index[i] / base - 1),
       realized: ix.map((i) => real[i - s]),
+      stack: ix.map((i) => T.value[s] + T.invested[i] - T.invested[s] + real[i - s]),
       dividends: ix.map((i) => divs[i - s]),
     };
   }
@@ -11402,13 +11431,29 @@ span.hc { cursor: default; }
     return "M" + xb + " " + y + "H" + (xe + r) + "A" + r + " " + r + " 0 0 0 " + xe + " " + (y + r) + "V" + (y + h - r) + "A" + r + " " + r + " 0 0 0 " + (xe + r) + " " + (y + h) + "H" + xb + "Z";
   }
 
-  /** "€1.2k" style label for an axis tick. */
-  function compactEuro(v) {
+  /**
+   * "€1.2k" style label for an axis tick or the end of a line. With step (the distance between two ticks of an axis, or the smallest amount
+   * that should still show) the thousands get as many decimals as that step needs, so that the ticks of a narrow axis are told apart
+   * ("€10.1k", "€10.2k" and not three times "€10k"); without it they get none from 10k up and one below.
+   */
+  function compactEuro(v, step) {
     const a = Math.abs(v);
     const s = v < 0 ? "−" : "";
-    if (a >= 1e6) return s + "€" + +(a / 1e6).toFixed(2) + "M";
-    if (a >= 1e3) return s + "€" + +(a / 1e3).toFixed(a >= 1e4 ? 0 : 1) + "k";
-    return s + "€" + +a.toFixed(0);
+    if (a >= 1e6) {
+      let dec = 2;
+      if (step > 0) for (dec = 0; dec < 5; dec++) if (Math.abs(+(step / 1e6).toFixed(dec) - step / 1e6) < 1e-12) break;
+      return s + "€" + +(a / 1e6).toFixed(dec) + "M";
+    }
+    if (a >= 1e3) {
+      let dec = a >= 1e4 ? 0 : 1;
+      if (step > 0) {
+        for (dec = 0; dec < 3; dec++) if (Math.abs(+(step / 1e3).toFixed(dec) - step / 1e3) < 1e-9) break;
+      }
+      return s + "€" + +(a / 1e3).toFixed(dec) + "k";
+    }
+    let dec = 0;
+    if (step > 0) for (dec = 0; dec < 3; dec++) if (Math.abs(+step.toFixed(dec) - step) < 1e-9) break;
+    return s + "€" + +a.toFixed(dec);
   }
 
 
@@ -11553,14 +11598,25 @@ span.hc { cursor: default; }
   }
 
   /**
+   * The key of a series in a legend or a tooltip: a short line for a line (kind "line"), a small filled box with an edge on top for a band
+   * (kind "band"), a square otherwise. The colour is also kept as --sw, so that the key of a switched-off line can be drawn hollow.
+   */
+  function keyOf(x) {
+    const sw = h("span", { class: "swatch" + (x.kind === "line" ? " ln" : x.kind === "band" ? " bd" : "") + (x.dash ? " dash" : "") });
+    sw.style.setProperty("--sw", x.color);
+    sw.style.background = x.kind === "band" ? "linear-gradient(180deg, " + x.color + " 0 2px, color-mix(in srgb, " + x.color + " 34%, transparent) 2px 100%)" : x.color;
+    return sw;
+  }
+
+  /**
    * The legend. With opts.toggle it is a row of buttons that hide and show lines (the axis follows what is shown); the state of a button is
-   * aria-pressed, and a hidden one is also struck through, so it never rests on colour alone. sync() puts the state of opts.hidden on them.
+   * aria-pressed, and the colour of a hidden one goes dim and its key hollow (the words are never struck through). sync() puts the state of
+   * opts.hidden on them.
    */
   function legend(series, opts) {
     const toggle = opts && opts.toggle;
     const ul = h("ul", { class: "legend" + (toggle ? " toggles" : ""), "aria-label": "Legend" }, series.map((x) => {
-      const sw = h("span", { class: "swatch" + (x.dash ? " dash" : "") });
-      sw.style.background = x.color;
+      const sw = keyOf(x);
       if (!toggle) return h("li", {}, [sw, h("span", { text: x.name })]);
       const b = h("button", { type: "button", class: "lg", "data-name": x.name, "aria-pressed": "true", title: "Show or hide: " + x.name }, [sw, h("span", { text: x.name })]);
       b.addEventListener("click", () => toggle(x.name));
@@ -11587,7 +11643,7 @@ span.hc { cursor: default; }
     return set;
   }
 
-  /** Tooltip that follows keyboard focus and the pointer. Text only (textContent), never markup. Rows: { name, value, color?, tone?, plain? }. */
+  /** Tooltip that follows keyboard focus and the pointer. Text only (textContent), never markup. Rows: { name, value, color?, kind? ("line" or "band": the shape of the key), tone?, plain? }. */
   function makeTip(wrap) {
     const tip = h("div", { class: "tip", role: "status", hidden: "" });
     wrap.appendChild(tip);
@@ -11597,11 +11653,7 @@ span.hc { cursor: default; }
         tip.appendChild(h("div", { class: "tip-title", text: title }));
         for (const r of rows) {
           const line = h("div", { class: "tip-row" + (r.plain ? " plain" : "") });
-          if (r.color) {
-            const sw = h("span", { class: "swatch" });
-            sw.style.background = r.color;
-            line.appendChild(sw);
-          }
+          if (r.color) line.appendChild(keyOf({ color: r.color, kind: r.kind }));
           line.appendChild(h("span", { class: "tip-name", text: r.name }));
           line.appendChild(h("span", { class: "tip-val" + (r.tone ? " " + r.tone : ""), text: r.value }));
           tip.appendChild(line);
@@ -11898,22 +11950,69 @@ span.hc { cursor: default; }
   }
 
   /**
+   * The line of a stacked series in two colours: as paths where its own value is zero or above (up) and where it is below zero (down),
+   * cut where the own value crosses zero. own: the own values; P: where the line is drawn; xs and y as for bandPaths.
+   * Returns { up: [path text, ...], down: [path text, ...] }.
+   */
+  function splitLinePaths(own, P, xs, y) {
+    const up = [];
+    const down = [];
+    let run = null;
+    // a point is added once (a crossing that lies on a point of the line does not repeat it), and a piece of one point is no line at all
+    const add = (r, q) => {
+      const l = r.pts[r.pts.length - 1];
+      if (!l || l[0] !== q[0] || l[1] !== q[1]) r.pts.push(q);
+    };
+    const close = () => {
+      if (run && run.pts.length > 1) (run.sg > 0 ? up : down).push("M" + run.pts.map((q) => q[0].toFixed(1) + " " + q[1].toFixed(1)).join("L"));
+      run = null;
+    };
+    for (let i = 0; i < P.length; i++) {
+      const sg = own[i] >= 0 ? 1 : -1;
+      if (run && run.sg !== sg) {
+        // the own value crossed zero between the two points: this piece ends at the crossing and the next one begins there
+        const t = own[i - 1] / (own[i - 1] - own[i]);
+        const c = [xs[i - 1] + t * (xs[i] - xs[i - 1]), y(P[i - 1] + t * (P[i] - P[i - 1]))];
+        add(run, c);
+        close();
+        run = { sg, pts: [c] };
+      }
+      if (!run) run = { sg, pts: [] };
+      add(run, [xs[i], y(P[i])]);
+    }
+    close();
+    return { up, down };
+  }
+
+  /**
    * One to four lines over a stretch of days, many points (the caller thins them): the value of a portfolio, the growth of 100.
    * The pointer, a finger or the arrow keys move a cross hair that shows the exact values of that day.
-   * opts: { days: ["YYYY-MM-DD", ...], series: [{ name, color, values: [number...], dash, texts, area, fade }], format: (number) => text (axis and
-   *         tooltip), zero: true (the axis includes zero), dateText: (iso) => text for the title of the tooltip, height, ariaLabel,
-   *         band: { a, b, up, down } shades the gap between series a and series b (colours for a above b and a below b),
+   * opts: { days: ["YYYY-MM-DD", ...], series: [{ name, color, values: [number...], dash, texts, area, fade, kind, width, glow, front, stackOn,
+   *         downColor, endText }], format: (number) => text (tooltip and the end of the lines), tickFormat: (number, step) => text of an axis tick (default
+   *         format), zero: true (the axis includes zero; without it the axis follows the lines), dateText: (iso) => text for the title of the
+   *         tooltip, height, ariaLabel,
+   *         bands: [{ a, b, up, down, cls, show }]: each shades the gap between series a and series b (colour up where a is above b, down where
+   *         it is below; cls an extra class; show the list of series that must be shown for it to be drawn, default a and b),
    *         a series with area: true shades between its line and zero (stronger the further from zero), with fade: true under its line,
    *         key: a name that keeps what the owner switched off in the legend when the chart is drawn again,
    *         rows: (index) => [[label, text, tone?], ...] more rows for the tooltip of a day }
+   * A series with stackOn: i sits on top of series i: it is drawn at the values of series i plus its own, while its own values are the figures
+   * of its tooltip row and end pill (a realised gain stacked on the money put in). It is drawn behind the others (so that where it lies on the
+   * line it sits on, that line stays visible), and with downColor its line, its pill and its key in the tooltip take that colour where its own
+   * value is below zero (a loss). kind: "line" or "band" is the shape of its key in the legend
+   * and the tooltip, width its line width, glow: false takes its glow away, front: true draws it above the others, endText the text of its pill.
    * With two or more lines the legend is a row of buttons that hide and show a line; the axis follows what is shown (the last line stays).
-   * Every line has a soft glow under it, the value of each line at its right end sits in a small pill, and the cross hair rings the points.
+   * The value of each line at its right end sits in a small pill (joined to its line by a short stroke where it had to be moved to leave
+   * room for another), and the cross hair rings the points.
    */
   function timeLines(opts) {
     const days = opts.days;
     const series = opts.series;
     const fmt = opts.format || compactEuro;
     const n = days.length;
+    // where each series is drawn: one that sits on another runs at the other's values plus its own
+    const pos = series.map((x) => (x.stackOn === undefined ? x.values : x.values.map((v, k) => v + series[x.stackOn].values[k])));
+    const endTexts = series.map((x) => x.endText || fmt(x.values[n - 1]));
     const wrap = h("div", { class: "chart-wrap" });
     const box = h("figure", { class: "chart" }, []);
     const hidden = hiddenFor(opts.key, series.map((x) => x.name));
@@ -11941,19 +12040,24 @@ span.hc { cursor: default; }
       for (const x of Array.from(wrap.querySelectorAll("svg"))) x.remove();
       const H = opts.height || 220;
       const vis = series.map((x, i) => i).filter((i) => !hidden.has(series[i].name));
-      const mt = 14, mb = 24, ml = 50;
-      const endTexts = series.map((x) => fmt(x.values[n - 1]));
+      const mt = 14, mb = 24;
+      // the axis follows what is shown; a band that sits on a line needs that line's values, shown or not
+      let lo = Infinity, hi = -Infinity;
+      const used = new Set(vis);
+      for (const i of vis) if (series[i].stackOn !== undefined) used.add(series[i].stackOn);
+      for (const i of used) for (const v of pos[i]) { if (v < lo) lo = v; if (v > hi) hi = v; }
+      if (opts.zero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+      const sc = niceScaleFree(lo, hi, 4);
+      const tickText = (t) => (opts.tickFormat ? opts.tickFormat(t, sc.step) : fmt(t));
+      // the left margin is as wide as the longest tick label (a phone has no room to spare), the right one as wide as the pills
+      const ml = Math.max(36, Math.ceil(Math.max.apply(null, sc.ticks.map((t) => tickText(t).length)) * 6.7) + 12);
       const pills = vis.length <= 4;
-      const pillW = (i) => Math.round(endTexts[i].length * 6.8 + 24);
+      const pillW = (i) => Math.round(endTexts[i].length * 6.8 + 22);
       const mr = pills ? Math.min(100, Math.max(14, Math.max.apply(null, vis.map(pillW)) + 12)) : 14;
       const pw = W - ml - mr, ph = H - mt - mb;
       const svg = s("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H, role: "group", "aria-label": (opts.ariaLabel || "Chart") + ". Use the left and right arrow keys to read the values of each day." });
       wrap.insertBefore(svg, wrap.firstChild);
       const defs = defsOf(svg, W, H);
-      let lo = Infinity, hi = -Infinity;
-      for (const i of vis) for (const v of series[i].values) { if (v < lo) lo = v; if (v > hi) hi = v; }
-      if (opts.zero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
-      const sc = niceScaleFree(lo, hi, 4);
       const y = (v) => mt + ph - ((v - sc.min) / (sc.max - sc.min)) * ph;
       const a = dayNum(days[0]), b = dayNum(days[n - 1]);
       const xOf = (iso) => (b > a ? ml + ((dayNum(iso) - a) / (b - a)) * pw : ml + pw / 2);
@@ -11961,13 +12065,15 @@ span.hc { cursor: default; }
       for (const t of sc.ticks) {
         s("line", { x1: ml, x2: W - mr, y1: y(t), y2: y(t), class: t === 0 && sc.min < 0 ? "axis" : "grid" }, svg);
         const lab = s("text", { x: ml - 6, y: y(t) + 4, class: "tick", "text-anchor": "end" }, svg);
-        lab.textContent = fmt(t);
+        lab.textContent = tickText(t);
       }
       s("line", { x1: ml, x2: W - mr, y1: mt + ph, y2: mt + ph, class: "axis" }, svg);
-      if (opts.band && vis.indexOf(opts.band.a) >= 0 && vis.indexOf(opts.band.b) >= 0) {
-        const bp = bandPaths(series[opts.band.a].values, series[opts.band.b].values, xs, y);
-        if (bp.up) s("path", { d: bp.up, class: "band" }, svg).style.fill = opts.band.up;
-        if (bp.down) s("path", { d: bp.down, class: "band" }, svg).style.fill = opts.band.down;
+      for (const bd of opts.bands || (opts.band ? [opts.band] : [])) {
+        if (!(bd.show || [bd.a, bd.b]).every((i) => vis.indexOf(i) >= 0)) continue;
+        const bp = bandPaths(pos[bd.a], pos[bd.b], xs, y);
+        const cls = "band" + (bd.cls ? " " + bd.cls : "");
+        if (bp.up) s("path", { d: bp.up, class: cls }, svg).style.fill = bd.up;
+        if (bp.down) s("path", { d: bp.down, class: cls }, svg).style.fill = bd.down;
       }
       for (const i of vis) {
         const x = series[i];
@@ -11992,29 +12098,53 @@ span.hc { cursor: default; }
         const lab = s("text", { x: Math.min(Math.max(tx, ml + 14), W - mr - 14), y: H - 7, class: "tick", "text-anchor": "middle" }, svg);
         lab.textContent = t.label;
       }
-      for (const i of vis) {
+      // the lines in the order of the series, a stacked one first (where it lies on the line it sits on, that one must stay visible) and the one
+      // that says "front" last so that nothing covers it
+      const rank = (i) => (series[i].front ? 2 : series[i].stackOn !== undefined ? 0 : 1);
+      const order = vis.slice().sort((p, q) => rank(p) - rank(q));
+      const pathOf = (i) => pos[i].map((v, k) => (k ? "L" : "M") + xs[k].toFixed(1) + " " + y(v).toFixed(1)).join("");
+      // the colour of a series on a day: a stacked one with a loss colour changes to it where its own value is below zero
+      const colorAt = (i, k) => (series[i].downColor !== undefined && series[i].stackOn !== undefined && series[i].values[k] < 0 ? series[i].downColor : series[i].color);
+      for (const i of order) {
         const x = series[i];
-        const d = x.values.map((v, k) => (k ? "L" : "M") + xs[k].toFixed(1) + " " + y(v).toFixed(1)).join("");
-        const gl = s("path", { d, class: "lineglow", filter: defs.glow }, svg);
+        if (x.glow === false) continue;
+        const gl = s("path", { d: pathOf(i), class: "lineglow", filter: defs.glow }, svg);
         gl.style.stroke = x.color;
         if (x.dash) gl.setAttribute("stroke-dasharray", "6 4");
       }
-      for (const i of vis) {
+      for (const i of order) {
         const x = series[i];
-        const d = x.values.map((v, k) => (k ? "L" : "M") + xs[k].toFixed(1) + " " + y(v).toFixed(1)).join("");
-        const p = s("path", { d, class: "line" }, svg);
-        p.style.stroke = x.color;
-        if (x.dash) p.setAttribute("stroke-dasharray", "6 4");
+        const paint = (d, color) => {
+          const p = s("path", { d, class: "line" }, svg);
+          p.style.stroke = color;
+          if (x.width) p.style.strokeWidth = x.width;
+          if (x.dash) p.setAttribute("stroke-dasharray", "6 4");
+        };
+        if (x.downColor !== undefined && x.stackOn !== undefined) {
+          const sp = splitLinePaths(x.values, pos[i], xs, y);
+          for (const d of sp.up) paint(d, x.color);
+          for (const d of sp.down) paint(d, x.downColor);
+        } else {
+          paint(pathOf(i), x.color);
+        }
       }
-      // the value at the right end of every line (at most four lines) in a small pill, pushed apart where they would touch
+      // the value at the right end of every line (at most four lines) in a small pill, pushed apart where they would touch (up from the
+      // bottom of the plot when they run out of room there) and joined to the end of the line by a short stroke where one had to move
       if (pills) {
-        const ends = vis.map((i) => ({ i, y: y(series[i].values[n - 1]) })).sort((p, q) => p.y - q.y);
+        const ends = vis.map((i) => ({ i, at: y(pos[i][n - 1]), y: y(pos[i][n - 1]) })).sort((p, q) => p.y - q.y);
         for (let k = 1; k < ends.length; k++) if (ends[k].y - ends[k - 1].y < 22) ends[k].y = ends[k - 1].y + 22;
+        const floor = mt + ph + 6;
+        for (let k = ends.length - 1; k >= 0; k--) {
+          if (ends[k].y > floor) ends[k].y = floor;
+          if (k > 0 && ends[k].y - ends[k - 1].y < 22) ends[k - 1].y = ends[k].y - 22;
+        }
         for (const e of ends) {
-          const g = s("g", { class: "pill", transform: "translate(" + (xs[n - 1] + 8).toFixed(1) + " " + (Math.min(e.y, mt + ph + 6) - 10).toFixed(1) + ")" }, svg);
-          s("rect", { width: pillW(e.i), height: 20, rx: 10, class: "pill-bg" }, g).style.stroke = series[e.i].color;
-          s("circle", { cx: 10, cy: 10, r: 3.5 }, g).style.fill = series[e.i].color;
-          s("text", { x: 19, y: 14.2, class: "pill-t" }, g).textContent = endTexts[e.i];
+          const pc = colorAt(e.i, n - 1);
+          if (Math.abs(e.y - e.at) > 3) s("path", { d: "M" + xs[n - 1].toFixed(1) + " " + e.at.toFixed(1) + "L" + (xs[n - 1] + 8).toFixed(1) + " " + e.y.toFixed(1), class: "pill-link" }, svg).style.stroke = pc;
+          const g = s("g", { class: "pill", transform: "translate(" + (xs[n - 1] + 8).toFixed(1) + " " + (e.y - 10).toFixed(1) + ")" }, svg);
+          s("rect", { width: pillW(e.i), height: 20, rx: 10, class: "pill-bg" }, g).style.stroke = pc;
+          s("circle", { cx: 10, cy: 10, r: 3.5 }, g).style.fill = pc;
+          s("text", { x: 18, y: 14.2, class: "pill-t" }, g).textContent = endTexts[e.i];
         }
       }
       const cross = s("line", { class: "cross", y1: mt, y2: mt + ph, x1: 0, x2: 0, style: "display:none" }, svg);
@@ -12036,11 +12166,12 @@ span.hc { cursor: default; }
         for (const i of vis) {
           for (const node of [marks[i], rings[i]]) {
             node.setAttribute("cx", xs[current]);
-            node.setAttribute("cy", y(series[i].values[current]));
+            node.setAttribute("cy", y(pos[i][current]));
+            node.style.fill = colorAt(i, current);
             node.style.display = "";
           }
         }
-        const rows = vis.map((i) => ({ name: series[i].name, color: series[i].color, value: series[i].texts && series[i].texts[current] ? series[i].texts[current] : fmt(series[i].values[current]) }));
+        const rows = vis.map((i) => ({ name: series[i].tipName || series[i].name, color: colorAt(i, current), kind: series[i].kind, value: series[i].texts && series[i].texts[current] ? series[i].texts[current] : fmt(series[i].values[current]) }));
         tipper.show((opts.dateText || String)(days[current]), rows.concat(plainRows(opts.rows ? opts.rows(current) : null)), xs[current]);
       };
       const hide = () => {
@@ -12182,7 +12313,7 @@ span.hc { cursor: default; }
     return h("div", { class: "tbl-wrap" }, [t]);
   }
 
-  return { niceScale, niceScaleFree, timeTicks, nearestIndex, barPath, hBarPath, compactEuro, bars, line, timeLines, hbars, tableOf, legend, constants: { MAX_BAR, RADIUS, GAP } };
+  return { niceScale, niceScaleFree, timeTicks, nearestIndex, barPath, hBarPath, compactEuro, bandPaths, splitLinePaths, bars, line, timeLines, hbars, tableOf, legend, constants: { MAX_BAR, RADIUS, GAP } };
 });
 
 /* ---- src/app/persist.js ---- */
@@ -15354,29 +15485,42 @@ const PerfUI = (function () {
     // ------------------------------------------------------------ the value against the money put in
 
     function valueCard(m, w) {
-      const cs = Perf.chartSeries(m, w, 300);
+      // exact steps: the days with money going in or out are kept, so that the money put in and the band on it are drawn as steps on their days
+      const cs = Perf.chartSeries(m, w, 300, { exact: true });
       const t = Perf.chartSeries(m, w, 48);
+      const last = cs.days.length - 1;
       const sold = cs.realized.some((v) => v !== 0);
-      const gainAt = (k) => cs.value[k] - cs.capital[k];
+      const gainAt = (k) => cs.value[k] - cs.capital[k]; // the gain so far, before dividends
+      const openAt = (k) => cs.value[k] - cs.stack[k]; // the part of it that is not realised, after fees (see the note of chartSeries in perf.js)
+      const short = (v) => C.compactEuro(v, 100); // "€457", "€11.4k": the end of a line; the exact figure is in the hover and the table
+      const signed = (v) => (v > 0 ? "+" : "") + short(v);
+      // The lines: the value is the green one (the main thing), the money put in a thin light-neutral one, the realised gain a lighter green band
+      // stacked on the money put in (its figures are the gain itself; the line is drawn at money put in plus that gain). Red stays for a loss.
       const series = [
-        { name: "Value", color: "var(--c-filed)", values: cs.value, texts: cs.value.map((v) => money(v)) },
-        { name: "Money put in", color: "var(--c-sel)", values: cs.capital, texts: cs.capital.map((v) => money(v)), dash: true },
+        { name: "Value", color: "var(--c-gain)", kind: "line", width: 2.6, front: true, values: cs.value, texts: cs.value.map((v) => money(v)), endText: short(cs.value[last]) },
+        { name: "Money put in", color: "var(--c-put)", kind: "line", width: 1.8, glow: false, values: cs.capital, texts: cs.capital.map((v) => money(v)), endText: short(cs.capital[last]) },
       ];
-      if (sold) series.push({ name: "Realised gain", color: "var(--c-gain)", values: cs.realized, texts: cs.realized.map((v) => money(v, true)) });
+      if (sold) series.push({ name: "Realised gain", tipName: "Realised gain, added on top", color: "var(--c-real)", downColor: "var(--c-more)", kind: "band", width: 1.3, glow: false, stackOn: 1, values: cs.realized, texts: cs.realized.map((v) => money(v, true)), endText: signed(cs.realized[last]) });
+      // the shading: the gain so far between the value and the money put in (green above the white line, red below), and on top of it, stronger,
+      // the realised band between the white line and its own upper edge (green above, red below); the two lie one inside the other and never blur
+      const bands = [{ a: 0, b: 1, up: "var(--c-gain)", down: "var(--c-more)", cls: "soft" }];
+      if (sold) bands.push({ a: 2, b: 1, up: "var(--c-real)", down: "var(--c-more)", cls: "real", show: [2] });
       const chart = C.timeLines({
         days: cs.days,
         series,
-        band: { a: 0, b: 1, up: "var(--c-gain)", down: "var(--c-more)" },
-        zero: true,
+        bands,
+        tickFormat: (v, step) => C.compactEuro(v, step),
         dateText: fd,
         key: "value",
-        rows: (i) => [["Gain so far, before dividends", money(gainAt(i), true), toneOf(gainAt(i))], ["Dividends so far", money(cs.dividends[i])]],
-        ariaLabel: "Value of the portfolio, the money put in" + (sold ? " and the realised gain" : "") + ", from " + fd(w.from) + " to " + fd(w.to),
-        height: 240,
+        rows: (i) => (sold ? [["Not yet realised, after fees", money(openAt(i), true), toneOf(openAt(i))]] : []).concat([["Gain so far, before dividends", money(gainAt(i), true), toneOf(gainAt(i))], ["Dividends so far", money(cs.dividends[i])]]),
+        ariaLabel: "Value of the portfolio and the money put in" + (sold ? ", with the realised gain stacked on it" : "") + ", from " + fd(w.from) + " to " + fd(w.to),
+        height: 250,
       });
-      const table = C.tableOf(["Date", "Value", "Money put in", "Gain so far", "Realised gain", "Dividends so far"], t.days.map((d, k) => [fd(d), money(t.value[k]), money(t.capital[k]), money(t.value[k] - t.capital[k], true), money(t.realized[k], true), money(t.dividends[k])]), "Value of the portfolio, the money put in, the gain so far, the realised gain and the dividends");
-      const note = "Money put in is what the holdings were worth when the time-frame began plus what you added since (purchases less sales, fees included). The shaded gap is the gain so far, before dividends: green above the line, red below it. "
-        + (sold ? "Realised gain is the price gain you made by selling, counted from the start of the time-frame (before tax)." : "No units were sold in this time-frame, so there is no realised gain to show.");
+      const table = C.tableOf(["Date", "Value", "Money put in", "Realised gain", "Not yet realised, after fees", "Gain so far", "Dividends so far"], t.days.map((d, k) => [fd(d), money(t.value[k]), money(t.capital[k]), money(t.realized[k], true), money(t.value[k] - t.stack[k], true), money(t.value[k] - t.capital[k], true), money(t.dividends[k])]), "Value of the portfolio, the money put in, the realised gain, the gain not yet realised, the gain so far and the dividends");
+      const note = "White: the money put in (what the holdings were worth when the time-frame began, plus purchases less sales, fees included). Green: the value. "
+        + (sold
+          ? "The band on the white line is the gain you have already realised by selling, before tax (the hover shows it as a figure); between the band and the green line is what is not yet realised, after fees. Red is a loss."
+          : "No units were sold in this time-frame, so there is no realised gain. The shaded gap is the gain so far, before dividends: green above the white line, red below it.");
       return chartCard("value", "Value and money put in", note, chart, table);
     }
 
