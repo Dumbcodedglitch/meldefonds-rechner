@@ -369,6 +369,18 @@ details.mini > .body { padding-top: 6px; }
 .risk-controls { display: grid; gap: 10px; min-width: 0; }
 .sec-sub { display: flex; flex-wrap: wrap; gap: 2px 14px; color: var(--muted); font-size: 13px; }
 @media (min-width: 640px) { .sec-table { display: block; } .sec-list { display: none; } }
+/* the choice of a view (where, what) and the places where a security or the whole portfolio is held: a name that is a button */
+.viewbar { display: grid; gap: 8px; min-width: 0; }
+.viewbar .fields.tight { flex: none; }
+.viewbar .now { font-size: 14px; overflow-wrap: anywhere; }
+button.rowlink { background: none; border: 0; padding: 4px 0; margin: 0; color: var(--fg); font: inherit; font-weight: 650; cursor: pointer; text-align: left; display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; min-height: 32px; max-width: 100%; overflow-wrap: anywhere; }
+button.rowlink .chev { color: var(--accent); font-weight: 400; }
+button.rowlink:hover .rl-name { text-decoration: underline; text-underline-offset: 3px; }
+button.rowlink:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.rowlink .rl-sub { color: var(--muted); font-weight: 400; font-size: 12px; }
+.tbl tr.sub .rowlink { margin-left: 14px; font-weight: 500; }
+.sec-list li.sub { margin-left: 14px; }
+.sec-list li.total { background: transparent; border: 1px solid var(--line); }
 .list.kit { gap: 8px; }
 .list.kit li { grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 10px 12px; background: var(--surface-2); border-radius: 10px; }
 .list.kit li strong { overflow-wrap: anywhere; font-size: 13px; }
@@ -2409,6 +2421,11 @@ span.hc { cursor: default; }
         best.i.role = "move_in";
         best.i.conf = o.conf;
         best.i.note = "Looks like a move from " + o.account + " (" + why + "). Not a purchase.";
+        // who is on the other side, and the day the units left: the performance views by account and broker need both (architecture 25.3, rule 2)
+        o.moveWith = best.i.account;
+        best.i.moveWith = o.account;
+        o.moveDate = o.date;
+        best.i.moveDate = o.date;
         moves.push({ date: o.date, from: o.account, to: best.i.account, symbol: o.symbol, conf: o.conf, days: best.dd });
         if (clear) movePairs++;
         else moveLoose++;
@@ -8451,6 +8468,9 @@ span.hc { cursor: default; }
         kind: LEDGER_KIND[r.role] || "OTHER",
         type: r.type,
         move: r.role === "move_in" || r.role === "move_out",
+        // for a move: the account on the other side and the day the units left (the performance views by account use them)
+        moveWith: (r.role === "move_in" || r.role === "move_out") && r.moveWith ? r.moveWith : "",
+        moveDate: (r.role === "move_in" || r.role === "move_out") && r.moveDate ? r.moveDate : "",
         qty: r.qty === null ? "" : q(r.qty),
         price: r.price === null ? "" : Dec.str(r.price),
         fee: r.fee === null ? "" : Dec.str(r.fee),
@@ -9433,6 +9453,11 @@ span.hc { cursor: default; }
  *     as an inflow, Act/365.
  *  6. A security without prices, or whose prices do not fit the trades, is left out of every figure and listed with the reason.
  *     Nothing is guessed: a figure is either computed or the security says why it is missing.
+ *  7. Views (perf-0.5.0, architecture 25): the lines of one broker, one account or one security can be handed in on their own
+ *     (scopeLines). A view is the performance of those transactions alone, worked as if they were the whole portfolio. A move between
+ *     two accounts that is only half inside a view is a flow in kind on the day the units left (no price, no fee); every view ends
+ *     on the day of the whole portfolio (input.end); and which securities can be valued is decided once, on the whole portfolio
+ *     (decisions, input.decided), so that the views of all accounts add up to the whole.
  *
  * Pure functions. The clock, the prices and the exchange rates are handed in.
  */
@@ -9442,7 +9467,7 @@ span.hc { cursor: default; }
 })(typeof self !== "undefined" ? self : this, function (Prices) {
   "use strict";
 
-  const VERSION = "perf-0.4.0";
+  const VERSION = "perf-0.5.0";
   const DAY = 86400000;
   const EPS = 1e-9;
   const dayNumber = Prices.dayNumber;
@@ -9514,6 +9539,8 @@ span.hc { cursor: default; }
    *   prices    (symbol) => the price entry { currency, closes: [[day, "price"], ...], splits: [{ date, num, den }], status, error } or null,
    *   fx        (currency, day) => { ok, rate (units of the currency per euro), lagDays } (never asked for EUR),
    *   options   { maxPriceLagDays: 10, maxFxLagDays: 7, applySplits: true, unpriced: "exclude" | "trade" }
+   *   end       (a view only) "YYYY-MM-DD": the last day of the axis (never before the last row), so that every view ends on the day of the whole
+   *   decided   (a view only) decisions(whole model): which tickers the whole portfolio could value; the view follows it
    * }
    * Returns { ok, reason, text, version, start, end, days[], total{...}, tickers[], problems[], ... } (see the end of this function).
    */
@@ -9616,6 +9643,15 @@ span.hc { cursor: default; }
         info.text = "No row of this security can be used.";
         continue;
       }
+      // a view follows the whole portfolio: a security the whole could not value is left out here too, with the same reason
+      const dec = input.decided && typeof input.decided === "object" ? input.decided[g.ticker] : null;
+      if (dec && dec.state === "EXCLUDED") {
+        info.symbol = dec.symbol || "";
+        info.currency = dec.currency || "";
+        info.reason = dec.reason || "NO_PRICES";
+        info.text = dec.text || "";
+        continue;
+      }
       const firstDn = Math.min(...all);
       const symbol = typeof mapping[g.ticker] === "string" ? mapping[g.ticker] : "";
       info.symbol = symbol;
@@ -9685,8 +9721,9 @@ span.hc { cursor: default; }
         continue;
       }
       if (g.trades.some((t) => t.ccy === "") || g.divs.some((d) => d.ccy === "")) P.add("info", "ASSUMED_CURRENCY", "Some rows of " + g.ticker + " are in an account without a currency; they are taken to be in " + ser.ccy + ".", g.ticker);
-      // do the prices fit the trades?
-      if (ser.real) {
+      // do the prices fit the trades? (a view does not ask again: the whole portfolio has answered, and a view that asked about fewer
+      // trades could decide differently and then the views would no longer add up to the whole)
+      if (ser.real && !(dec && dec.state === "INCLUDED")) {
         const dev = [];
         let ci = -1;
         for (const t of g.trades) {
@@ -9728,7 +9765,9 @@ span.hc { cursor: default; }
       }
       if (ser.real) lastCloseDn = Math.max(lastCloseDn, ser.dns[ser.dns.length - 1]);
     }
-    const endDn = Math.max(lastRowDn, Math.min(todayDn, lastCloseDn || todayDn));
+    let endDn = Math.max(lastRowDn, Math.min(todayDn, lastCloseDn || todayDn));
+    const forcedEnd = typeof input.end === "string" ? dayNumber(input.end) : null;
+    if (forcedEnd !== null) endDn = Math.max(lastRowDn, forcedEnd); // a view ends where the whole portfolio ends
     const N = endDn - startDn + 2; // index 0 is the day before the first row
     const dn0 = startDn - 1;
     const zeros = () => new Float64Array(N);
@@ -9912,6 +9951,46 @@ span.hc { cursor: default; }
       problems: P.list(),
       options: o,
     };
+  }
+
+  // ---------------------------------------------------------------- views: one broker, one account, one security
+
+  /**
+   * The ledger lines of a view, ready for compute(). scope: { accounts: [account names] | null (every account), ticker: "" (every security) }.
+   *  - A line belongs to the view when its account is one of the accounts and, with a ticker, the ticker is that one.
+   *  - A paired move between two accounts (line.move, with moveWith: the account on the other side, and moveDate: the day the units
+   *    left): both sides inside the view: left out, as in the whole portfolio. Only one side inside: a flow in kind on moveDate, with no
+   *    price and no fee, so that compute() values it at the close of that day: money in or out, never a gain (architecture 25.3, rule 2).
+   *    A move whose other side is not known counts as half inside, so that no holding is lost.
+   * Without accounts and ticker the lines come back as they are (the whole portfolio).
+   */
+  function scopeLines(lines, scope) {
+    const src = Array.isArray(lines) ? lines : [];
+    const accs = scope && Array.isArray(scope.accounts) ? new Set(scope.accounts) : null;
+    const tk = scope && typeof scope.ticker === "string" ? scope.ticker : "";
+    if (!accs && !tk) return src;
+    const out = [];
+    for (const l of src) {
+      if (!l || typeof l !== "object") continue;
+      if (tk && l.ticker !== tk) continue;
+      if (accs && !accs.has(l.account)) continue;
+      if (l.move === true && (l.kind === "BUY" || l.kind === "SELL")) {
+        const other = typeof l.moveWith === "string" && l.moveWith !== "" ? l.moveWith : null;
+        const bothInside = !accs || (other !== null && accs.has(other));
+        if (bothInside) continue;
+        out.push(Object.assign({}, l, { move: false, date: l.moveDate || l.date, price: "", fee: "", gross: "" }));
+        continue;
+      }
+      out.push(l);
+    }
+    return out;
+  }
+
+  /** What the whole portfolio decided about each security, to hand to a view as input.decided: { ticker: { state, reason, text, symbol, currency } }. */
+  function decisions(model) {
+    const out = {};
+    for (const t of model && Array.isArray(model.tickers) ? model.tickers : []) out[t.ticker] = { state: t.state, reason: t.reason, text: t.text, symbol: t.symbol, currency: t.currency };
+    return out;
   }
 
   // ---------------------------------------------------------------- time-frames
@@ -10605,7 +10684,7 @@ span.hc { cursor: default; }
     };
   }
 
-  return { VERSION, PRESETS, addMonths, median, xirr, compute, resolve, stats, years, byTicker, thin, chartSeries, months, periods, drawdown, drawdowns, risk, riskAdjusted, bridge, realizedSeries, allocation };
+  return { VERSION, PRESETS, addMonths, median, xirr, compute, scopeLines, decisions, resolve, stats, years, byTicker, thin, chartSeries, months, periods, drawdown, drawdowns, risk, riskAdjusted, bridge, realizedSeries, allocation };
 });
 
 /* ---- src/app/perf-input.js ---- */
@@ -10619,6 +10698,9 @@ span.hc { cursor: default; }
  *  - fx       the ECB rate of a day for any currency, read from the ECB files the owner stored for the tax (the wide ECB history file
  *             holds every currency, so a file stored for USD also gives GBP or CHF; a file that holds one currency gives only that one)
  *
+ * Views (architecture 25): placesOf lists the brokers, accounts and securities of the data for the choice of a view, scopeOf turns a choice
+ * into the scope of Perf.scopeLines, runView runs the engine on the lines of one view.
+ *
  * Nothing here is calculated: it only hands things over. Pure functions apart from a small memory of ECB files already read.
  */
 (function (root, factory) {
@@ -10627,7 +10709,7 @@ span.hc { cursor: default; }
 })(typeof self !== "undefined" ? self : this, function (Ecb, PriceBook, Perf) {
   "use strict";
 
-  const VERSION = "perfinput-0.1.0";
+  const VERSION = "perfinput-0.2.0";
   const MAX_LAG_DAYS = 3650; // a rate is always used, however old; the engine reports the ones that are far from their day
 
   const readers = new Map(); // "hash|ccy" -> ledger or null (the ECB file is large: read it once per currency)
@@ -10696,13 +10778,101 @@ span.hc { cursor: default; }
     return Perf.compute(build(args));
   }
 
+  // ---------------------------------------------------------------- views: one broker, one account, one security (architecture 25)
+
+  /** A view is { where: "" | "b:<broker>" | "a:<account>", ticker: "" }; the whole portfolio is the empty one. */
+  const isWhole = (sel) => !sel || (!sel.where && !sel.ticker);
+  const viewKey = (sel) => (isWhole(sel) ? "" : (sel.where || "") + "|" + (sel.ticker || ""));
+
+  /** The broker of an account the table of accounts does not know: the first word of its name, as the importer takes it. */
+  const brokerOfName = (name) => (String(name).split(/[-\s]/)[0] || String(name)).toUpperCase();
+
+  /**
+   * The places and the securities of the owner's data, for the choice of a view: { brokers: [{ broker, accounts: [{ name, kind, year,
+   * currency, tickers: [...] }] }], tickers: [...] }. Only accounts and securities that have a purchase, a sale or a dividend count (what the
+   * engine reads); brokers and accounts are in the order of their names. The names come from the data, never from here.
+   */
+  function placesOf(conv) {
+    const tables = conv && conv.tables ? conv.tables : {};
+    const lines = Array.isArray(tables.ledger) ? tables.ledger : [];
+    const held = new Map(); // account -> Set of tickers
+    const tickers = new Set();
+    for (const l of lines) {
+      if (!l || (l.kind !== "BUY" && l.kind !== "SELL" && l.kind !== "DIVIDEND")) continue;
+      if (typeof l.account !== "string" || l.account === "" || typeof l.ticker !== "string" || l.ticker === "") continue;
+      if (!held.has(l.account)) held.set(l.account, new Set());
+      held.get(l.account).add(l.ticker);
+      tickers.add(l.ticker);
+    }
+    const known = new Map();
+    for (const a of Array.isArray(tables.accounts) ? tables.accounts : []) if (a && typeof a.name === "string") known.set(a.name, a);
+    const byBroker = new Map();
+    for (const name of Array.from(held.keys()).sort()) {
+      const a = known.get(name) || {};
+      const broker = typeof a.broker === "string" && a.broker !== "" ? a.broker : brokerOfName(name);
+      if (!byBroker.has(broker)) byBroker.set(broker, { broker, accounts: [] });
+      byBroker.get(broker).accounts.push({ name, kind: a.kind || "", year: a.year || "", currency: a.currency || "", tickers: Array.from(held.get(name)).sort() });
+    }
+    return { brokers: Array.from(byBroker.values()).sort((x, y) => (x.broker < y.broker ? -1 : x.broker > y.broker ? 1 : 0)), tickers: Array.from(tickers).sort() };
+  }
+
+  /** The securities that a choice of "where" holds (all of them for everything): the ones to offer for "what". null for an unknown place. */
+  function tickersAt(places, where) {
+    if (!where) return places.tickers.slice();
+    const set = new Set();
+    let found = false;
+    for (const b of places.brokers)
+      for (const a of b.accounts) {
+        if (where === "b:" + b.broker || where === "a:" + a.name) {
+          found = true;
+          for (const t of a.tickers) set.add(t);
+        }
+      }
+    return found ? Array.from(set).sort() : null;
+  }
+
+  /** The scope for Perf.scopeLines: { accounts: [names] | null, ticker }, or null when the choice is not in the data (a vanished account). */
+  function scopeOf(conv, sel) {
+    if (isWhole(sel)) return { accounts: null, ticker: "" };
+    const places = placesOf(conv);
+    const where = typeof sel.where === "string" ? sel.where : "";
+    let accounts = null;
+    if (where !== "") {
+      const names = [];
+      for (const b of places.brokers)
+        for (const a of b.accounts) if (where === "b:" + b.broker || where === "a:" + a.name) names.push(a.name);
+      if (!names.length || !(where.startsWith("b:") || where.startsWith("a:"))) return null;
+      accounts = names;
+    }
+    const ticker = typeof sel.ticker === "string" ? sel.ticker : "";
+    if (ticker !== "" && !places.tickers.includes(ticker)) return null;
+    return { accounts, ticker };
+  }
+
+  /**
+   * The performance of one view. args: { doc, conv, book, today, options, base, sel } where base is the model of the whole portfolio (the view
+   * ends where it ends and follows what it could and could not value). The whole portfolio itself is returned as it is; a choice that is not
+   * in the data gives null, so that the caller falls back to the whole.
+   */
+  function runView(args) {
+    const base = args.base;
+    if (isWhole(args.sel)) return base;
+    const scope = scopeOf(args.conv, args.sel);
+    if (!scope) return null;
+    const input = build(args);
+    input.lines = Perf.scopeLines(input.lines, scope);
+    if (base && typeof base.end === "string") input.end = base.end;
+    input.decided = Perf.decisions(base);
+    return Perf.compute(input);
+  }
+
   /** What the owner has loaded for the ECB rates, in words for the screen: { loaded, currencies: [...] }. */
   function ecbInfo(doc) {
     const names = Object.keys(doc && doc.files && doc.files.ecb ? doc.files.ecb : {}).sort();
     return { loaded: names.length > 0, currencies: names };
   }
 
-  return { VERSION, makeFx, mappingOf, build, run, ecbInfo };
+  return { VERSION, makeFx, mappingOf, build, run, ecbInfo, isWhole, viewKey, placesOf, tickersAt, scopeOf, runView };
 });
 
 /* ---- src/app/names.js ---- */
@@ -11142,7 +11312,7 @@ span.hc { cursor: default; }
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  const VERSION = "perftips-0.1.0";
+  const VERSION = "perftips-0.2.0";
   const MON = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
   /** A number of units as the screen shows it: up to four decimals (float noise cut off), thousands separated. "1234.56789" gives "1,234.5679". */
@@ -11355,7 +11525,24 @@ span.hc { cursor: default; }
       };
     }
 
-    return { twr, mwr, gain, value, net, dividends, bridge, fall, back, vol, day, months, ratio, episode, now, count, periodRows, period, security };
+    /**
+     * A row of "Where it is held" (architecture 25): a broker or an account, worked from its own transactions alone. r: the figures of
+     * Perf.stats of that place's own model over the time-frame (valueStart, valueEnd, inflow, outflow, net, dividends, gain, twr) and
+     * { name, units (a number, or null when no single security is chosen), share (of the value of the view, 0 to 1, or null), since (the day of
+     * its first transaction), clamped (the time-frame began before that day) }. kind: "broker" or "account".
+     */
+    function place(r, kind) {
+      const rows = [];
+      if (r.units !== null && r.units !== undefined) rows.push(row("Units held", r.units > 0 ? F.units(r.units) : "sold"));
+      rows.push(money("Value at the end", r.valueEnd), row("Share of the value", Number.isFinite(r.share) ? (r.share * 100).toFixed(1) + " %" : "–"), row("Value at the start", r.valueStart > 0 ? F.money(r.valueStart) : "nothing held"), money("Paid in", r.inflow), money("Received", r.outflow), money("Money put in, net", r.net, true), money("Dividends", r.dividends), money("Gain", r.gain, true), pct("Return", r.twr, true), row("First transaction here", F.date(r.since)));
+      return {
+        t: r.name,
+        r: rows,
+        n: "Made only from the transactions of " + (kind === "broker" ? "all the accounts of this broker" : "this account") + ", as if they were your whole portfolio, over the time-frame above" + (r.clamped ? " (from its first transaction, which is after the start of the time-frame)" : "") + ". Before Austrian tax.",
+      };
+    }
+
+    return { twr, mwr, gain, value, net, dividends, bridge, fall, back, vol, day, months, ratio, episode, now, count, periodRows, period, security, place };
   }
 
   return { VERSION, create, unitsText };
@@ -12284,8 +12471,9 @@ span.hc { cursor: default; }
   // ---------------------------------------------------------------- table twin
 
   /**
-   * The same numbers as a table. cols: ["Year", "Filed", ...]; rows: arrays of cells, or { cells, tip } where tip is the text for data-tip of the
-   * whole row (made with Tip.attr); a cell is a text, or { text, tip } to carry a tip of its own (the name of a security).
+   * The same numbers as a table. cols: ["Year", "Filed", ...]; rows: arrays of cells, or { cells, tip, cls } where tip is the text for data-tip of the
+   * whole row (made with Tip.attr) and cls a class of the row; a cell is a text, or { text, tip } to carry a tip of its own (the name of a security),
+   * or { node, tip } to hold an element (a button) instead of a text.
    */
   function tableOf(cols, rows, caption) {
     const t = h("table", { class: "tbl" }, []);
@@ -12301,10 +12489,12 @@ span.hc { cursor: default; }
           const plain = Array.isArray(r);
           return h(
             "tr",
-            plain ? {} : tipOf(r.tip, true),
+            plain ? {} : Object.assign(tipOf(r.tip, true), r.cls ? { class: r.cls } : {}),
             (plain ? r : r.cells).map((c, i) => {
               const o = c !== null && typeof c === "object" ? c : { text: c };
-              return h(i ? "td" : "th", Object.assign(i ? { class: "r num", text: o.text } : { scope: "row", text: o.text }, tipOf(o.tip, false), !i && o.tip ? { class: "tipname" } : {}));
+              const base = i ? { class: "r num" } : { scope: "row" };
+              if (!o.node) base.text = o.text;
+              return h(i ? "td" : "th", Object.assign(base, tipOf(o.tip, false), !i && o.tip ? { class: "tipname" } : {}), o.node ? [o.node] : []);
             })
           );
         })
@@ -15215,6 +15405,7 @@ const PerfUI = (function () {
       note: "",
       riskWin: "SAME",
       rf: readRf(),
+      sel: { where: "", ticker: "" }, // the view: "" | "b:<broker>" | "a:<account>", and a ticker or "" (architecture 25); kept while the page is open
     };
     const doc = () => host.doc();
     const cv = () => host.conv();
@@ -15390,12 +15581,43 @@ const PerfUI = (function () {
       return m;
     }
 
+    // ------------------------------------------------------------ views: one broker, one account, one security (architecture 25)
+
+    let pmemo = { conv: null, places: null };
+    /** The brokers, accounts and securities of the data (read once for each conversion). */
+    function placesOf() {
+      const conv = cv();
+      if (pmemo.conv !== conv || !pmemo.places) pmemo = { conv, places: PerfInput.placesOf(conv) };
+      return pmemo.places;
+    }
+
+    let vmemo = { base: null, conv: null, map: new Map() };
+    /** The model of one view; the whole portfolio is the base itself; null when the choice is no longer in the data. */
+    function viewModel(sel) {
+      const base = model();
+      if (PerfInput.isWhole(sel)) return base;
+      const conv = cv();
+      if (vmemo.base !== base || vmemo.conv !== conv) vmemo = { base, conv, map: new Map() };
+      const key = PerfInput.viewKey(sel);
+      if (!vmemo.map.has(key)) {
+        if (vmemo.map.size > 200) vmemo.map.clear();
+        vmemo.map.set(key, PerfInput.runView({ doc: doc(), conv, book: st.book, today: host.today(), options: { unpriced: st.unpriced ? "trade" : "exclude" }, base, sel }));
+      }
+      return vmemo.map.get(key);
+    }
+
+    const isWhole = () => PerfInput.isWhole(st.sel);
+    /** "Your history" for the whole portfolio, "This view's history" for a view: the first words of what a time-frame that is out of reach says. */
+    const histOf = () => (isWhole() ? "Your history" : "This view's history");
+    const kindText = (a) => (a.kind === "TBSZ" ? "TBSZ" + (a.year ? " 20" + a.year : "") : a.kind ? "regular" : "");
+    const accountLabel = (a) => [a.name, kindText(a), a.currency].filter(Boolean).join(" · ");
+
     function windowOf(m) {
       let w = Perf.resolve(m, st.win === "CUSTOM" ? { from: st.from || m.start, to: st.to || m.end } : st.win);
       let why = "";
       if (!w.available) {
         const name = st.win.charAt(0) === "Y" ? st.win.slice(1) : KEYS.find((k) => k[0] === st.win)[1];
-        why = name + " is not available: your history runs from " + fd(m.start) + " to " + fd(m.end) + ".";
+        why = name + " is not available: " + histOf().toLowerCase() + " runs from " + fd(m.start) + " to " + fd(m.end) + ".";
         w = Perf.resolve(m, "MAX");
       } else if (w.error) {
         why = w.error;
@@ -15449,16 +15671,72 @@ const PerfUI = (function () {
 
     const kpi = (label, value, sub, key, spec) => el("div", tipped(spec, { class: "kpi", "data-k": "pk:" + key }), el("span", { class: "label", text: label }), el("span", { class: "value", text: value }), sub ? el("span", { class: "subline", text: sub }) : null);
 
+    // ------------------------------------------------------------ the choice of a view: where, and what
+
+    /** The place of the view in words: a broker (with the number of its accounts), an account, or everything. */
+    function whereWords(where) {
+      if (where.startsWith("b:")) {
+        const b = placesOf().brokers.find((x) => "b:" + x.broker === where);
+        if (!b) return where.slice(2);
+        if (b.accounts.length > 1) return b.broker + " (all " + b.accounts.length + " accounts)";
+        return b.accounts[0].name.toUpperCase() === b.broker ? b.broker : b.broker + " (" + b.accounts[0].name + ")";
+      }
+      return where.startsWith("a:") ? where.slice(2) : "everything";
+    }
+
+    function viewBar() {
+      const sel = st.sel;
+      const places = placesOf();
+      const n = nm();
+      const whereOpts = [el("option", { value: "", text: "Everything", selected: sel.where === "" })];
+      for (const b of places.brokers) {
+        if (b.accounts.length === 1) {
+          const a = b.accounts[0];
+          whereOpts.push(el("option", { value: "b:" + b.broker, text: a.name.toUpperCase() === b.broker ? b.broker : b.broker + " · " + accountLabel(a), selected: sel.where === "b:" + b.broker }));
+        } else {
+          whereOpts.push(el("optgroup", { label: b.broker },
+            el("option", { value: "b:" + b.broker, text: "All " + b.accounts.length + " accounts of " + b.broker, selected: sel.where === "b:" + b.broker }),
+            b.accounts.map((a) => el("option", { value: "a:" + a.name, text: accountLabel(a), selected: sel.where === "a:" + a.name }))));
+        }
+      }
+      const avail = PerfInput.tickersAt(places, sel.where) || places.tickers;
+      const label = (t) => n.ofTicker(t).label;
+      const whatOpts = [el("option", { value: "", text: "All securities", selected: sel.ticker === "" })].concat(avail.slice().sort((a, b) => label(a).localeCompare(label(b))).map((t) => el("option", { value: t, text: label(t), selected: sel.ticker === t })));
+      const whole = isWhole();
+      const info = sel.ticker ? n.ofTicker(sel.ticker) : null;
+      return el("div", { class: "viewbar", "data-k": "pf-viewbar" },
+        el("div", { class: "fields tight" },
+          el("div", { class: "field" }, el("label", { for: "f-pf-where", text: "Where" }), el("select", { "data-key": "pf-where", onchange: (e) => { const keep = PerfInput.tickersAt(placesOf(), e.target.value); st.sel = { where: e.target.value, ticker: keep && keep.includes(st.sel.ticker) ? st.sel.ticker : "" }; host.refresh(); } }, whereOpts)),
+          el("div", { class: "field" }, el("label", { for: "f-pf-what", text: "What" }), el("select", { "data-key": "pf-what", onchange: (e) => { st.sel = { where: st.sel.where, ticker: e.target.value }; host.refresh(); } }, whatOpts))),
+        whole
+          ? el("p", { class: "note", text: "Choose a broker, an account or a security to look closer. Everything on this tab then follows your choice." })
+          : el("div", { class: "stack", "data-k": "pf-viewnow" },
+              el("p", { class: "now" }, "Showing ", el("strong", { text: whereWords(sel.where) }), " · ", info ? el("strong", tipped(n.tip(info), { class: "tipname", text: info.full }, false)) : el("strong", { text: "all securities" }), ". Every figure and chart on this tab is made only from these transactions."),
+              el("p", { class: "note", "data-k": "pf-view-notes", text: "Gains add up across places; the split of a gain into realised and not yet realised does not, because the average cost is kept inside each view. Tax already paid in advance on fund income (agE) is not shown here yet: it comes with “What would I owe if I sold everything now”." }),
+              el("div", { class: "btn-row" }, button("Back to everything", () => { st.sel = { where: "", ticker: "" }; host.refresh(); }, "small quiet", "pf-view-reset"))));
+    }
+
+    /** After a choice made lower on the page: bring the top of the tab, where the choice is shown, into view. */
+    function toTop() {
+      const n = typeof document !== "undefined" ? document.querySelector('[data-k="pf-top"]') : null;
+      if (n && n.scrollIntoView) n.scrollIntoView({ block: "start", behavior: "smooth" });
+    }
+    /** Look at one place, one security, or both (a choice made in a table or a list). */
+    function pick(where, ticker) {
+      st.sel = { where, ticker };
+      host.refresh();
+      toTop();
+    }
+
     // ------------------------------------------------------------ the main card: time-frame and figures
 
-    function topCard(m, wv) {
+    function topCard(m, wv, bar, s) {
       const w = wv.w;
-      const s = Perf.stats(m, w);
       const b = bridgeOf(m, w);
       const opts = KEYS.map(([k, label]) => {
         if (k === "CUSTOM") return [k, label];
         const r = Perf.resolve(m, k);
-        return [k, label, r.available, r.available ? false : "Your history starts on " + fd(m.start)];
+        return [k, label, r.available, r.available ? false : histOf() + " starts on " + fd(m.start)];
       });
       const custom = st.win === "CUSTOM"
         ? el("div", { class: "fields tight" },
@@ -15468,6 +15746,7 @@ const PerfUI = (function () {
       const mwr = s.xirr !== null ? [pct(s.xirr, true), "per year (money-weighted, XIRR)"] : s.moneyWeighted !== null ? [pct(s.moneyWeighted, true), "over this time-frame, not per year"] : ["–", "not defined here"];
       return el("section", { class: "card", "data-k": "pf-top" },
         el("div", { class: "card-head" }, el("h2", { text: "Performance" }), el("span", { class: "sub", text: "Before Austrian tax · prices up to " + fd(m.pricesUntil || m.end) })),
+        bar,
         seg("Time-frame", KEYS.map((k) => (k[0] === "CUSTOM" ? k : opts.find((o) => o[0] === k[0]))), st.win, (v) => { st.win = v; host.refresh(); }, "pf-win"),
         yearBar(m),
         custom,
@@ -15666,7 +15945,7 @@ const PerfUI = (function () {
     function riskWindow(m, w) {
       if (st.riskWin === "SAME") return { rw: w, why: "" };
       const r = Perf.resolve(m, st.riskWin);
-      if (!r.available || r.error) return { rw: w, why: (RISK_KEYS.find((k) => k[0] === st.riskWin) || [0, st.riskWin])[1] + " is not available: your history starts on " + fd(m.start) + ". The time-frame above is used." };
+      if (!r.available || r.error) return { rw: w, why: (RISK_KEYS.find((k) => k[0] === st.riskWin) || [0, st.riskWin])[1] + " is not available: " + histOf().toLowerCase() + " starts on " + fd(m.start) + ". The time-frame above is used." };
       return { rw: r, why: "" };
     }
 
@@ -15683,7 +15962,7 @@ const PerfUI = (function () {
       const opts = RISK_KEYS.map(([k, label]) => {
         if (k === "SAME") return [k, label];
         const r = Perf.resolve(m, k);
-        return [k, label, r.available, r.available ? false : "Your history starts on " + fd(m.start)];
+        return [k, label, r.available, r.available ? false : histOf() + " starts on " + fd(m.start)];
       });
       const controls = el("div", { class: "risk-controls" },
         seg("Time-frame for the risk figures", opts, st.riskWin, (v) => { st.riskWin = v; host.refresh(); }, "pf-rwin"),
@@ -15747,7 +16026,19 @@ const PerfUI = (function () {
         days);
     }
 
+    /**
+     * A name that is a button: it chooses what the page then shows (a place or a security). aria-label says what happens; the chevron only
+     * points. hoverAttrs: the hover text of the name (made with tipped), which the whole button carries.
+     */
+    function rowLink(key, label, sub, ariaLabel, onPick, hoverAttrs) {
+      return el("button", Object.assign({ type: "button", class: "rowlink", "data-key": key, "aria-label": ariaLabel, onclick: onPick }, hoverAttrs || {}),
+        el("span", { class: "rl-name", text: label }),
+        sub ? el("span", { class: "rl-sub", text: sub }) : null,
+        el("span", { class: "chev", "aria-hidden": "true", text: "›" }));
+    }
+
     function securitiesCard(m, w) {
+      if (st.sel.ticker) return null; // one security chosen: the cards above are about it alone
       const rows = Perf.byTicker(m, w);
       if (!rows.length) return null;
       const n = nm();
@@ -15755,10 +16046,11 @@ const PerfUI = (function () {
       const nameSpec = (r) => n.tip(info(r));
       const ids = (r) => nameSpec(r).r; // ISIN, Yahoo ticker, ticker in your file
       const rowSpec = (r) => Tips.security(r, info(r).full, ids(r));
+      const look = (r) => () => pick(st.sel.where, r.ticker);
       const table = C.tableOf(
         ["Security", "Value", "Share", "Gain", "Return", "Dividends"],
         rows.map((r) => ({
-          cells: [{ text: info(r).label + (r.held ? "" : " (sold)") + (r.valuedBy === "TRADES" ? " · own prices" : ""), tip: Tip.attr(nameSpec(r)) }, money(r.valueEnd), r.held ? (r.weight * 100).toFixed(1) + " %" : "–", money(r.gain, true), pct(r.twr, true), money(r.dividends)],
+          cells: [{ node: rowLink("pf-sec-go:" + r.ticker, info(r).label + (r.held ? "" : " (sold)") + (r.valuedBy === "TRADES" ? " · own prices" : ""), "", "Look at " + info(r).full + " alone", look(r)), tip: Tip.attr(nameSpec(r)) }, money(r.valueEnd), r.held ? (r.weight * 100).toFixed(1) + " %" : "–", money(r.gain, true), pct(r.twr, true), money(r.dividends)],
           tip: Tip.attr(rowSpec(r)),
         })),
         "Securities over the time-frame"
@@ -15776,9 +16068,109 @@ const PerfUI = (function () {
         : null;
       // the same rows as a list for a phone, where six columns do not fit
       const list = el("ul", { class: "sec-list", "aria-label": "Securities over the time-frame" }, rows.map((r) => el("li", tipped(rowSpec(r), { "data-k": "sec:" + r.ticker }),
-        el("div", { class: "sec-top" }, el("strong", tipped(nameSpec(r), { class: "sec-name tipname", text: info(r).label }, false)), r.held ? null : chip("sold", "neutral"), r.valuedBy === "TRADES" ? chip("own prices", "warn") : null, el("span", { class: "num sec-value", text: money(r.valueEnd) })),
+        el("div", { class: "sec-top" }, el("strong", { class: "sec-name" }, rowLink("pf-sec-go-l:" + r.ticker, info(r).label, "", "Look at " + info(r).full + " alone", look(r), tipped(nameSpec(r), {}, false))), r.held ? null : chip("sold", "neutral"), r.valuedBy === "TRADES" ? chip("own prices", "warn") : null, el("span", { class: "num sec-value", text: money(r.valueEnd) })),
         el("div", { class: "sec-sub" }, r.held ? el("span", { text: (r.weight * 100).toFixed(1) + " % of the value" }) : null, el("span", { text: "Gain " + money(r.gain, true) }), el("span", { text: "Return " + pct(r.twr, true) }), el("span", { text: "Dividends " + money(r.dividends) })))));
-      return el("section", { class: "card", "data-k": "pf-sec" }, el("div", { class: "card-head" }, el("h2", { text: "Securities" }), el("span", { class: "sub", text: "same time-frame · hover a name for its ISIN and Yahoo ticker" })), gainChart ? el("div", { class: "stack", "data-k": "pf-contrib" }, el("h3", { text: "Gain by security" }), gainChart, rows.length > big.length ? el("p", { class: "note", text: "The " + big.length + " with the largest gain or loss. All of them are listed below." }) : null) : null, el("div", { class: "sec-table" }, table), list, el("p", { class: "note", text: "The return of a security is its own time-weighted return over the time-frame, from the day you bought it if that was later. A sold security shows what it earned while you held it." }));
+      return el("section", { class: "card", "data-k": "pf-sec" }, el("div", { class: "card-head" }, el("h2", { text: "Securities" }), el("span", { class: "sub", text: "same time-frame · hover a name for its ISIN and Yahoo ticker · press a name to look at that security alone" })), gainChart ? el("div", { class: "stack", "data-k": "pf-contrib" }, el("h3", { text: "Gain by security" }), gainChart, rows.length > big.length ? el("p", { class: "note", text: "The " + big.length + " with the largest gain or loss. All of them are listed below." }) : null) : null, el("div", { class: "sec-table" }, table), list, el("p", { class: "note", text: "The return of a security is its own time-weighted return over the time-frame, from the day you bought it if that was later. A sold security shows what it earned while you held it." }));
+    }
+
+    // ------------------------------------------------------------ where it is held (architecture 25)
+
+    /**
+     * The places of the view, in order: the brokers (the accounts of a broker that has several are listed below it), or, when one broker is
+     * chosen or there is only one, its accounts. A security that is chosen keeps only the places that hold it. An account has no places below it.
+     */
+    function placeList(sel) {
+      if (sel.where.startsWith("a:")) return [];
+      const holds = (a) => !sel.ticker || a.tickers.includes(sel.ticker);
+      const brokers = placesOf().brokers.filter((b) => !sel.where || sel.where === "b:" + b.broker).map((b) => ({ b, accs: b.accounts.filter(holds) })).filter((x) => x.accs.length > 0);
+      const acct = (a) => ({ kind: "account", where: "a:" + a.name, label: a.name, sub: [kindText(a), a.currency].filter(Boolean).join(" · "), children: [] });
+      if (brokers.length === 1) return brokers[0].accs.length > 1 ? brokers[0].accs.map(acct) : [];
+      return brokers.map((x) => {
+        const one = x.accs.length === 1 ? x.accs[0] : null;
+        return { kind: "broker", where: "b:" + x.b.broker, label: x.b.broker, sub: one ? (one.name.toUpperCase() === x.b.broker ? "" : accountLabel(one)) : x.accs.length + " accounts", children: x.accs.length > 1 ? x.accs.map(acct) : [] };
+      });
+    }
+
+    /**
+     * The figures of one place over the time-frame w of the page: the place is a model of its own transactions (a portfolio of its own, ending
+     * where the whole ends) and these are Perf.stats of it. null when nothing was held, paid in or received there in the time-frame. total: the
+     * stats of the view, for the share of the value.
+     */
+    function placeFigures(row, w, total) {
+      const pm = viewModel({ where: row.where, ticker: st.sel.ticker });
+      if (!pm || !pm.ok) return null;
+      const win = Perf.resolve(pm, { from: w.from, to: w.to });
+      if (win.error || !win.available) return null;
+      const ps = Perf.stats(pm, win);
+      if (!(ps.valueStart > 0 || ps.valueEnd > 0 || ps.inflow > 0 || ps.outflow > 0 || ps.dividends > 0)) return null;
+      const own = st.sel.ticker ? pm.per.find((p) => p.ticker === st.sel.ticker) : null;
+      return Object.assign({}, ps, { name: row.label, units: own ? own.units[win.e] : null, share: total.valueEnd > 0 ? ps.valueEnd / total.valueEnd : null, since: pm.start, clamped: !!win.clamped });
+    }
+
+    function placesCard(w, s) {
+      const sel = st.sel;
+      const list = placeList(sel);
+      if (list.length < 2) return null;
+      const figured = (row) => {
+        const f = placeFigures(row, w, s);
+        return f ? { row, f, kids: [] } : null;
+      };
+      const byValue = (a, b) => b.f.valueEnd - a.f.valueEnd || (a.row.label < b.row.label ? -1 : a.row.label > b.row.label ? 1 : 0);
+      const top = list.map((row) => {
+        const x = figured(row);
+        if (x) x.kids = row.children.map(figured).filter(Boolean).sort(byValue);
+        return x;
+      }).filter(Boolean).sort(byValue);
+      if (top.length < 2) return null;
+      const withUnits = !!sel.ticker;
+      const flat = [];
+      for (const x of top) {
+        flat.push({ x, child: false });
+        for (const k of x.kids) flat.push({ x: k, child: true });
+      }
+      const subOf = (x) => [x.row.sub, x.f.valueEnd > 0 ? "" : "nothing held"].filter(Boolean).join(" · ");
+      const shareText = (f) => (f.share !== null ? (f.share * 100).toFixed(1) + " %" : "–");
+      const unitsOf = (f) => (f.units > 0 ? PerfTips.unitsText(f.units) : "sold");
+      const tipOfRow = (x) => Tip.attr(Tips.place(x.f, x.row.kind));
+      const unitsTotal = withUnits ? top.reduce((a, x) => a + (x.f.units || 0), 0) : 0;
+      const body = flat.map(({ x, child }) => ({
+        cells: [{ node: rowLink((child ? "pf-go-c:" : "pf-go:") + x.row.where, x.row.label, subOf(x), "Look at " + x.row.label + " alone", () => pick(x.row.where, sel.ticker)) }].concat(withUnits ? [unitsOf(x.f)] : [], [money(x.f.valueEnd), shareText(x.f), money(x.f.gain, true), pct(x.f.twr, true), money(x.f.net, true), money(x.f.dividends)]),
+        tip: tipOfRow(x),
+        cls: child ? "sub" : "",
+      }));
+      body.push({ cells: ["Total"].concat(withUnits ? [unitsTotal > 0 ? PerfTips.unitsText(unitsTotal) : "sold"] : [], [money(s.valueEnd), s.valueEnd > 0 ? "100.0 %" : "–", money(s.gain, true), pct(s.twr, true), money(s.net, true), money(s.dividends)]), cls: "strong" });
+      const table = C.tableOf(["Place"].concat(withUnits ? ["Units"] : [], ["Value", "Share", "Gain", "Return", "Net put in", "Dividends"]), body, "Where it is held, over the time-frame");
+      table.classList.add("perf-tbl");
+      // the value of each place as bars (the places that add up to the view; the accounts below a broker are in the table and the list)
+      const chart = C.hbars({
+        items: top.map((x) => ({ label: x.row.label, title: x.row.label, value: x.f.valueEnd, text: money(x.f.valueEnd), tip: "Value at the end", details: [["Share of the value", shareText(x.f)], ["Gain", money(x.f.gain, true), toneOf(x.f.gain)], ["Return", pct(x.f.twr, true), toneP(x.f.twr)]].concat(withUnits ? [["Units held", unitsOf(x.f)]] : []) })),
+        color: "var(--c-gain)",
+        ariaLabel: "Value at the end of each place, over the time-frame",
+      });
+      // the same rows as a list for a phone, where eight columns do not fit
+      const rowsList = flat.map(({ x, child }) => el("li", tipped(Tips.place(x.f, x.row.kind), { class: child ? "sub" : false, "data-k": "plc:" + x.row.where }),
+        el("div", { class: "sec-top" }, el("strong", { class: "sec-name" }, rowLink((child ? "pf-go-lc:" : "pf-go-l:") + x.row.where, x.row.label, "", "Look at " + x.row.label + " alone", () => pick(x.row.where, sel.ticker))), x.f.valueEnd > 0 ? null : chip("nothing held", "neutral"), el("span", { class: "num sec-value", text: money(x.f.valueEnd) })),
+        el("div", { class: "sec-sub" }, x.row.sub ? el("span", { text: x.row.sub }) : null, withUnits ? el("span", { text: unitsOf(x.f) + (x.f.units > 0 ? " units" : "") }) : null, x.f.valueEnd > 0 ? el("span", { text: shareText(x.f) + " of the value" }) : null, el("span", { text: "Gain " + money(x.f.gain, true) }), el("span", { text: "Return " + pct(x.f.twr, true) }), el("span", { text: "Dividends " + money(x.f.dividends) }))));
+      rowsList.push(el("li", { class: "total", "data-k": "plc:total" },
+        el("div", { class: "sec-top" }, el("strong", { class: "sec-name", text: "Total" }), el("span", { class: "num sec-value", text: money(s.valueEnd) })),
+        el("div", { class: "sec-sub" }, el("span", { text: "Gain " + money(s.gain, true) }), el("span", { text: "Return " + pct(s.twr, true) }), el("span", { text: "Dividends " + money(s.dividends) }))));
+      const list2 = el("ul", { class: "sec-list", "aria-label": "Where it is held, over the time-frame" }, rowsList);
+      const by = top[0].row.kind === "broker" ? "broker" : "account";
+      return el("section", { class: "card", "data-k": "pf-places" },
+        el("div", { class: "card-head" }, el("h2", { text: "Where it is held" }), el("span", { class: "sub", text: "same time-frame · press a name to look at it alone" })),
+        el("div", { class: "stack", "data-k": "pf-place-bars" }, el("h3", { text: "Value at the end, by " + by }), chart),
+        el("div", { class: "sec-table" }, table),
+        list2,
+        el("p", { class: "note", text: "Each line is worked from the transactions of that place alone, as if it were your whole portfolio. The gains add up to the total; the returns do not, each place has its own." + (flat.some((r) => r.child) ? " The lines below a broker are its accounts: they are part of that broker, not added to it." : "") }));
+    }
+
+    function viewEmptyCard(m) {
+      const items = (m.tickers || []).filter((t) => t.state === "EXCLUDED");
+      return el("section", { class: "card", "data-k": "pf-top" },
+        el("div", { class: "card-head" }, el("h2", { text: "Performance" }), el("span", { class: "sub", text: "Before Austrian tax" })),
+        viewBar(),
+        el("p", { class: "note", text: items.length ? "Nothing in this view can be valued yet, so there are no figures. The securities in it are left out for these reasons:" : "This view has no purchases, sales or dividends, so there is nothing to show." }),
+        items.length ? el("ul", { class: "list" }, items.map((t) => listItem("bad", inText(t.ticker, t.name) + ": " + (t.text || REASON_TEXT[t.reason] || t.reason)))) : null);
     }
 
     // ------------------------------------------------------------ checks
@@ -15910,27 +16302,52 @@ const PerfUI = (function () {
       if (!lines().length) return root.appendChild(emptyCard());
       ensureLoaded();
       if (!st.loaded) return root.appendChild(card("Performance", null, el("p", { class: "note", text: "Loading the saved prices …" })));
-      let m;
+      let base;
       try {
-        m = model();
+        base = model();
       } catch (e) {
         return root.appendChild(card("Performance", null, el("p", { class: "note", text: "The performance calculation stopped with an unexpected error: " + (e && e.message ? e.message : String(e)) + ". Your data is not changed." }), setupCard(null)));
       }
+      if (!base.ok) {
+        root.appendChild(notReadyCard(base));
+        root.appendChild(setupCard(base));
+        root.appendChild(howCard());
+        return;
+      }
+      // The view: the whole portfolio, or one broker, account or security. A choice that is no longer in the data (an account that is gone
+      // after a new import) goes back to everything.
+      if (!isWhole() && PerfInput.scopeOf(cv(), st.sel) === null) st.sel = { where: "", ticker: "" };
+      let m = base;
+      if (!isWhole()) {
+        try {
+          m = viewModel(st.sel);
+        } catch (e) {
+          root.appendChild(card("Performance", null, viewBar(), el("p", { class: "note", text: "The calculation for this view stopped with an unexpected error: " + (e && e.message ? e.message : String(e)) + ". Your data is not changed." })));
+          root.appendChild(setupCard(base));
+          return;
+        }
+      }
       if (!m.ok) {
-        root.appendChild(notReadyCard(m));
-        root.appendChild(setupCard(m));
+        root.appendChild(viewEmptyCard(m));
+        add(root, checksCard(base));
+        root.appendChild(setupCard(base));
         root.appendChild(howCard());
         return;
       }
       const wv = windowOf(m);
-      root.appendChild(topCard(m, wv));
+      const s = Perf.stats(m, wv.w);
+      root.appendChild(topCard(m, wv, viewBar(), s));
+      // With a security chosen, where it is held comes first; otherwise the places stand next to the securities, which are the other parts.
+      const places = placesCard(wv.w, s);
+      if (st.sel.ticker) add(root, places);
       root.appendChild(valueCard(m, wv.w));
       root.appendChild(returnsCard(m, wv.w));
       root.appendChild(breakdownCard(m, wv.w));
       root.appendChild(riskCard(m, wv.w));
+      if (!st.sel.ticker) add(root, places);
       add(root, securitiesCard(m, wv.w));
       add(root, checksCard(m));
-      root.appendChild(setupCard(m));
+      root.appendChild(setupCard(base));
       root.appendChild(howCard());
     }
 
