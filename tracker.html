@@ -195,6 +195,8 @@ details .body { padding-top: 8px; display: grid; gap: 10px; }
 .tbl td.sign { width: 1.4em; color: var(--muted); text-align: center; padding-inline: 2px; }
 .tbl .why { display: block; color: var(--muted); font-size: 12px; font-weight: 400; margin-top: 2px; max-width: 52ch; }
 .rows { display: grid; gap: 8px; }
+/* A wide table inside an opened line must scroll inside its own box (.tbl-wrap), not widen the grid column and with it the whole page. */
+.card > *, .rows > * { min-width: 0; }
 .row-card { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; }
 .row-card.flat { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: baseline; }
 .row-card .extra { grid-column: 1 / -1; font-size: 13px; color: var(--muted); margin-top: 4px; }
@@ -212,10 +214,17 @@ details .body { padding-top: 8px; display: grid; gap: 10px; }
 .rc-title { font-weight: 500; overflow-wrap: anywhere; }
 .rc-sub { color: var(--muted); font-size: 12px; }
 .rc-val { font: 500 15px var(--font-mono); text-align: right; white-space: nowrap; }
+.row-card.key .rc-title, .row-card.key .rc-val { font-weight: 700; }
+/* "If you sold everything today": a range such as "€442.31 to €444.51" takes two lines on a phone; the fund-income table lets its headings wrap so that all columns fit. */
+@media (min-width: 640px) { .rc-val br.narrow { display: none; } }
+.sell-years .tbl thead th { white-space: normal; vertical-align: bottom; }
 .kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 16px; font-size: 13px; padding-top: 10px; }
 .kv dt { color: var(--muted); min-width: 0; overflow-wrap: anywhere; }
 .kv dd { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .kv .sep { grid-column: 1 / -1; border-top: 1px solid var(--line); margin: 2px 0; }
+/* A list of amounts: the label takes what is left and wraps, an amount never breaks in the middle of its digits. */
+.kv.nums { grid-template-columns: minmax(0, 1fr) auto; }
+.kv.nums dd { white-space: nowrap; }
 .list { display: grid; gap: 6px; font-size: 14px; }
 .list li { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; }
 .list li .ico { width: 18px; text-align: center; color: var(--muted); }
@@ -5737,6 +5746,434 @@ span.hc { cursor: default; }
   return { VERSION, FILED, SWITCH_KEYS, KNOWN_TRANSFER_KINDS, resolve, mergeScenarios, evaluate, compare, compareSwitches };
 });
 
+/* ---- src/engine/liquidate.js ---- */
+/*
+ * Liquidate: what would I owe if I sold everything today (architecture section 26).
+ *
+ * A read-only what-if. It takes the position AS FILED, adds one planned sale per open pool (one depot, one ISIN), all units, at the last
+ * close converted at the ECB rate, and lets the same engine that does "Plan a sale" work out the tax. Nothing is saved, nothing of the
+ * filed data changes (the input is copied; a test checks that its hash is the same afterwards).
+ *
+ * What it returns, all as exact decimal text:
+ *   positions   one per open pool: units, value, tax cost split into purchases / step-up / fund corrections, economic cost, taxable gain,
+ *               the tax on that gain alone, the bridge from the profit a broker shows to the taxable gain, and the prepaid tax in the cost.
+ *               A pool that cannot be valued (blocked by the engine, no price, no rate, units differ, bad quote) is listed with the reason
+ *               and is NOT in any total (never zero-filled, never valued at cost).
+ *   totals      sums over the valued positions; "complete" is false when any position was left out. "leftAfterTaxEur" is the value minus B.
+ *   A           "kestAloneEur": the tax on all valued positions together (gains minus losses), nothing else in the year.
+ *   B           "yearChange": the change of the sale year's KESt (before credit, the measure of the planner) between the year as filed and
+ *               the year with the sales added; so it counts what the year already has. Also the change of the tax due as a range.
+ *   prepaid     per ISIN and year the deemed distributed income (agE) already taxed, and KESt on it; plus "still in the cost".
+ *
+ * The bridge (section 26.5, an identity):  profit shown = taxable gain + step-up + fund corrections - fees
+ *   profit shown = value - economic cost (purchases with fees, no step-up, no corrections)
+ *   taxable gain = value - tax cost (purchases without fees + step-up + fund corrections)
+ *
+ * Quotes (decimal texts, built by the page from the price book and the ECB file; see liquidate-input.js):
+ *   quotes[isin] = { ok: true, price, ccy, rate, rateDate, priceDate, symbol }   rate = units of ccy per euro ("1" for EUR)
+ *              or { ok: false, reason: "NO_PRICE" | "NO_RATE" | "UNITS_DIFFER" | ..., text }
+ *
+ * Self-checks that stop the calculation (fail closed) if the engine and this module ever disagree: the sale of every valued pool is
+ * "OK" and empties the pool; value - tax cost equals the engine's taxable gain; the bridge adds up; the sum of the taxable gains equals the
+ * change of the year's realised net.
+ *
+ * Pure functions, no clock (the day is an input), no storage. Runs in Node (tests) and in a browser page.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("../lib/decimal.js"), require("../lib/hash.js"), require("./scenarios.js"));
+  else root.Liquidate = factory(root.Dec, root.Hash, root.Scenarios);
+})(typeof self !== "undefined" ? self : this, function (Dec, Hash, Scenarios) {
+  "use strict";
+
+  const VERSION = "liquidate-0.1.0";
+  const DP = 2;
+  const Z = Dec.mk(0n, DP);
+  const ZQ = Dec.mk(0n, 0);
+  const M = (d) => Dec.str(d, DP);
+  const SC_ID = "SELLALL";
+  const ID_PREFIX = "SELLALL~";
+  const SEQ0 = 4000000;
+  // The engine orders the rows of one day by kind (a sale before a transfer, before a fund report at the end of the day, before income).
+  // The sale of this feature comes after every row of its day, so that it sells the position as filed: a report dated today is already in
+  // the cost, and the units a transfer dated today brought into a depot are there to be sold (S2: the sale never comes before a row).
+  const LAST_OF_DAY = 1000;
+
+  const isObj = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
+  const clone = (x) => JSON.parse(JSON.stringify(x));
+  const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  const posDec = (t) => {
+    const d = Dec.parse(t);
+    return d && !Dec.isNeg(d) && !Dec.isZero(d) ? d : null;
+  };
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  /** 2026-11-13 as "13 Nov 2026", the way the rest of the page writes a day. */
+  const fd = (iso) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso));
+    return m ? +m[3] + " " + MONTHS[+m[2] - 1] + " " + m[1] : String(iso);
+  };
+  const isIso = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && new Date(s + "T00:00:00Z").toISOString().slice(0, 10) === s;
+
+  /** The reasons a position is left out, with the short label the screen shows next to it. */
+  const REASONS = {
+    BLOCKED: "Blocked",
+    NO_PRICE: "No current price",
+    NO_RATE: "No ECB rate",
+    UNITS_DIFFER: "Units differ",
+    BAD_QUOTE: "Unusable price",
+  };
+
+  function blockText(findings, pool) {
+    for (const f of findings || []) {
+      if (f.level === "error" && f.id === pool.blocked && (f.depot === undefined || f.depot === pool.depot) && (f.isin === undefined || f.isin === pool.isin)) return f.text;
+    }
+    return "The tax calculation has blocked this position (" + pool.blocked + "). See the Tax tab.";
+  }
+
+  function yearRow(yr) {
+    if (!yr) return { present: false, realizedNetEur: "0.00", ageEur: "0.00", dividendsEur: "0.00", netBaseEur: "0.00", lossForfeitedEur: "0.00", kestBeforeCreditEur: "0.00", kestDueLowEur: "0.00", kestDueHighEur: "0.00", complete: true, provisional: false, reasons: [] };
+    return {
+      present: true,
+      realizedNetEur: yr.special.realizedNetEur,
+      ageEur: yr.special.ageEur,
+      dividendsEur: yr.special.dividendsEur,
+      netBaseEur: yr.special.netBaseEur,
+      lossForfeitedEur: yr.special.lossForfeitedEur,
+      kestBeforeCreditEur: yr.kestBeforeCreditEur,
+      kestDueLowEur: yr.kestDueLowEur,
+      kestDueHighEur: yr.kestDueHighEur,
+      complete: yr.complete,
+      provisional: yr.provisional,
+      reasons: Array.isArray(yr.reasons) ? yr.reasons.slice() : [],
+    };
+  }
+  const diff = (a, b) => M(Dec.sub(Dec.parse(a), Dec.parse(b)));
+
+  /**
+   * The day of the sale (architecture 26.2, S2): the day given (today), but never before the last row of the data, so that the sale never
+   * comes before a row. A planned row does not count. The page needs it too, to look up the price and the rate of that day.
+   */
+  function dayOf(base, date) {
+    let last = "";
+    if (isObj(base) && Array.isArray(base.events)) for (const e of base.events) if (isObj(e) && e.planned !== true && typeof e.date === "string" && e.date > last) last = e.date;
+    return last > date ? { day: last, moved: true } : { day: date, moved: false };
+  }
+
+  function seal(out) {
+    out.hash = Hash.hashOf(Object.assign({}, out, { hash: null }));
+    return out;
+  }
+
+  /**
+   * @param args { base, quotes, date }  base: the engine input as filed; quotes: see above; date: today, "2026-11-13"
+   */
+  function compute(args) {
+    const out = {
+      version: VERSION,
+      ok: false,
+      errors: [],
+      notes: [],
+      date: null,
+      saleYear: null,
+      kestRate: null,
+      positions: [],
+      left: [],
+      totals: null,
+      securities: {},
+      yearChange: null,
+      prepaid: null,
+      filedInputHash: null,
+      hash: null,
+    };
+    const fail = (id, text, extra) => {
+      out.errors.push(Object.assign({ level: "error", id, text }, extra || {}));
+      return seal(out);
+    };
+    if (!isObj(args) || !isObj(args.base) || !Array.isArray(args.base.events)) return fail("BAD_INPUT", "The data to value is missing.");
+    if (!isIso(args.date)) return fail("BAD_DATE", "The day must look like 2026-11-13.");
+    const quotes = isObj(args.quotes) ? args.quotes : {};
+    const base = args.base;
+
+    // ---- 1. the position as filed
+    const filed = Scenarios.evaluate(base, null);
+    out.filedInputHash = filed.engine ? filed.engine.inputHash : null;
+    if (!filed.ok || !filed.engine) {
+      const why = (filed.engine && filed.engine.findings ? filed.engine.findings : []).filter((f) => f.level === "error").slice(0, 3).map((f) => f.text);
+      return fail("FILED_NOT_USABLE", "The position as filed cannot be calculated, so there is nothing to value. See the Tax tab and the Data tab." + (why.length ? " " + why.join(" ") : ""));
+    }
+    const rate = Dec.parse(filed.engine.settings.kestRate);
+    out.kestRate = filed.engine.settings.kestRate;
+
+    // ---- 2. the day: today, but never before the last row of the data
+    const when = dayOf(base, args.date);
+    const day = when.day;
+    out.date = day;
+    out.saleYear = day.slice(0, 4);
+    if (when.moved) out.notes.push({ id: "DAY_MOVED", text: "Your data has rows dated after " + fd(args.date) + ", so the sale is taken on " + fd(day) + ", the day of the last row." });
+
+    // ---- 3. one planned sale per open pool that can be valued
+    const used = new Set();
+    for (const e of base.events) if (isObj(e) && typeof e.id === "string") used.add(e.id);
+    const open = filed.engine.pools.filter((p) => Dec.cmp(Dec.parse(p.qty), ZQ) > 0);
+    const planned = [];
+    const items = [];
+    let seq = 0;
+    for (const p of open) {
+      const item = {
+        depot: p.depot,
+        isin: p.isin,
+        qty: p.qty,
+        status: "OK",
+        reason: "",
+        text: "",
+        taxCost: { totalEur: p.tax.total, baseEur: p.tax.base, stepUpEur: p.tax.stepUp, akkEur: p.tax.akk },
+        econCostEur: p.econ,
+        symbol: null,
+        ccy: null,
+        price: null,
+        priceDate: null,
+        rate: null,
+        rateDate: null,
+        valueEur: null,
+        taxGainEur: null,
+        profitShownEur: null,
+        kestAloneEur: null,
+        bridge: null,
+        prepaidInCostEur: null,
+        eventId: null,
+      };
+      items.push(item);
+      const leave = (status, text) => {
+        item.status = status;
+        item.reason = REASONS[status] || status;
+        item.text = text;
+      };
+      if (p.blocked) {
+        leave("BLOCKED", blockText(filed.engine.findings, p));
+        continue;
+      }
+      const q = quotes[p.isin];
+      if (!isObj(q)) {
+        leave("NO_PRICE", "There is no price for this security.");
+        continue;
+      }
+      if (q.ok !== true) {
+        const st = typeof q.reason === "string" && q.reason !== "" ? q.reason : "NO_PRICE";
+        leave(st, typeof q.text === "string" && q.text !== "" ? q.text : "This security cannot be valued.");
+        continue;
+      }
+      const ccy = typeof q.ccy === "string" ? q.ccy : "";
+      const price = posDec(q.price);
+      const fx = ccy === "EUR" ? Dec.parse("1") : posDec(q.rate);
+      if (!/^[A-Z]{3}$/.test(ccy) || !price || !fx) {
+        leave("BAD_QUOTE", "The price or the exchange rate for this security is not a plain positive number.");
+        continue;
+      }
+      const qty = Dec.parse(p.qty);
+      const gross = Dec.mul(qty, price);
+      const proceeds = Dec.divRound(gross, fx, DP);
+      let id;
+      do id = ID_PREFIX + ++seq; while (used.has(id));
+      used.add(id);
+      item.symbol = typeof q.symbol === "string" ? q.symbol : null;
+      item.ccy = ccy;
+      item.price = String(q.price);
+      item.priceDate = typeof q.priceDate === "string" ? q.priceDate : null;
+      item.rate = ccy === "EUR" ? "1" : String(q.rate);
+      item.rateDate = typeof q.rateDate === "string" ? q.rateDate : null;
+      item.valueEur = M(proceeds);
+      item.eventId = id;
+      planned.push({
+        id,
+        type: "DISPOSE",
+        date: day,
+        depot: p.depot,
+        isin: p.isin,
+        qty: p.qty,
+        proceedsEur: M(proceeds),
+        feeEur: "0.00",
+        seq: SEQ0 + seq,
+        priority: LAST_OF_DAY,
+        native: { ccy, qty: p.qty, price: String(q.price), gross: Dec.str(gross), fee: "0", rate: item.rate, rateDate: item.rateDate },
+        src: "sell everything today",
+        planned: true,
+      });
+    }
+
+    // ---- 4. the engine with the sales
+    let withEval = null;
+    const byEvent = new Map();
+    if (planned.length) {
+      const data = clone(base);
+      data.events = data.events.concat(planned);
+      withEval = Scenarios.evaluate(data, { id: SC_ID, label: "Sell everything today", switches: { includePlanned: planned.map((e) => e.id) } });
+      if (!withEval.ok || !withEval.engine) return fail("WITH_SALES_NOT_USABLE", "The position with everything sold could not be calculated. See the Tax tab.");
+      for (const r of withEval.engine.realizations) byEvent.set(r.id, r);
+    }
+
+    // ---- 5. read the result per position, with the self-checks
+    for (const item of items) {
+      if (item.status !== "OK") continue;
+      const r = byEvent.get(item.eventId);
+      if (!r || r.status !== "OK" || r.taxGainEur === null || r.taxGainEur === undefined || !r.poolAfter || Dec.cmp(Dec.parse(r.poolAfter.qty), ZQ) !== 0) {
+        return fail("SALE_NOT_OK", "The planned sale of " + item.isin + " in " + item.depot + " did not come out as a full, calculated sale. Nothing is shown rather than a wrong figure.");
+      }
+      const value = Dec.parse(item.valueEur);
+      const tc = r.taxCostRemoved;
+      const gain = Dec.parse(r.taxGainEur);
+      if (Dec.cmp(Dec.sub(value, Dec.parse(tc.total)), gain) !== 0 || tc.total !== item.taxCost.totalEur) return fail("SELF_CHECK", "The tax gain of " + item.isin + " in " + item.depot + " does not equal value minus tax cost. Nothing is shown rather than a wrong figure.");
+      const econ = Dec.parse(r.econCostRemovedEur);
+      const purchases = Dec.parse(tc.base);
+      const profit = Dec.sub(value, econ);
+      const fees = Dec.sub(econ, purchases);
+      const stepUp = Dec.parse(tc.stepUp);
+      const akk = Dec.parse(tc.akk);
+      // profit shown = taxable gain + step-up + fund corrections - fees
+      const lhs = profit;
+      const rhs = Dec.sub(Dec.add(Dec.add(gain, stepUp), akk), fees);
+      if (Dec.cmp(lhs, rhs) !== 0) return fail("SELF_CHECK", "The bridge from the broker's profit to the taxable gain of " + item.isin + " in " + item.depot + " does not add up. Nothing is shown rather than a wrong figure.");
+      item.taxCost = { totalEur: tc.total, baseEur: tc.base, stepUpEur: tc.stepUp, akkEur: tc.akk };
+      item.econCostEur = r.econCostRemovedEur;
+      item.taxGainEur = M(gain);
+      item.profitShownEur = M(profit);
+      item.kestAloneEur = M(Dec.mulRound(rate, Dec.isNeg(gain) ? Z : gain, DP));
+      item.bridge = { profitShownEur: M(profit), taxGainEur: M(gain), stepUpEur: M(stepUp), akkEur: M(akk), feesEur: M(fees) };
+      item.prepaidInCostEur = M(Dec.mulRound(rate, akk, DP));
+    }
+
+    const valued = items.filter((i) => i.status === "OK");
+    out.positions = items.slice().sort((a, b) => cmpStr(a.isin, b.isin) || cmpStr(a.depot, b.depot));
+    out.left = out.positions.filter((i) => i.status !== "OK").map((i) => ({ depot: i.depot, isin: i.isin, qty: i.qty, status: i.status, reason: i.reason, text: i.text }));
+
+    // ---- 6. totals over the valued positions
+    const sum = (f) => valued.reduce((s, i) => Dec.add(s, Dec.parse(f(i))), Z);
+    let gains = Z;
+    let losses = Z;
+    for (const i of valued) {
+      const g = Dec.parse(i.taxGainEur);
+      if (Dec.isNeg(g)) losses = Dec.add(losses, Dec.neg(g));
+      else gains = Dec.add(gains, g);
+    }
+    const net = Dec.sub(gains, losses);
+    const totals = {
+      positions: valued.length,
+      left: out.left.length,
+      complete: out.left.length === 0,
+      valueEur: M(sum((i) => i.valueEur)),
+      taxCostEur: M(sum((i) => i.taxCost.totalEur)),
+      econCostEur: M(sum((i) => i.econCostEur)),
+      gainsEur: M(gains),
+      lossesEur: M(losses),
+      taxGainNetEur: M(net),
+      kestAloneEur: M(Dec.mulRound(rate, Dec.isNeg(net) ? Z : net, DP)),
+      bridge: {
+        profitShownEur: M(sum((i) => i.bridge.profitShownEur)),
+        akkEur: M(sum((i) => i.bridge.akkEur)),
+        stepUpEur: M(sum((i) => i.bridge.stepUpEur)),
+        feesEur: M(sum((i) => i.bridge.feesEur)),
+        taxGainEur: M(sum((i) => i.bridge.taxGainEur)),
+      },
+      prepaidInCostEur: M(sum((i) => i.prepaidInCostEur)),
+    };
+    out.totals = totals;
+
+    // ---- 7. per security (the sum of its valued positions; the tax on it alone nets its own gains and losses)
+    const bySec = new Map();
+    for (const i of out.positions) {
+      const s = bySec.get(i.isin) || { isin: i.isin, positions: 0, left: 0, value: Z, taxCost: Z, gain: Z, prepaid: Z, profit: Z };
+      if (i.status === "OK") {
+        s.positions++;
+        s.value = Dec.add(s.value, Dec.parse(i.valueEur));
+        s.taxCost = Dec.add(s.taxCost, Dec.parse(i.taxCost.totalEur));
+        s.gain = Dec.add(s.gain, Dec.parse(i.taxGainEur));
+        s.profit = Dec.add(s.profit, Dec.parse(i.profitShownEur));
+        s.prepaid = Dec.add(s.prepaid, Dec.parse(i.prepaidInCostEur));
+      } else s.left++;
+      bySec.set(i.isin, s);
+    }
+    for (const s of bySec.values()) {
+      out.securities[s.isin] = {
+        positions: s.positions,
+        left: s.left,
+        valueEur: M(s.value),
+        taxCostEur: M(s.taxCost),
+        taxGainEur: M(s.gain),
+        profitShownEur: M(s.profit),
+        kestAloneEur: M(Dec.mulRound(rate, Dec.isNeg(s.gain) ? Z : s.gain, DP)),
+        prepaidInCostEur: M(s.prepaid),
+      };
+    }
+
+    // ---- 8. B: the sale year as filed against the sale year with the sales added
+    if (planned.length) {
+      const Y = out.saleYear;
+      const a = yearRow(filed.summary.years[Y]);
+      const b = yearRow(withEval.summary.years[Y]);
+      const dRealised = diff(b.realizedNetEur, a.realizedNetEur);
+      if (dRealised !== M(net)) return fail("SELF_CHECK", "The change of the year's realised result (" + dRealised + ") does not equal the sum of the taxable gains (" + M(net) + "). Nothing is shown rather than a wrong figure.");
+      const dBefore = diff(b.kestBeforeCreditEur, a.kestBeforeCreditEur);
+      const dLow = diff(b.kestDueLowEur, a.kestDueLowEur);
+      const dHigh = diff(b.kestDueHighEur, a.kestDueHighEur);
+      const reasons = [];
+      for (const t of a.reasons.concat(b.reasons)) if (!reasons.includes(t)) reasons.push(t);
+      const lo = Dec.cmp(Dec.parse(dLow), Dec.parse(dHigh)) <= 0 ? dLow : dHigh;
+      const hi = lo === dLow ? dHigh : dLow;
+      out.yearChange = {
+        year: Y,
+        filed: a,
+        withSales: b,
+        kestBeforeCreditDeltaEur: dBefore,
+        // the change of the tax due after the foreign-tax credit, as a range (the credit has two readings, section 6); equal to the change before credit when no credit moves
+        dueDeltaLowEur: lo,
+        dueDeltaHighEur: hi,
+        dueMovesWithCredit: lo !== dBefore || hi !== dBefore,
+        indicative: !a.complete || a.provisional || !b.complete || b.provisional,
+        reasons,
+      };
+    }
+
+    // what is left of the value after the extra tax of the sale year (the headline measure, B); without a calculated sale there is no tax to take off
+    totals.leftAfterTaxEur = M(Dec.sub(Dec.parse(totals.valueEur), out.yearChange ? Dec.parse(out.yearChange.kestBeforeCreditDeltaEur) : Z));
+
+    // ---- 9. prepaid: the fund income (agE) taxed so far, by security and year, and what is still in the cost
+    const hist = new Map();
+    for (const l of filed.engine.incomeLines || []) {
+      if (l.kind !== "AGE" || l.taxable !== true) continue;
+      const perYear = hist.get(l.isin) || new Map();
+      const cell = perYear.get(l.year) || { age: Z, wht: Z };
+      cell.age = Dec.add(cell.age, Dec.parse(l.grossEur));
+      cell.wht = Dec.add(cell.wht, Dec.parse(l.creditableWhtEur || "0.00"));
+      perYear.set(l.year, cell);
+      hist.set(l.isin, perYear);
+    }
+    const byIsin = {};
+    let allAge = Z;
+    let allKest = Z;
+    for (const isin of Array.from(hist.keys()).sort()) {
+      const years = [];
+      let tAge = Z;
+      let tKest = Z;
+      let tWht = Z;
+      for (const y of Array.from(hist.get(isin).keys()).sort()) {
+        const c = hist.get(isin).get(y);
+        const k = Dec.mulRound(rate, c.age, DP);
+        years.push({ year: y, ageEur: M(c.age), kestEur: M(k), foreignTaxCreditableEur: M(c.wht) });
+        tAge = Dec.add(tAge, c.age);
+        tKest = Dec.add(tKest, k);
+        tWht = Dec.add(tWht, c.wht);
+      }
+      byIsin[isin] = { years, ageEur: M(tAge), kestEur: M(tKest), foreignTaxCreditableEur: M(tWht) };
+      allAge = Dec.add(allAge, tAge);
+      allKest = Dec.add(allKest, tKest);
+    }
+    out.prepaid = { byIsin, ageEur: M(allAge), kestEur: M(allKest), inCostEur: totals.prepaidInCostEur };
+
+    out.ok = true;
+    return seal(out);
+  }
+
+  return { VERSION, REASONS, dayOf, compute };
+});
+
 /* ---- src/app/zip.js ---- */
 /*
  * Zip: reads the files inside a ZIP archive, and turns the bytes of a text file into text.
@@ -8699,7 +9136,13 @@ span.hc { cursor: default; }
         p02: { label: "Move the World ETF from Broker H to Broker I", transfer: true },
       },
     };
-    return { base, meta };
+    // Invented last closes for "If you sold everything today" (the demo's day is meta.asOf). One security is in dollars, one is below its cost.
+    const quotes = {
+      [W]: { ok: true, price: "78.40", ccy: "EUR", rate: "1", rateDate: null, priceDate: "2026-10-19", symbol: "DEMO-W" },
+      [E]: { ok: true, price: "36.20", ccy: "EUR", rate: "1", rateDate: null, priceDate: "2026-10-19", symbol: "DEMO-E" },
+      [U]: { ok: true, price: "152.30", ccy: "USD", rate: "1.0820", rateDate: "2026-10-20", priceDate: "2026-10-19", symbol: "DEMO-U" },
+    };
+    return { base, meta, quotes };
   }
 
   return { build, ISIN: { WORLD: W, EUROPE: E, US_TECH: U, STOCK_A: S } };
@@ -10709,7 +11152,7 @@ span.hc { cursor: default; }
 })(typeof self !== "undefined" ? self : this, function (Ecb, PriceBook, Perf) {
   "use strict";
 
-  const VERSION = "perfinput-0.2.0";
+  const VERSION = "perfinput-0.3.0";
   const MAX_LAG_DAYS = 3650; // a rate is always used, however old; the engine reports the ones that are far from their day
 
   const readers = new Map(); // "hash|ccy" -> ledger or null (the ECB file is large: read it once per currency)
@@ -10728,12 +11171,12 @@ span.hc { cursor: default; }
     return l;
   }
 
-  /** (currency, day) => { ok, rate (units of the currency per euro), lagDays } from the ECB files of the document. */
-  function makeFx(doc) {
+  /** currency => the ECB ledger of the document for it (or null); each currency is looked up once. The file stored for the currency comes first. */
+  function ledgersOf(doc) {
     const files = doc && doc.files && doc.files.ecb ? doc.files.ecb : {};
     const names = Object.keys(files).sort();
     const own = new Map();
-    function ledgerFor(ccy) {
+    return (ccy) => {
       if (own.has(ccy)) return own.get(ccy);
       let l = null;
       const order = (files[ccy] ? [ccy] : []).concat(names.filter((n) => n !== ccy));
@@ -10743,12 +11186,32 @@ span.hc { cursor: default; }
       }
       own.set(ccy, l);
       return l;
-    }
+    };
+  }
+
+  /** (currency, day) => { ok, rate (units of the currency per euro), lagDays } from the ECB files of the document. */
+  function makeFx(doc) {
+    const ledgerFor = ledgersOf(doc);
     return (ccy, day) => {
       const l = ledgerFor(ccy);
       if (!l) return { ok: false };
       const r = l.rateOn(day, { maxLagDays: MAX_LAG_DAYS });
       return r.ok ? { ok: true, rate: Number(r.rate), lagDays: r.lagDays } : { ok: false };
+    };
+  }
+
+  /**
+   * (currency, day, maxLagDays) => { ok, rate, rateDate, lagDays } or { ok: false, reason }: the same ECB files, but the rate comes back as the
+   * exact decimal text of the file (units of the currency per euro) and a rate older than maxLagDays is refused. For the figures that enter a
+   * tax calculation (architecture 26: what I would owe if I sold everything today); the floating-point makeFx above is for the performance only.
+   */
+  function makeRateOn(doc) {
+    const ledgerFor = ledgersOf(doc);
+    return (ccy, day, maxLagDays) => {
+      const l = ledgerFor(ccy);
+      if (!l) return { ok: false, reason: "there is no ECB rate file for " + ccy + " (load it in step 4 of the Data tab)." };
+      const r = l.rateOn(day, { maxLagDays });
+      return r.ok ? { ok: true, rate: r.rate, rateDate: r.rateDate, lagDays: r.lagDays } : { ok: false, reason: r.reason };
     };
   }
 
@@ -10872,7 +11335,403 @@ span.hc { cursor: default; }
     return { loaded: names.length > 0, currencies: names };
   }
 
-  return { VERSION, makeFx, mappingOf, build, run, ecbInfo, isWhole, viewKey, placesOf, tickersAt, scopeOf, runView };
+  return { VERSION, makeFx, makeRateOn, mappingOf, build, run, ecbInfo, isWhole, viewKey, placesOf, tickersAt, scopeOf, runView };
+});
+
+/* ---- src/app/liquidate-input.js ---- */
+/*
+ * LiquidateInput: the prices that "what would I owe if I sold everything today" (architecture section 26) values the positions with.
+ *
+ * It only hands things over and refuses what is doubtful; the tax is worked out by liquidate.js. For every ISIN of which the tax data holds
+ * units it builds one quote, { ok: true, price, ccy, rate, rateDate, priceDate, symbol } or { ok: false, reason, text }, from
+ *  - the performance model of the whole portfolio (which securities it could value from market prices, and the units it holds today),
+ *  - the price book (the daily closes),
+ *  - the ECB files of the document (the exact rate text; a rate older than 14 days is refused),
+ *  - the units of the tax pools.
+ *
+ * The rules (26.2): S3 the last close of the symbol the owner chose, at most 10 days older than the sale day, only for a security the
+ * performance module values from market prices (never "valued at my own transaction prices"); several tickers of one ISIN: the symbol with
+ * the most recent close, ties to the symbol that sorts first. S4 euro needs no rate; any other currency needs an ECB rate on the sale day or
+ * the latest day before it, at most 14 days old. S6 the units of the ISIN in the tax pools (all depots) must equal the units the performance
+ * module holds today in the tickers of that ISIN (0.000001 tolerance): the tax data has no split rows while the performance module applies
+ * the splits of the price file, so a difference means a split or a missing or doubled row, and a price would then be wrong by that factor.
+ * Anything else: the position is left out with the reason, never valued at cost or at an old price.
+ *
+ * Pure functions, no clock (the day is an input). Floating point is used for the units check only, never for money.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("../lib/decimal.js"), require("../prices/prices.js"));
+  else root.LiquidateInput = factory(root.Dec, root.Prices);
+})(typeof self !== "undefined" ? self : this, function (Dec, Prices) {
+  "use strict";
+
+  const VERSION = "liquidateinput-0.1.0";
+  const MAX_PRICE_LAG_DAYS = 10;
+  const MAX_RATE_LAG_DAYS = 14;
+  const UNITS_TOLERANCE = 0.000001;
+
+  const isObj = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
+  const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  const no = (reason, text) => ({ ok: false, reason, text });
+  const plural = (n, one, many) => n + " " + (n === 1 ? one : many);
+  const unitsText = (x) => String(Math.round(x * 1e6) / 1e6);
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  /** 2026-11-13 as "13 Nov 2026", the way the rest of the page writes a day. */
+  const fd = (iso) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso));
+    return m ? +m[3] + " " + MONTHS[+m[2] - 1] + " " + m[1] : String(iso);
+  };
+
+  /** The latest close on or before day number `dn`: { date, dn, price } or null. Closes are [day, "price"]; an unreadable one is skipped. */
+  function lastClose(closes, dn) {
+    let best = null;
+    for (const c of closes) {
+      if (!Array.isArray(c) || typeof c[1] !== "string") continue;
+      const d = Prices.dayNumber(c[0]);
+      if (d === null || d > dn || (best !== null && d <= best.dn)) continue;
+      const p = Dec.parse(c[1]);
+      if (!p || Dec.isNeg(p) || Dec.isZero(p)) continue;
+      best = { date: c[0], dn: d, price: c[1] };
+    }
+    return best;
+  }
+
+  /**
+   * args: {
+   *   tickers   the ticker rows of the conversion (conv.tables.tickers): { ticker, isin, isinStatus }
+   *   model     the performance model of the whole portfolio (Perf.compute): tickers[] (state, symbol, valuedBy, reason, text) and per[] (units)
+   *   prices    (symbol) => price entry { currency, closes: [[day, "price"], ...] } or null (the price book)
+   *   pools     the pools of the position as filed: { depot, isin, qty }
+   *   day       the day of the sale (Liquidate.dayOf)
+   *   rateOn    (currency, day, maxLagDays) => { ok, rate, rateDate } | { ok: false, reason } (PerfInput.makeRateOn)
+   * }
+   * Returns { version, quotes: { isin: quote }, orphans: [{ ticker, isin, units, text }] }: orphans are securities the performance figures hold
+   * today that have no open position in the tax data (a total that leaves them out would be too small, so the page says so).
+   */
+  function quotes(args) {
+    const out = { version: VERSION, quotes: {}, orphans: [] };
+    if (!isObj(args)) return out;
+    const dayNo = Prices.dayNumber(args.day);
+    if (dayNo === null) return out;
+    const day = args.day;
+    const tickers = Array.isArray(args.tickers) ? args.tickers.filter((t) => isObj(t) && typeof t.ticker === "string") : [];
+    const model = isObj(args.model) ? args.model : null;
+    const priceOf = typeof args.prices === "function" ? args.prices : () => null;
+    const rateOn = typeof args.rateOn === "function" ? args.rateOn : () => ({ ok: false, reason: "no ECB rates were handed in." });
+    const maxPrice = Number.isInteger(args.maxPriceLagDays) ? args.maxPriceLagDays : MAX_PRICE_LAG_DAYS;
+    const maxRate = Number.isInteger(args.maxRateLagDays) ? args.maxRateLagDays : MAX_RATE_LAG_DAYS;
+
+    const infos = new Map(); // ticker -> what the performance module decided
+    const units = new Map(); // ticker -> units it holds on its last day
+    if (model && Array.isArray(model.tickers)) for (const i of model.tickers) if (isObj(i)) infos.set(i.ticker, i);
+    if (model && Array.isArray(model.per)) for (const a of model.per) if (isObj(a) && a.units && a.units.length) units.set(a.ticker, Number(a.units[a.units.length - 1]));
+
+    // the units in the tax pools, per ISIN, all depots added
+    const held = new Map();
+    for (const p of Array.isArray(args.pools) ? args.pools : []) {
+      if (!isObj(p) || typeof p.isin !== "string") continue;
+      const q = Dec.parse(p.qty);
+      if (!q || Dec.isNeg(q) || Dec.isZero(q)) continue;
+      held.set(p.isin, Dec.add(held.get(p.isin) || Dec.mk(0n, 0), q));
+    }
+
+    function one(isin, taxQty) {
+      const mine = tickers.filter((t) => t.isin === isin && t.isinStatus === "OK").map((t) => t.ticker).sort();
+      if (!mine.length) return no("NO_PRICE", "No security of your data has this ISIN, so there is no price to look up.");
+      // S3: which of its tickers the performance module values from market prices
+      const live = [];
+      const why = [];
+      let onlyRates = true;
+      for (const t of mine) {
+        const i = infos.get(t);
+        if (!i) {
+          onlyRates = false;
+          why.push(t + ": " + (model ? "no row of it can be used by the performance figures." : "the performance figures are not available."));
+        } else if (i.state === "INCLUDED" && i.valuedBy !== "TRADES") live.push(i);
+        else if (i.state === "INCLUDED") {
+          onlyRates = false;
+          why.push(t + ": there are no market prices for " + (i.symbol || t) + ". The Performance tab values it at your own transaction prices, which is not a value of today.");
+        } else {
+          if (i.reason !== "NO_FX_RATES") onlyRates = false;
+          why.push(t + ": " + (i.text || "it cannot be valued from market prices."));
+        }
+      }
+      if (!live.length) return no(onlyRates && why.length ? "NO_RATE" : "NO_PRICE", why.join(" "));
+      // the last close of each symbol, and the most recent of them
+      const cands = [];
+      for (const i of live) {
+        const entry = priceOf(i.symbol);
+        const c = isObj(entry) && Array.isArray(entry.closes) ? lastClose(entry.closes, dayNo) : null;
+        if (c) cands.push({ symbol: i.symbol, entry, date: c.date, dn: c.dn, price: c.price });
+      }
+      if (!cands.length) return no("NO_PRICE", "No closing price of " + live.map((i) => i.symbol).join(", ") + " on or before " + fd(day) + " is loaded. Update the prices on the Performance tab.");
+      cands.sort((a, b) => b.dn - a.dn || cmpStr(a.symbol, b.symbol));
+      const c = cands[0];
+      const lag = dayNo - c.dn;
+      if (lag > maxPrice) return no("NO_PRICE", "The last close of " + c.symbol + " is from " + fd(c.date) + ", " + plural(lag, "day", "days") + " before " + fd(day) + " (at most " + maxPrice + " are accepted). Update the prices on the Performance tab.");
+      // S4: the rate
+      const ccy = typeof c.entry.currency === "string" ? c.entry.currency.trim().toUpperCase() : "";
+      if (!/^[A-Z]{3}$/.test(ccy)) return no("BAD_QUOTE", "The price file does not say which currency " + c.symbol + " is quoted in.");
+      let rate = "1";
+      let rateDate = null;
+      if (ccy !== "EUR") {
+        const r = rateOn(ccy, day, maxRate);
+        if (!isObj(r) || r.ok !== true) return no("NO_RATE", "No usable ECB rate for " + ccy + ": " + (isObj(r) && r.reason ? r.reason : "none was found.") + " Load a newer ECB file (step 4 of the Data tab).");
+        rate = String(r.rate);
+        rateDate = typeof r.rateDate === "string" ? r.rateDate : null;
+      }
+      // S6: the units of the tax data and of the performance figures must agree
+      let perf = 0;
+      for (const t of mine) if (units.has(t)) perf += units.get(t);
+      const tax = Number(Dec.str(taxQty));
+      if (!(Math.abs(tax - perf) <= UNITS_TOLERANCE)) {
+        return no("UNITS_DIFFER", "Your tax data holds " + Dec.str(Dec.normalize(taxQty)) + " units of this security, the performance figures " + unitsText(perf) + ". A split, a missing or doubled row, or a ticker without prices is the likely cause, and the price would then be wrong, so this position is not valued. Check the Performance and Transactions tabs.");
+      }
+      return { ok: true, price: c.price, ccy, rate, rateDate, priceDate: c.date, symbol: c.symbol };
+    }
+
+    for (const isin of Array.from(held.keys()).sort()) out.quotes[isin] = one(isin, held.get(isin));
+
+    // the other direction: units the performance figures hold that the tax data has no open position for
+    const byIsin = new Map();
+    for (const t of tickers) byIsin.set(t.ticker, t.isinStatus === "OK" && typeof t.isin === "string" ? t.isin : "");
+    for (const t of Array.from(units.keys()).sort()) {
+      const u = units.get(t);
+      if (!(u > UNITS_TOLERANCE)) continue;
+      const isin = byIsin.has(t) ? byIsin.get(t) : "";
+      if (isin !== "" && held.has(isin)) continue;
+      out.orphans.push({ ticker: t, isin, units: unitsText(u), text: t + ": the performance figures hold " + unitsText(u) + " units, but the tax data has no open position for " + (isin !== "" ? isin : "a security with this ticker") + "." });
+    }
+    return out;
+  }
+
+  return { VERSION, MAX_PRICE_LAG_DAYS, MAX_RATE_LAG_DAYS, UNITS_TOLERANCE, lastClose, quotes };
+});
+
+/* ---- src/app/sell-view.js ---- */
+/*
+ * SellView: the figures and words of the card "If you sold everything today" (architecture section 26.7), as plain data.
+ *
+ * It takes the result of Liquidate.compute and decides what is shown: the four tiles, the tax lines, the bridge from the broker's profit to
+ * the taxable gain, the prepaid figures, the positions that were left out and why, and for each security the lines and the table of fund
+ * income taxed so far. ui-sell.js only draws this. Nothing here works out tax: every amount is an exact decimal text that came from the
+ * engine; the only arithmetic is turning the sign of a figure that is printed as a step ("less ..."), which is exact.
+ *
+ * Pure functions, no DOM, no clock. Runs in Node (tests) and in the page.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("../lib/decimal.js"), require("./model.js"));
+  else root.SellView = factory(root.Dec, root.Model);
+})(typeof self !== "undefined" ? self : this, function (Dec, Model) {
+  "use strict";
+
+  const VERSION = "sellview-0.1.0";
+  const TITLE = "If you sold everything today";
+  const fm = (t, o) => Model.fmtMoney(t, o);
+  const fd = (t) => Model.fmtDate(t);
+  const fq = (t) => Model.fmtQty(t);
+  const plural = (n, one, many) => n + " " + (n === 1 ? one : many || one + "s");
+
+  const LIMITS = [
+    "The price is the last close of each security, not a live price, and no selling costs are taken off.",
+    "These figures use the position as filed. A selection on the What-if tab is not part of them.",
+    "Only the special rate (KESt) is applied. The normal tax scale is not; the Tax tab compares it for each filed year.",
+    "A currency gain or loss when you later exchange the proceeds is not included.",
+    "A fund report that is out but not in your data yet (the Data tab lists missing reports) leaves the cost too low here, so the gain and the tax come out too high.",
+  ];
+
+  /** "0.275" -> "27.5 %" (exact). */
+  function pct(rate) {
+    const r = Dec.parse(rate);
+    return r ? Dec.str(Dec.normalize(Dec.mul(r, Dec.mk(100n, 0)))) + " %" : "";
+  }
+  /** The same amount with the opposite sign, as money text ("108.00" -> "-108.00", "0.00" stays "0.00"). */
+  const flip = (t) => {
+    const d = Dec.parse(t);
+    return d ? Dec.str(Dec.neg(d), 2) : t;
+  };
+  const isZero = (t) => {
+    const d = Dec.parse(t);
+    return !d || Dec.isZero(d);
+  };
+  const isNeg = (t) => {
+    const d = Dec.parse(t);
+    return !!d && Dec.isNeg(d) && !Dec.isZero(d);
+  };
+  const same = (a, b) => {
+    const x = Dec.parse(a);
+    const y = Dec.parse(b);
+    return !!x && !!y && Dec.cmp(x, y) === 0;
+  };
+
+  /**
+   * res: the result of Liquidate.compute. ctx: { nameOf(isin), depotOf(depot), relocation: "2020-01-28", orphans: [...] } (all optional).
+   * Returns { ok, title, sub, intro, text, notes, incomplete, tiles, tax, bridge, prepaid, left, limits }.
+   */
+  function build(res, ctx) {
+    const c = ctx || {};
+    const nameOf = typeof c.nameOf === "function" ? c.nameOf : (x) => x;
+    const depotOf = typeof c.depotOf === "function" ? c.depotOf : (x) => x;
+    const v = { version: VERSION, ok: false, title: TITLE, sub: "", intro: "", text: "", notes: [], incomplete: "", tiles: [], tax: [], bridge: null, prepaid: null, left: [], limits: LIMITS.slice() };
+    if (!res || res.ok !== true) {
+      v.text = res && Array.isArray(res.errors) && res.errors[0] && res.errors[0].text ? res.errors[0].text : "The figures could not be worked out.";
+      return v;
+    }
+    v.ok = true;
+    const t = res.totals;
+    const yc = res.yearChange;
+    const year = res.saleYear;
+    const rate = pct(res.kestRate);
+    const valued = t.positions > 0;
+    v.sub = fd(res.date);
+    v.intro = "A what-if: nothing is sold or saved. Every open position is valued at its last close, and the Austrian tax on selling all of it on " + fd(res.date) + " is worked out with the same calculation as “Plan a sale”.";
+    v.notes = (res.notes || []).map((n) => n.text);
+
+    // ---- what was left out (positions that could not be valued, securities the performance figures hold that the tax data does not)
+    for (const p of res.left) v.left.push({ key: p.isin + "|" + p.depot, name: nameOf(p.isin), depot: depotOf(p.depot), units: fq(p.qty), reason: p.reason, text: p.text });
+    const orphans = Array.isArray(c.orphans) ? c.orphans : [];
+    for (const o of orphans) v.left.push({ key: "orphan|" + o.ticker, name: o.isin ? nameOf(o.isin) : o.ticker, depot: "", units: fq(o.units), reason: "Not in the tax data", text: o.text });
+    const out = res.left.length + orphans.length;
+    if (out > 0) v.incomplete = "Not everything could be valued: these figures leave out " + plural(out, "position") + " (listed below). Nothing is estimated.";
+
+    // ---- the four tiles
+    const dash = "–";
+    const nPos = t.positions;
+    v.tiles = [
+      {
+        key: "value",
+        label: "Value today",
+        value: valued ? fm(t.valueEur) : dash,
+        sub: valued ? (res.left.length > 0 ? nPos + " of " + (nPos + res.left.length) + " positions" : plural(nPos, "position")) + " at the last close" : "no position could be valued",
+        tip: { t: "Value today", r: [["Day", fd(res.date)], ["Positions valued", String(nPos)], ["Left out", String(out)]], n: "Units held × the last close of each security, converted to euro at the ECB rate of that day. No selling costs are taken off." },
+      },
+      {
+        key: "tax",
+        label: "Extra tax in " + year,
+        value: yc ? fm(yc.kestBeforeCreditDeltaEur) : dash,
+        sub: !yc ? "no position could be valued" : isNeg(yc.kestBeforeCreditDeltaEur) ? "your " + year + " tax would go down" : rate + " KESt on what the sale adds to " + year + (yc.indicative ? " · indicative" : ""),
+        tip: yc
+          ? { t: "Extra tax in " + year, r: [[year + " KESt as filed", fm(yc.filed.kestBeforeCreditEur)], [year + " KESt with the sale", fm(yc.withSales.kestBeforeCreditEur)], ["Extra tax", fm(yc.kestBeforeCreditDeltaEur)], ["Tax on these positions alone", fm(t.kestAloneEur)]], n: rate + " KESt on the gains of the sale, counting what " + year + " already has: gains and losses already realised, fund income reported so far and dividends. Losses offset gains within the year; there is no carry-forward. Before any foreign-tax credit." }
+          : { t: "Extra tax", n: "Nothing could be valued, so there is no tax to show." },
+      },
+      {
+        key: "left",
+        label: "Left after tax",
+        value: valued ? fm(t.leftAfterTaxEur) : dash,
+        sub: valued ? (out > 0 ? "value minus the extra tax, without the positions left out" : "value minus the extra tax") : "no position could be valued",
+        tip: valued ? { t: "Left after tax", r: [["Value today", fm(t.valueEur)], ["Extra tax in " + year, yc ? fm(yc.kestBeforeCreditDeltaEur) : fm("0.00")], ["Left after tax", fm(t.leftAfterTaxEur)]], n: "Selling costs and the exchange of foreign currency are not counted." } : { t: "Left after tax", n: "Nothing could be valued." },
+      },
+      {
+        key: "prepaid",
+        label: "Prepaid in your cost",
+        value: valued ? fm(t.prepaidInCostEur) : dash,
+        sub: valued ? "tax already paid on fund income, kept in the cost of these units" : "no position could be valued",
+        tip: valued ? { t: "Prepaid in your cost", r: [["Fund corrections in the cost", fm(t.bridge.akkEur)], ["KESt rate", rate], ["Prepaid in the cost", fm(t.prepaidInCostEur)]], n: "Fund income that OeKB reported (agE) was taxed in the year it was reported and added to the cost of your units. The sale tax is lower by this amount because it was paid ahead." } : { t: "Prepaid in your cost", n: "Nothing could be valued." },
+      },
+    ];
+
+    // ---- the tax lines (only when something was valued: a total of nothing is not shown as zero)
+    if (valued && yc) {
+      v.tax.push({
+        key: "extra",
+        label: "Extra tax in " + year,
+        sub: rate + " KESt on what selling adds to " + year + ", counting what " + year + " already has" + (yc.indicative ? ". Indicative: " + (yc.reasons.length ? yc.reasons.join(" ") : year + " is not complete in your data.") : ""),
+        value: fm(yc.kestBeforeCreditDeltaEur),
+        strong: true,
+        tip: { t: "Extra tax in " + year, r: [["Realised result " + year + " as filed", fm(yc.filed.realizedNetEur)], ["Fund income (agE) " + year + " as filed", fm(yc.filed.ageEur)], ["Dividends " + year + " as filed", fm(yc.filed.dividendsEur)], ["Realised result with the sale", fm(yc.withSales.realizedNetEur)], [year + " KESt as filed", fm(yc.filed.kestBeforeCreditEur)], [year + " KESt with the sale", fm(yc.withSales.kestBeforeCreditEur)]], n: "The change of the " + year + " KESt before the foreign-tax credit. A year that already has a gain makes a loss worth more; a year that already has a loss makes a gain cost less." },
+      });
+      v.tax.push({
+        key: "alone",
+        label: "Tax on these positions alone",
+        sub: rate + " of the gains minus the losses of the valued positions, nothing else counted",
+        value: fm(t.kestAloneEur),
+        strong: false,
+        tip: { t: "Tax on these positions alone", r: [["Gains", fm(t.gainsEur)], ["Losses", fm(flip(t.lossesEur))], ["Net taxable gain", fm(t.taxGainNetEur)], ["KESt", fm(t.kestAloneEur)]], n: "It does not depend on anything else in the data. It differs from the extra tax when " + year + " already has gains, losses, fund income or dividends (and by a cent now and then, because a year's tax is rounded once)." },
+      });
+      if (yc.dueMovesWithCredit) {
+        const lo = yc.dueDeltaLowEur;
+        const hi = yc.dueDeltaHighEur;
+        v.tax.push({
+          key: "credit",
+          label: "Extra tax due after the foreign-tax credit",
+          sub: "The credit for foreign tax withheld on dividends moves with the sale. The Tax tab explains the range.",
+          value: same(lo, hi) ? fm(lo) : fm(lo) + " to " + fm(hi),
+          strong: false,
+          tip: { t: "After the foreign-tax credit", r: [["Lower reading", fm(lo)], ["Higher reading", fm(hi)]], n: "The credit has two readings (architecture section 6); the true figure is in this range." },
+        });
+      }
+    }
+
+    // ---- the bridge: the profit a broker app shows, and what of it is taxable
+    if (valued) {
+      const b = t.bridge;
+      const rows = [["Profit your broker shows", fm(b.profitShownEur), ""]];
+      if (!isZero(b.akkEur)) rows.push(["Fund income already taxed (OeKB corrections in the cost)", fm(flip(b.akkEur), { plus: true }), "step"]);
+      if (!isZero(b.stepUpEur)) rows.push([(isNeg(b.stepUpEur) ? "Loss from before the move to Austria, never counted (step-up" : "Gain from before the move to Austria (step-up") + (c.relocation ? " of " + fd(c.relocation) : "") + ")", fm(flip(b.stepUpEur), { plus: true }), "step"]);
+      if (!isZero(b.feesEur)) rows.push(["Fees, which are not deductible", fm(b.feesEur, { plus: true }), "step"]);
+      rows.push(["Taxable gain", fm(b.taxGainEur), "total"]);
+      v.bridge = {
+        title: "From the profit your broker shows to the taxable gain",
+        sub: fm(b.profitShownEur) + " → " + fm(b.taxGainEur),
+        rows,
+        note: "Your broker’s profit is the value minus what you paid with fees. The tax uses another cost: the purchases without fees, the step-up at the move to Austria and the fund corrections already taxed.",
+      };
+    }
+
+    // ---- prepaid: what the fund income of earlier years already paid
+    if (valued && (!isZero(res.prepaid.ageEur) || !isZero(t.prepaidInCostEur))) {
+      v.prepaid = {
+        title: "Prepaid tax",
+        sub: fm(t.prepaidInCostEur) + " still in your cost",
+        rows: [
+          ["Still in your cost", fm(t.prepaidInCostEur), "KESt " + rate + " × the fund corrections in the cost of the units you hold. It is how much less the sale tax is."],
+          ["Fund income taxed so far (agE)", fm(res.prepaid.ageEur), "All years and all securities, including income on units sold since."],
+          ["KESt on it so far", fm(res.prepaid.kestEur), rate + " of that income, before the foreign-tax credit and the loss offset of each year. The Tax tab has what each year came to."],
+        ],
+      };
+    }
+    return v;
+  }
+
+  /**
+   * The lines for one security: { head, depots: { depot: { line, rows: [[label, text]], note } }, years: { cols, rows, total } | null }.
+   * head is set only when every position of the security could be valued (it is then the value next to the tax cost).
+   */
+  function security(res, isin) {
+    const out = { head: null, depots: {}, years: null };
+    if (!res || res.ok !== true) return out;
+    const sec = res.securities[isin];
+    if (sec && sec.positions > 0 && sec.left === 0) out.head = "Value " + fm(sec.valueEur);
+    for (const p of res.positions) {
+      if (p.isin !== isin) continue;
+      if (p.status !== "OK") {
+        out.depots[p.depot] = { line: "Not valued: " + p.reason, rows: [], note: "Not valued: " + p.reason + ". " + p.text };
+        continue;
+      }
+      const eu = p.ccy === "EUR";
+      out.depots[p.depot] = {
+        line: "Worth " + fm(p.valueEur) + " · taxable gain if sold " + fm(p.taxGainEur),
+        rows: [["Value today", fm(p.valueEur)], ["Taxable gain if sold", fm(p.taxGainEur)], ["Tax on this gain alone", fm(p.kestAloneEur)], ["Prepaid tax still in the cost", fm(p.prepaidInCostEur)]],
+        note: "Price " + p.price + " " + p.ccy + (p.priceDate ? " (last close " + fd(p.priceDate) + ")" : "") + (eu ? "" : ", " + p.rate + " " + p.ccy + " per euro" + (p.rateDate ? " (ECB, " + fd(p.rateDate) + ")" : "")) + (p.symbol ? " · " + p.symbol : ""),
+      };
+    }
+    const h = res.prepaid && res.prepaid.byIsin ? res.prepaid.byIsin[isin] : null;
+    if (h && h.years.length) {
+      const foreign = h.years.some((y) => !isZero(y.foreignTaxCreditableEur));
+      const rate = pct(res.kestRate);
+      const cols = ["Year", "Fund income (agE)", "KESt " + rate].concat(foreign ? ["Foreign tax"] : []);
+      const row = (label, a, k, f) => [label, fm(a), fm(k)].concat(foreign ? [isZero(f) ? "–" : fm(f)] : []);
+      out.years = {
+        cols,
+        rows: h.years.map((y) => row(y.year, y.ageEur, y.kestEur, y.foreignTaxCreditableEur)),
+        total: row("All years", h.ageEur, h.kestEur, h.foreignTaxCreditableEur),
+        caption: "Fund income taxed so far",
+      };
+    }
+    return out;
+  }
+
+  return { VERSION, TITLE, LIMITS, pct, build, security };
 });
 
 /* ---- src/app/names.js ---- */
@@ -15712,7 +16571,7 @@ const PerfUI = (function () {
           ? el("p", { class: "note", text: "Choose a broker, an account or a security to look closer. Everything on this tab then follows your choice." })
           : el("div", { class: "stack", "data-k": "pf-viewnow" },
               el("p", { class: "now" }, "Showing ", el("strong", { text: whereWords(sel.where) }), " · ", info ? el("strong", tipped(n.tip(info), { class: "tipname", text: info.full }, false)) : el("strong", { text: "all securities" }), ". Every figure and chart on this tab is made only from these transactions."),
-              el("p", { class: "note", "data-k": "pf-view-notes", text: "Gains add up across places; the split of a gain into realised and not yet realised does not, because the average cost is kept inside each view. Tax already paid in advance on fund income (agE) is not shown here yet: it comes with “What would I owe if I sold everything now”." }),
+              el("p", { class: "note", "data-k": "pf-view-notes", text: "Gains add up across places; the split of a gain into realised and not yet realised does not, because the average cost is kept inside each view. Tax already paid in advance on fund income (agE) is not shown here: the Holdings tab has it, in the card “If you sold everything today” and under each security." }),
               el("div", { class: "btn-row" }, button("Back to everything", () => { st.sel = { where: "", ticker: "" }; host.refresh(); }, "small quiet", "pf-view-reset"))));
     }
 
@@ -16351,7 +17210,199 @@ const PerfUI = (function () {
       root.appendChild(howCard());
     }
 
-    return { render, state: st, preload: readBook, book: () => (st.loaded ? st.book : null) };
+    return { render, state: st, preload: readBook, book: () => (st.loaded ? st.book : null), model: () => (st.loaded && cv() ? model() : null) };
+  }
+
+  return { create };
+})();
+
+/* ---- src/app/ui-sell.js ---- */
+/*
+ * "If you sold everything today" on the Holdings tab (browser only; architecture section 26).
+ *
+ * The card values every open position at its last close and shows what the Austrian tax on selling all of it would be. It also hands the
+ * Holdings tab the lines for each security (value, taxable gain, tax on that gain alone, prepaid tax still in the cost) and the table of
+ * fund income taxed so far. Nothing is sold, planned or saved.
+ *
+ * This file only draws. The tax comes from Liquidate (liquidate.js, which runs the engine twice: once as filed, once with a sale of
+ * everything), the prices and rates from LiquidateInput (which refuses anything doubtful), and every word and figure on the card from
+ * SellView (sell-view.js). The result is kept until the data, the prices, the day or the mode change, because the screen is drawn on every
+ * keystroke. Text is always put in with textContent.
+ */
+const SellUI = (function () {
+  "use strict";
+
+  const { el, listItem, fold, card } = Dom;
+  const C = Charts;
+
+  /** The attributes of an element with a hover box: the text and a place in the tab order. */
+  const tipped = (spec) => {
+    const a = spec ? Tip.attr(spec) : false;
+    return a ? { "data-tip": a, tabindex: "0" } : {};
+  };
+
+  /**
+   * host: {
+   *   mode()            "mine" | "demo"
+   *   base()            the engine input of what is on screen
+   *   meta()            its names (the demo's date of its prices is in meta.asOf)
+   *   conv(), doc()     the conversion and the document (my data only)
+   *   pools()           the pools of the position as filed
+   *   today()           today as YYYY-MM-DD
+   *   book()            the price book, or null while the saved prices are being read
+   *   perfModel()       the performance model of the whole portfolio
+   *   demoQuotes()      invented prices for the demo
+   *   secName(isin), depotLabel(depot), relocation()
+   *   refresh()
+   * }
+   */
+  function create(host) {
+    const st = { open: {} };
+    let memo = { base: null, model: null, book: null, today: "", mode: "", out: null, view: null, secs: new Map() };
+
+    /** { res, orphans, view } for what is on screen, null while there is nothing to draw yet, or { error } when it stopped. */
+    function result() {
+      const base = host.base();
+      if (!base) return null;
+      const mode = host.mode();
+      const today = host.today();
+      let model = null;
+      let book = null;
+      try {
+        if (mode !== "demo") {
+          book = host.book();
+          if (!book) return null; // the saved prices are still being read
+          model = host.perfModel();
+        }
+        if (memo.out && memo.base === base && memo.model === model && memo.book === book && memo.today === today && memo.mode === mode) return memo.out;
+        let res;
+        let orphans = [];
+        if (mode === "demo") {
+          const meta = host.meta();
+          res = Liquidate.compute({ base, quotes: host.demoQuotes() || {}, date: meta && meta.asOf ? meta.asOf : today });
+        } else {
+          const conv = host.conv();
+          const when = Liquidate.dayOf(base, today);
+          const q = LiquidateInput.quotes({ tickers: conv && conv.tables ? conv.tables.tickers : [], model, prices: (s) => book.store.symbols[s] || null, pools: host.pools(), day: when.day, rateOn: PerfInput.makeRateOn(host.doc()) });
+          res = Liquidate.compute({ base, quotes: q.quotes, date: today });
+          orphans = q.orphans;
+        }
+        const view = SellView.build(res, { nameOf: host.secName, depotOf: host.depotLabel, relocation: host.relocation(), orphans });
+        memo = { base, model, book, today, mode, out: { res, orphans, view }, secs: new Map() };
+        return memo.out;
+      } catch (e) {
+        return { error: "The figures could not be worked out (" + (e && e.message ? e.message : String(e)) + "). Your data is not changed." };
+      }
+    }
+
+    function toggle(key) {
+      return (open) => {
+        st.open[key] = open;
+        host.refresh();
+      };
+    }
+
+    /** A line that opens: a title, a short line under it, and the body. */
+    function foldRow(key, title, sub, body) {
+      return el("div", { class: "row-card", "data-k": "sell-" + key }, fold({ "data-k": "sell-d-" + key }, !!st.open[key], toggle(key), el("span", { class: "rc-main" }, el("span", { class: "rc-title", text: title }), sub ? [el("br"), el("span", { class: "rc-sub", text: sub })] : null), body));
+    }
+
+    function tile(t) {
+      return el("div", Object.assign({ class: "kpi", "data-k": "sell-tile:" + t.key }, tipped(t.tip)), el("span", { class: "label", text: t.label }), el("span", { class: "value", text: t.value }), el("span", { class: "subline", text: t.sub }));
+    }
+
+    /** A value that is a range ("€442.31 to €444.51") breaks after the first figure on a narrow screen (the style sheet drops the break on a wide one). */
+    function valueOf(v) {
+      const i = v.indexOf(" to ");
+      return i < 0 ? el("span", { class: "rc-val", text: v }) : el("span", { class: "rc-val" }, v.slice(0, i + 1), el("br", { class: "narrow" }), v.slice(i + 1));
+    }
+
+    function line(x) {
+      return el("div", Object.assign({ class: "row-card flat" + (x.strong ? " key" : ""), "data-k": "sell-line:" + x.key }, tipped(x.tip)), el("div", { class: "rc-main" }, el("span", { class: "rc-title", text: x.label }), el("br"), el("span", { class: "rc-sub", text: x.sub })), valueOf(x.value));
+    }
+
+    const leftItem = (x) => listItem("warn", x.name + (x.depot ? " · " + x.depot : "") + " · " + x.units + " units: " + x.reason + ". " + x.text);
+
+    function bridgeBody(b) {
+      const rows = b.rows.map((r) => (r[2] === "total" ? { cells: [r[0], r[1]], cls: "strong" } : [r[0], r[1]]));
+      return [C.tableOf(["Step", "Amount"], rows, b.title), el("p", { class: "note", text: b.note })];
+    }
+
+    function prepaidBody(p) {
+      return el("div", { class: "rows" }, p.rows.map((r, i) => el("div", { class: "row-card flat", "data-k": "sell-pre:" + i }, el("div", { class: "rc-main" }, el("span", { class: "rc-title", text: r[0] }), el("br"), el("span", { class: "rc-sub", text: r[2] })), el("span", { class: "rc-val", text: r[1] }))));
+    }
+
+    /** The card at the top of the Holdings tab. Nothing is drawn while the prices are being read or when nothing is held. */
+    function render(root) {
+      const x = result();
+      if (!x) return;
+      if (x.error) {
+        root.appendChild(card(SellView.TITLE, null, el("p", { class: "note", text: x.error })));
+        return;
+      }
+      const v = x.view;
+      if (v.ok && x.res.positions.length === 0 && x.orphans.length === 0) return;
+      const kids = [el("div", { class: "card-head" }, el("h2", { text: v.title }), v.sub ? el("span", { class: "sub", text: v.sub }) : null)];
+      if (!v.ok) {
+        kids.push(el("p", { class: "note", text: v.text }));
+        root.appendChild(el("section", { class: "card", "data-k": "sell" }, kids));
+        return;
+      }
+      kids.push(el("p", { class: "note", text: v.intro }));
+      for (const n of v.notes) kids.push(el("div", { class: "banner info", "data-k": "sell-note" }, el("span", { text: n })));
+      kids.push(el("div", { class: "kpis" }, v.tiles.map(tile)));
+      if (v.left.length) kids.push(el("div", { class: "banner", "data-k": "sell-left" }, el("strong", { text: "Left out of these figures" }), el("span", { text: v.incomplete }), el("ul", { class: "list" }, v.left.map(leftItem))));
+      if (v.tax.length) kids.push(el("div", { class: "rows" }, v.tax.map(line)));
+      const folds = [];
+      if (v.bridge) folds.push(foldRow("bridge", v.bridge.title, v.bridge.sub, bridgeBody(v.bridge)));
+      if (v.prepaid) folds.push(foldRow("prepaid", v.prepaid.title, v.prepaid.sub, prepaidBody(v.prepaid)));
+      folds.push(foldRow("limits", "What these figures leave out", null, el("ul", { class: "list" }, v.limits.map((t) => listItem("info", t)))));
+      kids.push(el("div", { class: "rows" }, folds));
+      root.appendChild(el("section", { class: "card", "data-k": "sell" }, kids));
+    }
+
+    /** The lines of one security (SellView.security), or null when there is nothing to show for it. */
+    function sec(isin) {
+      const x = result();
+      if (!x || x.error || !x.res.ok) return null;
+      if (!memo.secs.has(isin)) memo.secs.set(isin, SellView.security(x.res, isin));
+      return memo.secs.get(isin);
+    }
+
+    /** The value of a security for the head of its card ("Value €6,300.00"), or null. */
+    const head = (isin) => {
+      const s = sec(isin);
+      return s ? s.head : null;
+    };
+
+    /** The short line under a depot's name ("Worth €… · taxable gain if sold €…"), or null. */
+    const depotLine = (isin, depot) => {
+      const s = sec(isin);
+      return s && s.depots[depot] ? s.depots[depot].line : null;
+    };
+
+    /** The lines of a depot for its fold: a heading, the rows and the price used, or null. */
+    function depotBlock(isin, depot) {
+      const s = sec(isin);
+      const d = s ? s.depots[depot] : null;
+      if (!d) return null;
+      const kv = el("dl", { class: "kv nums" });
+      for (const r of d.rows) {
+        kv.appendChild(el("dt", { text: r[0] }));
+        kv.appendChild(el("dd", { text: r[1] }));
+      }
+      return [el("h3", { text: "If sold today" }), d.rows.length ? kv : null, el("p", { class: "note", text: d.note })];
+    }
+
+    /** The table of fund income taxed so far for a security, or null. */
+    function yearsBlock(isin) {
+      const s = sec(isin);
+      if (!s || !s.years) return null;
+      const y = s.years;
+      return el("div", { class: "rows sell-years", "data-k": "sell-years:" + isin }, el("h3", { text: y.caption }), C.tableOf(y.cols, y.rows.map((r) => [r[0]].concat(r.slice(1))).concat([{ cells: y.total, cls: "strong" }]), y.caption + " by year"));
+    }
+
+    return { render, head, depotLine, depotBlock, yearsBlock, state: st };
   }
 
   return { create };
@@ -17204,7 +18255,7 @@ const RegularUI = (function () {
     const title = secShort(r.isin) + (r.kind === "DEEMED_SALE" ? " · closure treated as sale" : " · sale");
     const sub = fd(r.date) + " · " + depotLabel(r.depot) + " · " + fq(r.qty) + " units";
     const val = blocked ? el("span", { class: "rc-val", text: "blocked" }) : el("span", { class: "rc-val", text: fm(gain, { plus: true }) });
-    const body = el("dl", { class: "kv" });
+    const body = el("dl", { class: "kv nums" });
     const kv = (k, v2) => {
       body.appendChild(el("dt", { text: k }));
       body.appendChild(el("dd", { text: v2 }));
@@ -17463,7 +18514,7 @@ const RegularUI = (function () {
     const yr = v.summary.years[y];
     if (!yr) return;
     const s = yr.special;
-    const kv = el("dl", { class: "kv" });
+    const kv = el("dl", { class: "kv nums" });
     const row = (k, t) => {
       kv.appendChild(el("dt", { text: k }));
       kv.appendChild(el("dd", { text: t }));
@@ -17505,11 +18556,15 @@ const RegularUI = (function () {
     add(root, demoBanner());
     sourceSwitch(root);
     const groups = M.holdings(v.pools, meta);
+    // what selling everything would cost is worked out for the position as filed; a ticked selection has its own pools
+    const asFiled = v === R.filed;
     if (!groups.length) root.appendChild(card("Holdings", null, el("p", { class: "note", text: "No open positions." })));
+    else if (asFiled) sellUI.render(root);
+    else root.appendChild(el("p", { class: "note", "data-k": "sell-selection", text: "“If you sold everything today” is worked out for the position as filed. Choose “As filed” above to see it." }));
     for (const g of groups) {
       const inner = el("div", { class: "rows" });
       for (const r of g.rows) {
-        const kv = el("dl", { class: "kv" });
+        const kv = el("dl", { class: "kv nums" });
         const row = (k, t) => {
           kv.appendChild(el("dt", { text: k }));
           kv.appendChild(el("dd", { text: t }));
@@ -17523,11 +18578,13 @@ const RegularUI = (function () {
         kv.appendChild(el("div", { class: "sep" }));
         row("Economic cost (fees in, no step-up)", fm(r.econ));
         row("Average economic cost per unit", M.fmtUnit(r.avgEcon));
-        inner.appendChild(el("div", { class: "row-card", "data-k": "pos:" + g.isin + ":" + r.depot }, el("details", { "data-k": "pos-d:" + g.isin + ":" + r.depot }, el("summary", {}, el("span", { class: "rc-main" }, el("span", { class: "rc-title", text: r.depotLabel }), el("br"), el("span", { class: "rc-sub", text: fq(r.qty) + " units · average " + M.fmtUnit(r.avgTax) + " per unit" + (r.blocked ? " · blocked: " + (r.blocked.text || r.blocked.id || "") : "") })), el("span", { class: "rc-val", text: fm(r.tax.total) })), kv, el("h3", { text: "History of this position" }), historyTable(v, r.depot, g.isin))));
+        const worth = asFiled ? sellUI.depotLine(g.isin, r.depot) : null;
+        inner.appendChild(el("div", { class: "row-card", "data-k": "pos:" + g.isin + ":" + r.depot }, el("details", { "data-k": "pos-d:" + g.isin + ":" + r.depot }, el("summary", {}, el("span", { class: "rc-main" }, el("span", { class: "rc-title", text: r.depotLabel }), el("br"), el("span", { class: "rc-sub", text: fq(r.qty) + " units · average " + M.fmtUnit(r.avgTax) + " per unit" + (r.blocked ? " · blocked: " + (r.blocked.text || r.blocked.id || "") : "") }), worth ? [el("br"), el("span", { class: "rc-sub", "data-k": "pos-worth:" + g.isin + ":" + r.depot, text: worth })] : null), el("span", { class: "rc-val", text: fm(r.tax.total) })), kv, asFiled ? sellUI.depotBlock(g.isin, r.depot) : null, el("h3", { text: "History of this position" }), historyTable(v, r.depot, g.isin))));
       }
-      root.appendChild(el("section", { class: "card", "data-k": "hold:" + g.isin }, el("div", { class: "card-head" }, el("h2", { text: g.name }), el("span", { class: "sub", text: "Tax cost " + fm(g.taxCostText) })), inner));
+      const value = asFiled ? sellUI.head(g.isin) : null;
+      root.appendChild(el("section", { class: "card", "data-k": "hold:" + g.isin }, el("div", { class: "card-head" }, el("h2", { text: g.name }), el("span", { class: "sub", text: (value ? value + " · " : "") + "Tax cost " + fm(g.taxCostText) })), inner, asFiled ? sellUI.yearsBlock(g.isin) : null));
     }
-    root.appendChild(el("p", { class: "note", text: "The tax cost is what the KESt calculation uses. It is not today’s value: prices are not loaded yet, so profit and return charts come with the price data." }));
+    root.appendChild(el("p", { class: "note", text: "The tax cost is what the KESt calculation uses; it is not today’s value. Today’s value and the tax on selling are in the card at the top, from the last close of the prices on the Performance tab." + (ui.mode === "demo" ? " In the demo the prices are invented." : "") }));
   }
 
   // ---------------------------------------------------------------- Data
@@ -17787,6 +18844,24 @@ const RegularUI = (function () {
     setState,
     refresh: () => render(),
     openStep: (k) => { dataUI.state.open[k] = true; goTab("data"); },
+  });
+
+  // "If you sold everything today" and the lines it adds to the cards of the Holdings tab (architecture section 26). Read-only.
+  const sellUI = SellUI.create({
+    mode: () => ui.mode,
+    base: () => base,
+    meta: () => meta,
+    conv: () => conv,
+    doc: () => doc,
+    pools: () => (R && R.filed ? R.filed.pools : []),
+    today: todayIso,
+    book: () => perfUI.book(),
+    perfModel: () => perfUI.model(),
+    demoQuotes: () => (demo ? demo.quotes : null),
+    secName,
+    depotLabel,
+    relocation: () => (base && base.settings ? base.settings.relocationDate : ""),
+    refresh: () => render(),
   });
 
   async function init() {
