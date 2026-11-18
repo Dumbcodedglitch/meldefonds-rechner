@@ -36,10 +36,21 @@
   --c-gain: #199e70;
   --c-put: #E6ECF8; /* the money put in: a light neutral (white), never red */
   --c-real: #FFB366; /* the realised gain: a light orange (his choice, 10 Nov); a realised loss is red (--c-more) */
+  --c-real-line: #FF9F40; /* the realised gain since 17 Nov: a deeper orange for the glowing line and the shading that fades under it toward the white line */
   --c-age: #9085e9;
   --c-div: #c98500;
+  --c-abroad: #c98500; /* the tax withheld abroad: amber, and the Austrian tax in blue; the pair is validated against this surface (27.1) */
+  --c-austria: #3987e5;
   --c-more: #e66767;
   --c-less: #3987e5;
+  /* the places of the pie of "Where it is held" (27.3, 17 Nov): five hues that stay apart for every pair, also for colour-blind readers (checked with --pairs all against the card #0E1423),
+     and a grey for the rest; no red (a loss), no green (a gain), no orange (the realised gain) */
+  --c-pie-1: #155bd6;
+  --c-pie-2: #c98500;
+  --c-pie-3: #d55181;
+  --c-pie-4: #a170fb;
+  --c-pie-5: #2b98b0;
+  --c-pie-other: #B4BED4;
   --font-body: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   color-scheme: dark;
@@ -129,6 +140,8 @@ main { display: grid; gap: 16px; padding-top: 16px; }
 .kpi { background: var(--lit), var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; min-width: 0; display: grid; gap: 3px; align-content: start; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); transition: border-color 0.15s, box-shadow 0.2s; }
 .kpi .label { color: var(--muted); font-size: 12px; font-weight: 500; }
 .kpi .value { font: 700 clamp(17px, 5vw, 26px)/1.15 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -0.025em; overflow-wrap: anywhere; }
+.kpi .value.pos { color: var(--ok); }
+.kpi .value.neg { color: var(--bad); }
 .kpi .subline { color: var(--muted); font-size: 12px; }
 .delta-up::before { content: "\25B2\00a0"; color: var(--c-more); }
 .delta-down::before { content: "\25BC\00a0"; color: var(--c-less); }
@@ -247,7 +260,13 @@ details .body { padding-top: 8px; display: grid; gap: 10px; }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
 .swatch.ln { width: 16px; height: 4px; border-radius: 2px; }
 .swatch.bd { width: 16px; height: 11px; border-radius: 2px; }
+.swatch.tk { width: 16px; height: 4px; border-radius: 1px; box-shadow: 0 0 0 1px var(--surface); }
+.mk { stroke-width: 2.5; stroke-linecap: round; pointer-events: none; }
+.mk-ring { stroke: var(--surface); stroke-width: 5.5; stroke-linecap: round; pointer-events: none; }
 .swatch.dash { background-image: repeating-linear-gradient(90deg, transparent 0 3px, var(--bg) 3px 5px) !important; }
+/* a piece that is not there but shown (27.6: the loss below the cost): a dashed outline, in the legend and on the bar */
+.swatch.gh { box-sizing: border-box; width: 14px; height: 10px; background: transparent !important; border: 1.5px dashed var(--sw, var(--muted)); }
+.sbars .ghost { fill: color-mix(in srgb, var(--c-more) 12%, transparent); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
 .grid { stroke: var(--grid); stroke-width: 1; }
 .axis { stroke: var(--axis); stroke-width: 1; }
 .tick { fill: var(--muted); font: 11px var(--font-mono); }
@@ -256,6 +275,27 @@ details .body { padding-top: 8px; display: grid; gap: 10px; }
 .hit { fill: transparent; cursor: default; }
 .hit:hover { fill: rgba(255, 255, 255, 0.035); }
 .hit:focus { outline: none; fill: rgba(143, 168, 255, 0.10); }
+/* the pie (27.3): a ring with the total in the hole; the legend is beside it from 640 px and under it on a phone */
+.pie-body { display: grid; gap: 14px; justify-items: center; }
+.pie-ring { max-width: 280px; }
+.chart .pie-ring svg { width: 100%; height: auto; }
+.pie .slice { stroke: var(--surface); stroke-width: 2; stroke-linejoin: round; outline: none; cursor: default; transition: opacity 0.15s, transform 0.15s; }
+.pie .slice.on { transform: translate(var(--dx, 0px), var(--dy, 0px)); }
+.pie .slice:focus-visible { stroke: var(--fg); }
+.pie.has-on .slice:not(.on) { opacity: 0.4; }
+.pie-pct { pointer-events: none; }
+.pie-c1 { fill: var(--muted); font: 12px var(--font-body); }
+.pie-c2 { fill: var(--fg); font-family: var(--font-mono); font-weight: 600; }
+.pie-c3 { fill: var(--muted); font: 11.5px var(--font-body); }
+.pie-legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; width: 100%; font-size: 13px; }
+.pie-legend li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 4px 10px; padding: 4px 8px; border-radius: 8px; transition: background 0.15s, opacity 0.15s; }
+.pie-legend li.on { background: var(--surface-2); }
+.pie.has-on .pie-legend li:not(.on) { opacity: 0.6; }
+.pie-legend .pl-name { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
+.pie-legend .pl-share { color: var(--muted); font-family: var(--font-mono); font-size: 12px; text-align: right; white-space: nowrap; }
+.pie-legend .pl-val { font-family: var(--font-mono); font-size: 12.5px; text-align: right; white-space: nowrap; min-width: 8ch; }
+@media (min-width: 640px) { .pie-body { grid-template-columns: minmax(200px, 280px) minmax(0, 1fr); align-items: center; justify-items: stretch; column-gap: 28px; } .pie-legend { max-width: 400px; } }
+@media (prefers-reduced-motion: reduce) { .pie .slice, .pie-legend li { transition: none; } }
 .line { fill: none; stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
 .lineglow { fill: none; stroke-width: 7; stroke-linejoin: round; stroke-linecap: round; opacity: 0.5; pointer-events: none; }
 .barglow { opacity: 0.5; pointer-events: none; }
@@ -414,8 +454,7 @@ button.rowlink:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .ychip input:checked + span { background: linear-gradient(180deg, #AEC0FF, var(--accent)); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; box-shadow: 0 0 16px -4px var(--accent-glow); }
 .ychip input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 .band { stroke: none; fill-opacity: 0.22; }
-.band.soft { fill-opacity: 0.13; } /* the gain so far between the value and the money put in: the realised band on top of it is stronger */
-.band.real { fill-opacity: 0.9; } /* a light orange has to stay orange on the dark card: at a low opacity it turns brown */
+.band.soft { fill-opacity: 0.13; } /* the gain so far between the value and the money put in; the realised fade on top of it sets its own opacity on each shape */
 
 .heat-box { display: grid; gap: 10px; min-width: 0; }
 .heat-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
@@ -4985,6 +5024,14 @@ span.hc { cursor: default; }
  *    income at the special rate, never against deposit interest (Z 1) or other kinds of income, and an unused loss is not carried forward.
  *    So the capital income that enters the tariff is the NET base of the special-rate pool (after the loss offset) plus the gross bank interest.
  *  - § 20 Abs 2 EStG: no expenses can be deducted from this income, with or without the option.
+ *  - Sonderausgaben (§ 18 EStG) and außergewöhnliche Belastungen (§§ 34 and 35 EStG) come off the Gesamtbetrag der Einkünfte (§ 2 Abs 2 EStG,
+ *    read 15 Nov 2026). Income at the special rate is outside that sum (§ 27a Abs 1: "weder beim Gesamtbetrag der Einkünfte noch beim
+ *    Einkommen") unless the option is used (Abs 5). So on the special rates a deduction can only use up the other income (the Einkommen is
+ *    never below zero; what is left over finds nothing to be set against, and no carry-forward rule was found), and with the option it comes
+ *    off the other income and the capital income together. They are not expenses tied to the capital income, so § 20 Abs 2 does not stop
+ *    them (own reading; EStR 2000 Rz 6228 only says that § 20 Abs 2 still applies under the option). The amounts are taken as the notice
+ *    shows them: a Selbstbehalt (§ 34 Abs 4, 6 / 8 / 10 / 12 % of the Einkommen) is not worked out here, and the flat amounts of the
+ *    Verordnung über außergewöhnliche Belastungen (BGBl. Nr. 303/1996) and tax advice (§ 18 Abs 1 Z 6) have none.
  *  - Tax credits (Absetzbeträge, for example the Familienbonus Plus) reduce the tax of the tariff and can only bring it down to zero here.
  *    Income at the special rate does not use them, so the option can make them useful. Credits that can be paid out
  *    (Alleinverdiener-/Alleinerzieherabsetzbetrag and others) have their own conditions that this module does not work out; the owner enters
@@ -4992,9 +5039,16 @@ span.hc { cursor: default; }
  *  - Foreign tax is credited at most with "die auf die ausländischen Einkünfte entfallende inländische Steuer" (BMF explanation of E 1kv). Under the
  *    tariff that is the AVERAGE rate of the tariff tax times the foreign income (an approximation of the attributable tax; the tax before the
  *    credits is used). Per income line the credit is the smallest of: tax paid, treaty rate x income, average rate x income; the loss interplay
- *    (Method A / Method B) is the one of taxyear.js, so the saving comes as a range when the two readings differ.
+ *    (Method A / Method B) is the one of taxyear.js, so the saving comes as a range when the two readings differ. With deductions the average
+ *    rate is the tariff tax divided by the Gesamtbetrag der Einkünfte BEFORE the deductions (the deductions are shared by all incomes in
+ *    proportion, so the foreign income carries its share): the cautious cap. With no deduction it is the figure of regular-0.1.0.
  *  - The tariff of § 33 Abs 1 EStG for 2020 to 2026 is built in (source: usp.gv.at, Tarifstufen, read 4 Nov 2026). Other years are refused,
  *    never guessed. The 55 % band above one million euros is in the table.
+ *
+ *  - The tax that was actually paid (paid(), 15 and 16 Nov 2026): what the investment income cost in the way the return was filed, for the
+ *    Overview. Abroad: the foreign tax withheld at the source. Austria: with the special rates the KESt less the foreign-tax credit; with the
+ *    normal scale the tax that the capital income adds to the tax on the other income, after the deductions, the credits and the foreign-tax
+ *    credit (same figures and same cap as compare(), so the two screens cannot disagree).
  *
  * Money is exact (Dec). The tariff tax is exact and rounded to cents once; every amount that is shown is in cents. The Finanzamt rounds the
  * final amount to whole euros; this module does not.
@@ -5007,10 +5061,15 @@ span.hc { cursor: default; }
 })(typeof self !== "undefined" ? self : this, function (Dec, TaxYear) {
   "use strict";
 
-  const VERSION = "regular-0.1.0";
+  const VERSION = "regular-0.3.0";
   const DP = 2;
   const Z = Dec.mk(0n, DP);
   const M = (d) => Dec.str(d, DP);
+  /** "€1,234.50" for the text of a note (the amounts in notes are never negative); the screens format their own figures with the model's formatter. */
+  const eur = (d) => {
+    const parts = Dec.str(d, DP).split(".");
+    return "€" + parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "." + (parts[1] || "00");
+  };
   const cents = (d) => Dec.round(d, DP);
   const D = (t) => Dec.parse(t);
   const dMax = Dec.max;
@@ -5092,16 +5151,58 @@ span.hc { cursor: default; }
   }
   const amountOf = (text) => (typeof text === "string" && text.trim() !== "" && checkAmount(text) === null ? cents(D(text.trim())) : null);
 
+  // ---------------------------------------------------------------- deductions (Sonderausgaben, außergewöhnliche Belastungen)
+
+  /** "SA" Sonderausgaben (§ 18 EStG), "AB" außergewöhnliche Belastungen (§§ 34, 35 EStG), "OTHER" any other deduction of the notice. */
+  const DEDUCTION_KINDS = Object.freeze(["SA", "AB", "OTHER"]);
+  const MAX_DEDUCTION_LINES = 12;
+  const LABEL_MAX = 60;
+
+  /**
+   * The deduction lines as typed: [{ kind, label, amountEur }] (the amount as text, like the other fields). Every line is read strictly. A
+   * problem is reported next to its field (deductionKind:i, deductionEur:i) and blocks the comparison: a deduction that was left out
+   * silently would change the answer. An empty amount counts as zero. The kind only labels the line; the sum is what is deducted.
+   * Returns { lines (as shown), problems, blocked, total (Dec, cents), byKind }.
+   */
+  function readDeductions(list) {
+    const out = { lines: [], problems: [], blocked: false, total: Z, byKind: { SA: Z, AB: Z, OTHER: Z } };
+    if (list === undefined || list === null) return out;
+    if (!Array.isArray(list)) {
+      out.problems.push({ field: "deductions", text: "The list of deductions could not be read." });
+      out.blocked = true;
+      return out;
+    }
+    if (list.length > MAX_DEDUCTION_LINES) out.problems.push({ field: "deductions", text: "At most " + MAX_DEDUCTION_LINES + " deduction lines are used." });
+    list.slice(0, MAX_DEDUCTION_LINES).forEach((x, i) => {
+      const line = x && typeof x === "object" && !Array.isArray(x) ? x : {};
+      const kind = DEDUCTION_KINDS.includes(line.kind) ? line.kind : null;
+      const label = typeof line.label === "string" ? line.label.trim().slice(0, LABEL_MAX) : "";
+      const typed = line.amountEur === undefined || line.amountEur === null ? "" : line.amountEur;
+      const bad = typeof typed === "string" ? checkAmount(typed) : "Type the amount as digits and a dot, for example 500 or 500.50.";
+      if (kind === null) out.problems.push({ field: "deductionKind:" + i, text: "Choose what kind of deduction this is." });
+      if (bad) out.problems.push({ field: "deductionEur:" + i, text: bad });
+      const amount = kind !== null && !bad ? amountOf(typed) : null;
+      if (amount !== null) {
+        out.total = Dec.add(out.total, amount);
+        out.byKind[kind] = Dec.add(out.byKind[kind], amount);
+      }
+      out.lines.push({ kind, label, amountEur: amount === null ? "" : M(amount) });
+    });
+    out.blocked = out.problems.length > 0;
+    return out;
+  }
+
   // ---------------------------------------------------------------- one comparison
 
   /** What the year's figures are, read once: the capital income, the KESt on it and the foreign-tax credit on the special rates. */
-  function context(y, credits) {
+  function context(y, credits, deductions) {
     const net = D(y.special.netBaseEur);
     const bank = D(y.bankInterest.grossEur);
     return {
       y,
       year: String(y.year),
       credits,
+      deductions: deductions === undefined ? Z : deductions,
       net,
       bank,
       capital: Dec.add(net, bank),
@@ -5117,16 +5218,20 @@ span.hc { cursor: default; }
    * foreign-tax credit are carried through both ways, so the saving of A is the saving of the same reading.
    */
   function evaluate(ctx, other) {
-    // the special rates: the tariff on the other income alone (credits only up to that tax), plus the KESt
-    const tS = tariffTax(ctx.year, other);
+    // the special rates: the Einkommen is the other income less the deductions (never below zero); the tariff on it (credits only up to
+    // that tax), plus the KESt
+    const incomeS = dMax(Z, Dec.sub(other, ctx.deductions));
+    const tS = tariffTax(ctx.year, incomeS);
     const cuS = dMin(ctx.credits, tS);
     const incS = Dec.sub(tS, cuS);
-    // the option: the tariff on the other income and the capital income together
-    const base = Dec.add(other, ctx.capital);
+    // the option: the other income and the capital income together are the Gesamtbetrag der Einkünfte; the deductions come off the whole
+    const total = Dec.add(other, ctx.capital);
+    const base = dMax(Z, Dec.sub(total, ctx.deductions));
     const tO = tariffTax(ctx.year, base);
     const cuO = dMin(ctx.credits, tO);
     const incO = Dec.sub(tO, cuO);
-    const avg = Dec.isZero(base) ? TaxYear.ratio(Z, Dec.mk(1n, 0)) : TaxYear.ratio(tO, base);
+    // the cap of the foreign-tax credit: the average rate of the tariff tax over the income BEFORE the deductions (see the header)
+    const avg = Dec.isZero(total) ? TaxYear.ratio(Z, Dec.mk(1n, 0)) : TaxYear.ratio(tO, total);
     const fo = TaxYear.creditAt(ctx.y, avg, avg);
     const foHigh = D(fo.creditHighEur);
     const foLow = D(fo.creditLowEur);
@@ -5138,10 +5243,10 @@ span.hc { cursor: default; }
     const savingA = Dec.sub(spA, opA);
     const savingB = Dec.sub(spB, opB);
     return {
-      other, base, tS, cuS, incS, tO, cuO, incO, avg, foHigh, foLow, spA, spB, opA, opB,
+      other, incomeS, total, base, tS, cuS, incS, tO, cuO, incO, avg, foHigh, foLow, spA, spB, opA, opB,
       savingLow: dMin(savingA, savingB),
       savingHigh: dMax(savingA, savingB),
-      averagePercent: Dec.isZero(base) ? "0" : Dec.str(Dec.normalize(Dec.divRound(Dec.mul(tO, Dec.mk(100n, 0)), base, 1))),
+      averagePercent: Dec.isZero(total) ? "0" : Dec.str(Dec.normalize(Dec.divRound(Dec.mul(tO, Dec.mk(100n, 0)), total, 1))),
     };
   }
 
@@ -5215,13 +5320,23 @@ span.hc { cursor: default; }
     if (creditsProblem) out.problems.push({ field: "creditsEur", text: creditsProblem });
     const other = amountOf(inputs.otherEur);
     const credits = amountOf(inputs.creditsEur);
-    const ctx = context(y, credits === null ? Z : credits);
+    const ded = readDeductions(inputs.deductions);
+    ded.problems.forEach((p) => out.problems.push(p));
+    const ctx = context(y, credits === null ? Z : credits, ded.total);
 
     out.ok = true;
     out.tariffYear = year;
     out.scale = scale(year);
     out.entered = other !== null;
     out.creditsEntered = credits !== null && !Dec.isZero(credits);
+    out.blocked = ded.blocked; // a deduction that cannot be read stops every figure of the comparison
+    out.deductions = {
+      lines: ded.lines,
+      totalEur: M(ded.total),
+      sonderausgabenEur: M(ded.byKind.SA),
+      belastungenEur: M(ded.byKind.AB),
+      otherEur: M(ded.byKind.OTHER),
+    };
     out.capital = { specialNetEur: M(ctx.net), bankGrossEur: M(ctx.bank), totalEur: M(ctx.capital), kestEur: M(ctx.kest) };
     out.nothingToCompare = Dec.isZero(ctx.capital);
     out.notes = [];
@@ -5233,19 +5348,27 @@ span.hc { cursor: default; }
       return out;
     }
     if (!y.complete) out.notes.push({ level: "warn", id: "YEAR_INCOMPLETE", text: "The tax figures of " + year + " are not complete yet (see the notes above). The comparison uses them as they are." });
-    if (!Dec.isZero(D(y.special.lossForfeitedEur))) out.notes.push({ level: "info", id: "LOSS_FORFEITED", text: M(D(y.special.lossForfeitedEur)) + " of realised losses found no income to be set against in " + year + ". The loss rules (§ 27 Abs 8 EStG) are the same under the normal scale, so this stays lost either way." });
+    if (!Dec.isZero(D(y.special.lossForfeitedEur))) out.notes.push({ level: "info", id: "LOSS_FORFEITED", text: eur(D(y.special.lossForfeitedEur)) + " of realised losses found no income to be set against in " + year + ". The loss rules (§ 27 Abs 8 EStG) are the same under the normal scale, so this stays lost either way." });
     if (y.foreignTax.capUnknown.lines > 0) out.notes.push({ level: "warn", id: "TREATY_UNKNOWN", text: "Foreign tax on " + y.foreignTax.capUnknown.lines + " income line(s) has no treaty rate yet. No credit is counted for it on either side." });
     if (!out.creditsEntered) out.notes.push({ level: "info", id: "NO_CREDITS", text: "No tax credits (Absetzbeträge) are entered, so none are assumed. Credits only reduce tax on the normal scale, so entering them can only make the normal scale look better, never worse." });
+    if (ded.blocked) out.notes.push({ level: "warn", id: "DEDUCTION_UNREADABLE", text: "A deduction below cannot be read (see the red message next to it). Until it is fixed no figure is shown, because it would leave that deduction out." });
+    if (!ded.blocked && ded.lines.some((l) => l.kind === "AB" && l.amountEur !== "")) out.notes.push({ level: "info", id: "SELBSTBEHALT", text: "A burden with a Selbstbehalt (§ 34 Abs 4 EStG) depends on your Einkommen, which is different with the two ways. Your amounts are used as typed on both sides, so they are exact only for the way you filed. Flat amounts and the burdens of § 34 Abs 6 EStG have no Selbstbehalt." });
 
-    if (other !== null) {
+    if (other !== null && !ded.blocked) {
       const r = evaluate(ctx, other);
-      const marginO = marginalPercent(year, other);
+      const marginO = marginalPercent(year, r.incomeS);
       const marginT = marginalPercent(year, r.base);
       const extra = Dec.sub(r.incO, r.incS);
+      const usedS = dMin(ctx.deductions, other);
+      const usedO = dMin(ctx.deductions, r.total);
       out.at = {
         otherEur: M(other),
         creditsEur: M(ctx.credits),
+        deductionsEur: M(ctx.deductions),
         special: {
+          taxableIncomeEur: M(r.incomeS),
+          deductionsUsedEur: M(usedS),
+          deductionsLostEur: M(Dec.sub(ctx.deductions, usedS)),
           tariffTaxEur: M(r.tS),
           creditsUsedEur: M(r.cuS),
           incomeTaxEur: M(r.incS),
@@ -5256,6 +5379,9 @@ span.hc { cursor: default; }
           totalHighEur: M(r.spB),
         },
         option: {
+          totalIncomeEur: M(r.total),
+          deductionsUsedEur: M(usedO),
+          deductionsLostEur: M(Dec.sub(ctx.deductions, usedO)),
           taxableIncomeEur: M(r.base),
           tariffTaxEur: M(r.tO),
           creditsUsedEur: M(r.cuO),
@@ -5277,7 +5403,11 @@ span.hc { cursor: default; }
         verdict: verdictOf(r.savingLow, r.savingHigh),
       };
       if (!Dec.isZero(Dec.sub(r.savingLow, r.savingHigh))) out.notes.push({ level: "info", id: "CREDIT_RANGE", text: "Foreign tax with losses set against it has two readings (see the Tax tab), so the saving is a range, not one figure." });
+      if (Dec.cmp(ctx.deductions, usedS) > 0) { // the option uses at least as much as the special rates do (usedS <= usedO), so this is the only test needed
+        out.notes.push({ level: "info", id: "DEDUCTION_LOST", text: "Your deductions come to " + eur(ctx.deductions) + ". With the special rates " + eur(usedS) + " of them find other income to be set against; with the normal scale " + eur(usedO) + " do. Einkommen and tax cannot go below zero. No rule that carries the rest to another year was found, so it is counted as lost." });
+      }
     }
+    if (ded.blocked) return out; // no break-even and no chart while a deduction cannot be read
     out.breakEven = breakEven(ctx);
     let top = 40000;
     const be = out.breakEven.lowEnd.state === "FOUND" ? Number(out.breakEven.lowEnd.eur) : 0;
@@ -5287,7 +5417,85 @@ span.hc { cursor: default; }
     return out;
   }
 
-  return { VERSION, ROUNDING_POINTS, TARIFF, SUPPORTED_YEARS, SEARCH_LIMIT_EUR: String(SEARCH_LIMIT_EUR), isSupported, scale, tariffExact, tariffTax, marginalPercent, checkAmount, compare };
+  // ---------------------------------------------------------------- the tax that was actually paid (27.1)
+
+  /** How a return was filed: "SPECIAL" = the special rates (27.5 % and 25 %, § 27a Abs 1 EStG), "OPTION" = the normal scale (§ 27a Abs 5 EStG). */
+  const WAYS = Object.freeze(["SPECIAL", "OPTION"]);
+
+  /**
+   * The tax that was actually paid on the investment income of one year, for the way the return was filed. Two parts, never mixed up:
+   *  - abroad: the foreign tax really withheld at the source (the year's foreignTax.paidEur: what the taxable dividend, fund and interest
+   *    lines of the year carried, exact, nothing assumed);
+   *  - Austria: the tax that the investment income adds, after the foreign-tax credit.
+   *      "SPECIAL": the KESt before the credit less the credit. Whether a bank withholds it or the return asks for it makes no difference to what is
+   *      paid, and no typed figure is needed.
+   *      "OPTION": the tax on the other income plus the capital income, less the tax on the other income alone, both after the deductions (27.2) and
+   *      the tax credits, and with the capital income the foreign-tax credit comes off as well (evaluate(): the cap of section 21). The tax on the
+   *      other income itself is not part of it. The other income is needed (a year without it is NEEDS_INCOME, nothing is made up).
+   * A range stays a range: when the credit has two readings (losses set against income that carried foreign tax, readings A and B of taxyear.js)
+   * the Austrian part is austriaLowEur (A) to austriaHighEur (B).
+   * It cannot be below zero: the tax the capital income adds is the difference of two tariff taxes, which is not negative, and the foreign credit
+   * is capped by the average rate times the foreign income, which on a progressive scale is at most that difference. The clamp at zero below is
+   * a seatbelt for cents; a test and the independent reference check the unclamped difference.
+   * A year with no capital income at the special rates has an Austrian part of 0.00 whatever way it was filed.
+   *
+   * @param y       one entry of TaxYear.summarize().years
+   * @param inputs  { otherEur, creditsEur, deductions } as for compare() (only the normal scale reads them; a typed figure that cannot be read blocks the year)
+   * @param way     "SPECIAL" or "OPTION"
+   * @returns { ok, state, year, way, abroadEur, kestEur, austriaLowEur, austriaHighEur, range, problems }.
+   *          state: OK, NOTHING (no capital income: Austria is 0.00), NEEDS_INCOME (normal scale without the other income), BLOCKED (a typed figure
+   *          cannot be read), NO_TARIFF (normal scale in a year without a built-in scale), NO_YEAR, NO_WAY. The Austrian part is null unless the state
+   *          is OK or NOTHING; the abroad part and the KESt are there whenever the year is.
+   */
+  function paid(y, inputs, way) {
+    inputs = inputs || {};
+    const year = y && y.year ? String(y.year) : "";
+    const out = { version: VERSION, ok: false, state: "NO_YEAR", year, way: WAYS.includes(way) ? way : null, abroadEur: null, kestEur: null, austriaLowEur: null, austriaHighEur: null, range: false, problems: [] };
+    if (!y || !y.special || !y.bankInterest || !y.foreignTax) return out;
+    if (!WAYS.includes(way)) {
+      out.state = "NO_WAY";
+      return out;
+    }
+    const ctx0 = context(y, Z, Z);
+    out.abroadEur = M(D(y.foreignTax.paidEur));
+    out.kestEur = M(ctx0.kest);
+    out.ok = true;
+    const known = (low, high, state) => {
+      out.state = state;
+      out.austriaLowEur = M(dMax(Z, dMin(low, high)));
+      out.austriaHighEur = M(dMax(Z, dMax(low, high)));
+      out.range = out.austriaLowEur !== out.austriaHighEur;
+      return out;
+    };
+    if (Dec.isZero(ctx0.capital)) return known(Z, Z, "NOTHING");
+    if (way === "SPECIAL") return known(Dec.sub(ctx0.kest, ctx0.creditHigh), Dec.sub(ctx0.kest, ctx0.creditLow), "OK");
+
+    // the normal scale: the typed figures of the Tax tab
+    if (!isSupported(year)) {
+      out.state = "NO_TARIFF";
+      return out;
+    }
+    const otherProblem = checkAmount(inputs.otherEur);
+    const creditsProblem = checkAmount(inputs.creditsEur);
+    if (otherProblem) out.problems.push({ field: "otherEur", text: otherProblem });
+    if (creditsProblem) out.problems.push({ field: "creditsEur", text: creditsProblem });
+    const ded = readDeductions(inputs.deductions);
+    ded.problems.forEach((p) => out.problems.push(p));
+    if (out.problems.length > 0) {
+      out.state = "BLOCKED";
+      return out;
+    }
+    const other = amountOf(inputs.otherEur);
+    if (other === null) {
+      out.state = "NEEDS_INCOME";
+      return out;
+    }
+    const credits = amountOf(inputs.creditsEur);
+    const r = evaluate(context(y, credits === null ? Z : credits, ded.total), other);
+    return known(Dec.sub(r.opA, r.incS), Dec.sub(r.opB, r.incS), "OK");
+  }
+
+  return { VERSION, ROUNDING_POINTS, TARIFF, SUPPORTED_YEARS, SEARCH_LIMIT_EUR: String(SEARCH_LIMIT_EUR), WAYS, isSupported, scale, tariffExact, tariffTax, marginalPercent, checkAmount, compare, paid };
 });
 
 /* ---- src/engine/scenarios.js ---- */
@@ -6826,8 +7034,11 @@ span.hc { cursor: default; }
  *   plans       planned sales and planned moves to another broker the owner is thinking about (day, depot, security, units,
  *               expected price; a move also the name of the receiving broker). Never part of the filed position: they only
  *               feed the comparison on the What-if screen
- *   regular     by tax year, what the owner typed for the comparison with the normal tax scale on the Tax screen: his other taxable
- *               income and the tax credits he can use (as typed; the screen checks them). A document without any is unchanged.
+ *   regular     by tax year, what the owner typed for the comparison with the normal tax scale on the Tax screen: his other income
+ *               before deductions, the tax credits he can use and, optionally, deduction lines (Sonderausgaben, außergewöhnliche
+ *               Belastungen, other: kind "SA" / "AB" / "OTHER", a label, an amount) as the assessment notice shows them (as typed; the
+ *               screen checks them) and, optionally, how that year's return was filed ("SPECIAL" = special rates, "OPTION" = normal
+ *               scale; absent = not said, the Overview then assumes). A document without any is unchanged.
  *   whatIf      the ticks on the What-if screen
  *
  * Rules of this module:
@@ -6857,6 +7068,9 @@ span.hc { cursor: default; }
   const ENTRY_ID = /^m\d{1,6}$/;
   const MAX_MANUAL = 5000;
   const MAX_REGULAR = 40;
+  const MAX_DEDUCTIONS = 12; // deduction lines per tax year
+  const DEDUCTION_KINDS = ["SA", "AB", "OTHER"];
+  const FILED_WAYS = ["SPECIAL", "OPTION"]; // how the return of a year was filed: the special rates, or the normal scale (27.1)
   const DEFAULT_RELOCATION = "2020-01-28";
   const DEFAULT_OEKB_ADDRESS = "data/oekb-data.json";
   const MAX_ADDRESS = 500;
@@ -7151,7 +7365,38 @@ span.hc { cursor: default; }
           continue;
         }
         const e = { otherEur: str(r.otherEur, 20), creditsEur: str(r.creditsEur, 20) };
-        if (e.otherEur === "" && e.creditsEur === "") continue;
+        // The deduction lines: strictly read (an unknown kind or a line that is no object is dropped and reported); the amount is kept as
+        // typed, like the other figures. The key is left out when there is no line, so a document that never used it is unchanged.
+        if (r.deductions !== undefined && !Array.isArray(r.deductions)) {
+          problems.push("The deductions typed for the normal tax scale under " + JSON.stringify(String(y)) + " could not be read and were dropped.");
+        } else if (Array.isArray(r.deductions)) {
+          const lines = [];
+          let dropped = 0;
+          let extra = 0;
+          for (const x of r.deductions) {
+            if (!isObj(x) || !DEDUCTION_KINDS.includes(x.kind)) {
+              dropped++;
+              continue;
+            }
+            const line = { kind: x.kind, label: str(x.label, 60), amountEur: str(x.amountEur, 20) };
+            if (line.label === "" && line.amountEur === "") continue; // an empty line says nothing
+            if (lines.length >= MAX_DEDUCTIONS) {
+              extra++;
+              continue;
+            }
+            lines.push(line);
+          }
+          if (dropped) problems.push(dropped + " deduction line(s) typed for the normal tax scale under " + JSON.stringify(String(y)) + " could not be read and were dropped.");
+          if (extra) problems.push("Only the first " + MAX_DEDUCTIONS + " deduction lines of " + JSON.stringify(String(y)) + " are kept; " + extra + " more were dropped.");
+          if (lines.length) e.deductions = lines;
+        }
+        // How the return of that year was filed (27.1). Optional, so every older backup loads; an empty value means "not said". Anything else
+        // is dropped and reported, never guessed.
+        if (r.filed !== undefined && r.filed !== null && r.filed !== "") {
+          if (FILED_WAYS.includes(r.filed)) e.filed = r.filed;
+          else problems.push("How the return of " + JSON.stringify(String(y)) + " was filed could not be read and was dropped.");
+        }
+        if (e.otherEur === "" && e.creditsEur === "" && !e.deductions && !e.filed) continue;
         if (kept >= MAX_REGULAR) {
           tooMany++;
           continue;
@@ -9771,11 +10016,158 @@ span.hc { cursor: default; }
   function regularView(summary, year, inputs) {
     const y = summary && summary.years ? summary.years[year] : null;
     const typed = inputs || {};
-    const key = [summary && summary.hash, year, typed.otherEur || "", typed.creditsEur || ""].join("|");
+    const lines = Array.isArray(typed.deductions) ? typed.deductions : [];
+    const key = [summary && summary.hash, year, typed.otherEur || "", typed.creditsEur || "", JSON.stringify(lines)].join("|");
     if (y && summary.hash && regularLast.key === key) return regularLast.value;
-    const value = Regular.compare(y, { otherEur: typed.otherEur || "", creditsEur: typed.creditsEur || "" });
+    const value = Regular.compare(y, { otherEur: typed.otherEur || "", creditsEur: typed.creditsEur || "", deductions: lines });
     if (y && summary.hash) regularLast = { key, value };
     return value;
+  }
+
+  // ---------------------------------------------------------------- the tax that was actually paid (27.1)
+
+  /** Why the Austrian part of a year is missing, in the words of the Overview (the state comes from Regular.paid). */
+  const WHY_MISSING = {
+    NEEDS_INCOME: "needs your other income of the year (Tax tab)",
+    BLOCKED: "a figure on the Tax tab cannot be read",
+    NO_TARIFF: "no tax scale is built in for this year",
+  };
+
+  /** a - b as money text ("-12.50" is possible); anything that is not money counts as zero. */
+  function subMoney(a, b) {
+    const x = typeof a === "string" ? Dec.parse(a) : null;
+    const y = typeof b === "string" ? Dec.parse(b) : null;
+    return Dec.str(Dec.sub(x || Dec.mk(0n, 2), y || Dec.mk(0n, 2)), 2);
+  }
+
+  /**
+   * How the return of a year was filed. `saved` is what the owner said on the Tax tab ("SPECIAL" or "OPTION"). Without it the way is assumed from
+   * the year's own figures: a year in which an Austrian bank withheld KESt is taken as filed with the special rates (the withholding was the tax),
+   * a year without any withheld KESt as filed with the normal scale. The Overview says so wherever it rests on this assumption.
+   * @returns { way: "SPECIAL" | "OPTION", assumed: boolean }
+   */
+  function filedWay(y, saved) {
+    if (saved === "SPECIAL" || saved === "OPTION") return { way: saved, assumed: false };
+    const withheld = y && y.kestWithheldEur;
+    return { way: withheld && !isZeroText(withheld) ? "SPECIAL" : "OPTION", assumed: true };
+  }
+
+  /**
+   * The tax that was actually paid on the investment income, year by year and in total: what was withheld abroad at the source and what the
+   * investment income cost in Austria in the way the return was filed (Regular.paid for each year; the rules and the arithmetic are there).
+   * Nothing is made up: a year whose Austrian part cannot be worked out (the normal scale without the other income, an unreadable figure) has
+   * no Austrian figure and is listed in totals.missingYears; its foreign part is still counted.
+   * A range stays a range: the figures that bars and tiles show (austriaEur, totalEur) are the higher tax; austriaLowEur and totalLowEur are the lower one.
+   *
+   * @param summary    a TaxYear summary (one view: as filed, or a selection)
+   * @param years      the years to list, in order (a year the summary does not have has no investment income: a row of zeros)
+   * @param inputsFor  year -> { otherEur, creditsEur, deductions, filed } as typed on the Tax tab (an empty object when nothing was typed)
+   * @returns { rows, byYear, totals: { abroadEur, austriaEur, austriaLowEur, totalEur, totalLowEur, kestEur, range, missingYears, missingBy, assumedYears, rangeYears } }
+   */
+  function taxPaid(summary, years, inputsFor) {
+    const rows = [];
+    for (const year of years) {
+      const y = summary && summary.years ? summary.years[year] : null;
+      if (!y) {
+        rows.push({ year, way: null, assumed: false, state: "NOTHING", abroadEur: "0.00", kestEur: "0.00", austriaLowEur: "0.00", austriaHighEur: "0.00", austriaEur: "0.00", totalEur: "0.00", totalLowEur: "0.00", range: false, missing: false, why: "" });
+        continue;
+      }
+      const typed = (inputsFor && inputsFor(year)) || {};
+      const fw = filedWay(y, typed.filed);
+      const r = Regular.paid(y, typed, fw.way);
+      const known = r.ok && r.austriaLowEur !== null;
+      const abroad = r.abroadEur || "0.00";
+      const low = known ? r.austriaLowEur : null;
+      const high = known ? r.austriaHighEur : null;
+      rows.push({
+        year,
+        way: fw.way,
+        assumed: fw.assumed,
+        state: r.state,
+        abroadEur: abroad,
+        kestEur: r.kestEur || "0.00",
+        austriaLowEur: low,
+        austriaHighEur: high,
+        austriaEur: high === null ? "0.00" : high,
+        totalEur: sumMoney([abroad, high === null ? "0.00" : high]),
+        totalLowEur: sumMoney([abroad, low === null ? "0.00" : low]),
+        range: !!r.range,
+        missing: !known,
+        why: known ? "" : WHY_MISSING[r.state] || "could not be worked out",
+      });
+    }
+    const sum = (key) => sumMoney(rows.map((x) => x[key]));
+    const totals = {
+      abroadEur: sum("abroadEur"),
+      austriaEur: sum("austriaEur"),
+      austriaLowEur: sumMoney(rows.map((x) => (x.austriaLowEur === null ? "0.00" : x.austriaLowEur))),
+      totalEur: sum("totalEur"),
+      totalLowEur: sum("totalLowEur"),
+      kestEur: sum("kestEur"),
+      missingYears: rows.filter((x) => x.missing).map((x) => x.year),
+      missingBy: { NEEDS_INCOME: [], BLOCKED: [], NO_TARIFF: [] }, // the same years by cause, for the words on the Overview
+      assumedYears: rows.filter((x) => x.assumed && x.state === "OK").map((x) => x.year), // only years that have capital income rest on the assumption
+      rangeYears: rows.filter((x) => x.range).map((x) => x.year),
+    };
+    totals.range = totals.totalLowEur !== totals.totalEur;
+    for (const x of rows) if (x.missing && totals.missingBy[x.state]) totals.missingBy[x.state].push(x.year);
+    const byYear = {};
+    for (const x of rows) byYear[x.year] = x;
+    return { rows, byYear, totals };
+  }
+
+  // ---------------------------------------------------------------- the words of the tax paid (27.1)
+  // The Overview says what the rows and totals of taxPaid mean. The words are made here, so that a test can pin every one of them (the two
+  // readings of the credit too, which no everyday example reaches) and the screen only places them.
+
+  const WAY_LABEL = { SPECIAL: "special rates", OPTION: "normal scale" };
+
+  /** A list of years in words: up to three by name ("2021, 2022"), more as a count ("7 years"). */
+  function yearsText(list) {
+    return list.length <= 3 ? list.join(", ") : list.length + " years";
+  }
+
+  /** The Austrian part of a row: "needs your figures" when it cannot be worked out, "€a to €b" for the two readings of the credit, else the amount. */
+  function austriaText(r) {
+    return r.missing ? "needs your figures" : r.range ? fmtMoney(r.austriaLowEur) + " to " + fmtMoney(r.austriaHighEur) : fmtMoney(r.austriaEur);
+  }
+
+  /** The total of a row: "€a to €b" (lower to higher reading), "€x (Austria missing)" when the Austrian part is not in it, else the amount. */
+  function paidTotalText(r) {
+    return r.range ? fmtMoney(r.totalLowEur) + " to " + fmtMoney(r.totalEur) : r.missing ? fmtMoney(r.totalEur) + " (Austria missing)" : fmtMoney(r.totalEur);
+  }
+
+  /** How a row was filed: "special rates" or "normal scale", with "(assumed)" when the owner has not said; "–" for a year without a way. */
+  function wayText(r) {
+    return r.way ? WAY_LABEL[r.way] + (r.assumed ? " (assumed)" : "") : "–";
+  }
+
+  /** The lines under the all-years tile: the two parts, and the years that have no Austrian figure. */
+  function paidTotalLines(t) {
+    const lines = ["abroad " + fmtMoney(t.abroadEur) + " · Austria " + fmtMoney(t.austriaEur) + (t.range ? " (higher of two readings)" : "")];
+    if (t.missingYears.length) lines.push("No Austrian figure for " + yearsText(t.missingYears) + ": needs the Tax tab");
+    return lines;
+  }
+
+  /** The lines under the tile of one year. */
+  function paidYearLines(r) {
+    if (r.missing) return ["abroad " + fmtMoney(r.abroadEur), "Austria: " + r.why];
+    return ["abroad " + fmtMoney(r.abroadEur) + " · Austria " + austriaText(r)];
+  }
+
+  /**
+   * What the owner should know about the figures under the chart, as { tone, text } ("warn" or "info"), most important first: years without
+   * an Austrian figure (by cause), years that rest on an assumption about how the return was filed, years with two readings of the credit.
+   */
+  function paidNotes(t) {
+    const items = [];
+    const by = t.missingBy;
+    if (by.NEEDS_INCOME.length) items.push({ tone: "warn", text: "No Austrian tax is counted for " + yearsText(by.NEEDS_INCOME) + ": the normal scale needs your other income of the year. Type it on the Tax tab, or say there that you filed with the special rates." });
+    if (by.BLOCKED.length) items.push({ tone: "warn", text: "No Austrian tax is counted for " + yearsText(by.BLOCKED) + ": a figure on the Tax tab cannot be read. Correct it there." });
+    if (by.NO_TARIFF.length) items.push({ tone: "warn", text: "No Austrian tax is counted for " + yearsText(by.NO_TARIFF) + ": no normal tax scale is built in for " + (by.NO_TARIFF.length === 1 ? "that year" : "those years") + ". If you filed with the special rates, say so on the Tax tab." });
+    if (t.assumedYears.length) items.push({ tone: "info", text: yearsText(t.assumedYears) + (t.assumedYears.length === 1 ? " rests" : " rest") + " on an assumption about how the return was filed: the normal scale when no KESt was withheld in Austria, the special rates when it was. Say how you filed on the Tax tab." });
+    if (t.rangeYears.length) items.push({ tone: "info", text: "In " + yearsText(t.rangeYears) + " the foreign-tax credit has two readings. The higher tax is drawn and counted; hover or open the table for both." });
+    return items;
   }
 
   /** Estimated amount still to pay: low and high end (the foreign-tax credit is a range until the matching rule is settled). */
@@ -9860,6 +10252,16 @@ span.hc { cursor: default; }
     compute,
     yearRows,
     regularView,
+    subMoney,
+    filedWay,
+    taxPaid,
+    yearsText,
+    austriaText,
+    paidTotalText,
+    wayText,
+    paidTotalLines,
+    paidYearLines,
+    paidNotes,
     dueText,
     holdings,
     history,
@@ -12181,9 +12583,17 @@ span.hc { cursor: default; }
     return parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (parts[1] ? "." + parts[1] : "");
   }
 
+  /**
+   * The green or red of a figure, from its sign. One rule for the hover boxes and for the tiles of the Performance tab, so they can never
+   * disagree: "pos" above zero, "neg" below it, undefined at zero and for anything that is not a number (a figure that shows as "–").
+   * Zero is what the text shows as zero: tone() counts an amount of money from half a cent (the text has two decimals, so "0.00 EUR"
+   * has no sign and no colour), toneP() a fraction from 0.00005 (0.005 %, the text of a percentage has two decimals as well). The
+   * colour is never the only sign: the text of every toned figure carries its + or − too.
+   */
+  const tone = (x) => (Number.isFinite(x) && Math.abs(x) >= 0.005 ? (x > 0 ? "pos" : "neg") : undefined);
+  const toneP = (x) => (Number.isFinite(x) && Math.abs(x) >= 0.00005 ? (x > 0 ? "pos" : "neg") : undefined);
+
   function create(F) {
-    const tone = (x) => (Number.isFinite(x) && Math.abs(x) >= 0.005 ? (x > 0 ? "pos" : "neg") : undefined);
-    const toneP = (x) => (Number.isFinite(x) && Math.abs(x) >= 0.00005 ? (x > 0 ? "pos" : "neg") : undefined);
     const row = (label, value, t) => (t ? [label, value, t] : [label, value]);
     const money = (label, x, plus) => row(label, F.money(x, plus), plus ? tone(x) : undefined);
     const pct = (label, x, plus) => row(label, Number.isFinite(x) ? F.pct(x, plus) : "–", plus ? toneP(x) : undefined);
@@ -12404,7 +12814,7 @@ span.hc { cursor: default; }
     return { twr, mwr, gain, value, net, dividends, bridge, fall, back, vol, day, months, ratio, episode, now, count, periodRows, period, security, place };
   }
 
-  return { VERSION, create, unitsText };
+  return { VERSION, create, unitsText, tone, toneP };
 });
 
 /* ---- src/app/charts.js ---- */
@@ -12433,6 +12843,7 @@ span.hc { cursor: default; }
   const MAX_BAR = 24; // px
   const RADIUS = 4; // px, data end only
   const GAP = 2; // px between neighbouring bars and stacked segments
+  const PIE_HUES = 5; // the coloured slices of a pie (--c-pie-1 to --c-pie-5 in the style); every place beyond that is grey (architecture 27.3)
 
   // ---------------------------------------------------------------- pure helpers
 
@@ -12453,6 +12864,16 @@ span.hc { cursor: default; }
     const ticks = [];
     for (let v = min; v <= max + step / 2; v += step) ticks.push(Math.abs(v) < step / 1e6 ? 0 : +v.toPrecision(12));
     return { min, max, step, ticks };
+  }
+
+  /** The range { lo, hi } widened to take in extra values (the ticks of a bar chart); a value that is not a finite number is ignored. */
+  function widenRange(lo, hi, values) {
+    for (const v of values || []) {
+      if (typeof v !== "number" || !isFinite(v)) continue;
+      lo = Math.min(lo, v);
+      hi = Math.max(hi, v);
+    }
+    return { lo, hi };
   }
 
   /** Path of a vertical bar from the baseline yb to the data end yt; rounded at the data end only. */
@@ -12644,13 +13065,14 @@ span.hc { cursor: default; }
   }
 
   /**
-   * The key of a series in a legend or a tooltip: a short line for a line (kind "line"), a small filled box with an edge on top for a band
-   * (kind "band"), a square otherwise. The colour is also kept as --sw, so that the key of a switched-off line can be drawn hollow.
+   * The key of a series in a legend or a tooltip: a short line for a line (kind "line"), a line with a shading that fades away under it for a
+   * band (kind "band"), a short thick tick for the tick of a bar (kind "tick"), a dashed outline for a piece that is not there but is shown
+   * (kind "ghost": a loss below the cost, architecture 27.6), a square otherwise. The colour is also kept as --sw, so that the key of a switched-off line can be drawn hollow.
    */
   function keyOf(x) {
-    const sw = h("span", { class: "swatch" + (x.kind === "line" ? " ln" : x.kind === "band" ? " bd" : "") + (x.dash ? " dash" : "") });
+    const sw = h("span", { class: "swatch" + (x.kind === "line" ? " ln" : x.kind === "band" ? " bd" : x.kind === "tick" ? " tk" : x.kind === "ghost" ? " gh" : "") + (x.dash ? " dash" : "") });
     sw.style.setProperty("--sw", x.color);
-    sw.style.background = x.kind === "band" ? "linear-gradient(180deg, " + x.color + " 0 2px, color-mix(in srgb, " + x.color + " 90%, transparent) 2px 100%)" : x.color;
+    sw.style.background = x.kind === "band" ? "linear-gradient(180deg, " + x.color + " 0 3px, color-mix(in srgb, " + x.color + " 40%, transparent) 3px, transparent 100%)" : x.color;
     return sw;
   }
 
@@ -12661,9 +13083,10 @@ span.hc { cursor: default; }
    */
   function legend(series, opts) {
     const toggle = opts && opts.toggle;
+    const only = opts && Array.isArray(opts.only) ? opts.only : null; // with it, only these names are buttons and the others are plain entries
     const ul = h("ul", { class: "legend" + (toggle ? " toggles" : ""), "aria-label": "Legend" }, series.map((x) => {
       const sw = keyOf(x);
-      if (!toggle) return h("li", {}, [sw, h("span", { text: x.name })]);
+      if (!toggle || (only && only.indexOf(x.name) < 0)) return h("li", {}, [sw, h("span", { text: x.name })]);
       const b = h("button", { type: "button", class: "lg", "data-name": x.name, "aria-pressed": "true", title: "Show or hide: " + x.name }, [sw, h("span", { text: x.name })]);
       b.addEventListener("click", () => toggle(x.name));
       return h("li", {}, [b]);
@@ -12689,12 +13112,31 @@ span.hc { cursor: default; }
     return set;
   }
 
-  /** Tooltip that follows keyboard focus and the pointer. Text only (textContent), never markup. Rows: { name, value, color?, kind? ("line" or "band": the shape of the key), tone?, plain? }. */
+  // one on/off switch (the ticks of a bar chart) that stays as the owner left it when the chart is drawn again; the first time it starts as `initial`
+  const flagMemo = new Map();
+  function flagGet(key, initial) {
+    if (!key) return !!initial;
+    const on = flagMemo.has(key) ? flagMemo.get(key) : !!initial;
+    flagMemo.delete(key);
+    flagMemo.set(key, on);
+    if (flagMemo.size > 40) flagMemo.delete(flagMemo.keys().next().value);
+    return on;
+  }
+  function flagSet(key, on) {
+    if (key) flagMemo.set(key, !!on);
+  }
+
+  /**
+   * Tooltip that follows keyboard focus and the pointer. Text only (textContent), never markup. Rows: { name, value, color?, kind? ("line", "band", "tick" or "ghost":
+   * the shape of the key), tone?, plain? }. The box sits at the top of the chart; a tall chart passes box ({ y0, y1 }: the vertical extent of the row it
+   * describes, in pixels from the top of the chart) and the box then opens under that row when it fits in the chart there, else above the row when it
+   * fits there, else under the row anyway (running over what is below the chart): it never covers the row it describes (architecture 27.6).
+   */
   function makeTip(wrap) {
     const tip = h("div", { class: "tip", role: "status", hidden: "" });
     wrap.appendChild(tip);
     return {
-      show(title, rows, cx) {
+      show(title, rows, cx, box) {
         tip.textContent = "";
         tip.appendChild(h("div", { class: "tip-title", text: title }));
         for (const r of rows) {
@@ -12708,6 +13150,14 @@ span.hc { cursor: default; }
         const W = wrap.clientWidth;
         const tw = tip.offsetWidth;
         tip.style.left = Math.max(0, Math.min(W - tw, cx - tw / 2)) + "px";
+        if (box) {
+          // under the row when the box fits in the chart there, else above it when it fits there, else under it anyway (over what is below the chart):
+          // the box never covers the row it describes
+          const th = tip.offsetHeight;
+          const under = box.y1 + 4;
+          const above = box.y0 - th - 4;
+          tip.style.top = (under + th <= wrap.clientHeight || above < 0 ? under : above) + "px";
+        }
       },
       hide() {
         tip.hidden = true;
@@ -12740,10 +13190,15 @@ span.hc { cursor: default; }
    *   categories: ["2020", ...],
    *   series: [{ id, name, color, values: [number...], texts: ["€1.00", ...] }],
    *   mode: "grouped" | "stacked" | "split"   (split: one series, colour by sign: colorPos / colorNeg)
+   *   legend: true shows the legend of a single series too (the title does not name it)
    *   colorPos, colorNeg, height, ariaLabel, totalTexts (stacked: text of each total), labelMax: true,
    *   tickLabels: ["Jan\n2024", "Feb", "", ...] (text under the bars when it should be shorter than the category, which stays the title of
    *   the tip; "\n" starts a second line; an empty one is left out),
    *   details: [[["Gain", "+€5.00", "pos"], ...], ...] (rows under the values of each category in the tooltip: label, text, tone)
+   *   labelTexts: stacked only, the text of the direct label on the largest stack when it should be shorter than the total in the tooltip (a range)
+   *   markers: { name, color, values: [number...], texts: [...], key, defaultOn } (a short tick across each bar at its own value, for a figure that is
+   *   compared with the bars and not part of them: KESt against the tax paid. It has its own button in the legend; key is where the choice is
+   *   remembered, defaultOn false means off until the button is pressed. Off, it is not drawn, not in the axis and not in the tooltip. Ticks at 0 are not drawn.)
    * }
    * Grouped and split bars are lit at the data end and have a soft glow; stacked segments are flat (neighbours of different colours).
    */
@@ -12753,7 +13208,23 @@ span.hc { cursor: default; }
     const mode = opts.mode || "grouped";
     const wrap = h("div", { class: "chart-wrap" });
     const box = h("figure", { class: "chart" }, []);
-    if (series.length > 1 || (mode === "split" && opts.splitLegend)) box.appendChild(mode === "split" ? legend(opts.splitLegend) : legend(series));
+    const mk = opts.markers && opts.markers.values ? opts.markers : null;
+    let markerOn = mk ? flagGet(mk.key, !!mk.defaultOn) : false;
+    let redraw = () => {};
+    if (mk) {
+      // the bars are plain entries, the ticks have a button of their own
+      const ul = legend(series.concat([{ name: mk.name, color: mk.color, kind: "tick" }]), {
+        toggle: () => {
+          markerOn = !markerOn;
+          flagSet(mk.key, markerOn);
+          syncLegend(ul, markerOn ? new Set() : new Set([mk.name]));
+          redraw();
+        },
+        only: [mk.name],
+      });
+      syncLegend(ul, markerOn ? new Set() : new Set([mk.name]));
+      box.appendChild(ul);
+    } else if (series.length > 1 || opts.legend || (mode === "split" && opts.splitLegend)) box.appendChild(mode === "split" ? legend(opts.splitLegend) : legend(series));
     box.appendChild(wrap);
     const tipper = makeTip(wrap);
 
@@ -12776,6 +13247,7 @@ span.hc { cursor: default; }
       });
       if (mode === "stacked") hi = Math.max.apply(null, totals.concat([0]));
       else for (const x of series) for (const v of x.values) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+      if (mk && markerOn) ({ lo, hi } = widenRange(lo, hi, mk.values));
       const sc = niceScale(lo, hi, 4);
       const y = (v) => mt + ph - ((v - sc.min) / (sc.max - sc.min)) * ph;
 
@@ -12850,17 +13322,26 @@ span.hc { cursor: default; }
         // direct label on the largest bar
         if (opts.labelMax !== false && i === maxI && maxV > 0) {
           const v = mode === "stacked" ? totals[i] : series[maxS].values[i];
-          const text = mode === "stacked" ? (opts.totalTexts && opts.totalTexts[i]) : series[maxS].texts && series[maxS].texts[i];
+          const text = mode === "stacked" ? (opts.labelTexts && opts.labelTexts[i]) || (opts.totalTexts && opts.totalTexts[i]) : series[maxS].texts && series[maxS].texts[i];
           if (text) {
             const lx = mode === "grouped" ? gx + maxS * (bw + GAP) + bw / 2 : cx;
-            const ly = v >= 0 ? y(v) - 5 : y(v) + 13;
+            const tickTop = mk && markerOn && (mk.values[i] || 0) > 0 ? mk.values[i] : 0; // a tick above the bar lifts the label over it
+            const ly = v >= 0 ? y(Math.max(v, tickTop)) - 5 : y(v) + 13;
             const lab = s("text", { x: Math.min(Math.max(lx, ml + 18), W - mr - 18), y: ly, class: "dlabel", "text-anchor": "middle" }, svg);
             lab.textContent = text;
           }
         }
+        // the tick of this category: a short thick line across the bar with a ring in the surface colour, so that it reads on the bar and off it
+        const tv = mk && markerOn ? mk.values[i] || 0 : 0;
+        if (tv > 0) {
+          const tx1 = gx - 4, tx2 = gx + groupW + 4, ty = y(tv);
+          s("line", { x1: tx1 - 1, x2: tx2 + 1, y1: ty, y2: ty, class: "mk-ring" }, svg);
+          s("line", { x1: tx1, x2: tx2, y1: ty, y2: ty, class: "mk" }, svg).style.stroke = mk.color;
+        }
         // hit area: the whole band, keyboard focusable
         const rows = series.map((x) => ({ name: x.name, color: mode === "split" ? (x.values[i] < 0 ? opts.colorNeg : opts.colorPos) : x.color, value: (x.texts && x.texts[i]) || String(x.values[i]) }));
         if (mode === "stacked" && opts.totalTexts) rows.push({ name: "Total", value: opts.totalTexts[i] });
+        if (mk && markerOn) rows.push({ name: mk.name, color: mk.color, kind: "tick", value: (mk.texts && mk.texts[i]) || String(mk.values[i]) });
         const more = plainRows(opts.details && opts.details[i]);
         const hit = s("rect", { x: ml + band * i, y: mt, width: band, height: ph + mb, class: "hit", tabindex: 0, role: "img", "aria-label": c + ": " + rows.concat(more).map((r) => r.name + " " + r.value).join(", ") }, svg);
         const on = () => tipper.show(c, rows.concat(more), cx);
@@ -12870,7 +13351,9 @@ span.hc { cursor: default; }
         hit.addEventListener("blur", () => tipper.hide());
       });
     }
-    responsive(wrap, draw);
+    redraw = responsive(wrap, draw);
+    const again = redraw;
+    redraw = () => again(true);
     return box;
   }
 
@@ -13030,6 +13513,49 @@ span.hc { cursor: default; }
     return { up, down };
   }
 
+  /** How many shapes a fade is made of (see fadeShapes): more steps are smoother, fewer are cheaper; 16 steps of an opacity near 3 % cannot be told apart. */
+  const FADE_STEPS = 16;
+
+  /**
+   * A fade between two lines, made of shapes that lie one inside the other. The area from the line A down to the line B is cut into `steps`
+   * pieces by lines that run from A to B in equal steps; shape j (1 to steps) covers the area from A to the j-th of those lines, so that the
+   * piece next to A is covered by every shape and the piece next to B only by the last. Every shape has the same opacity, the one that gives
+   * `alpha` where all of them lie on top of each other, so the colour is strongest at A and almost gone at B, however far apart the two
+   * lines are on each day (a gradient of the drawing has the same slope everywhere and cannot follow a band that is thick on one day and
+   * thin on the next). Where A and B are the same nothing is drawn. A, B: the values; xs, y as for bandPaths.
+   * Returns { opacity, shapes: [{ up, down }] }, the paths as bandPaths gives them (up where A is above B), the nested shapes from the smallest.
+   */
+  function fadeShapes(A, B, xs, y, alpha, steps) {
+    const n = steps || FADE_STEPS;
+    const shapes = [];
+    for (let j = 1; j <= n; j++) {
+      const f = j / n;
+      const low = f === 1 ? B : A.map((v, k) => v + (B[k] - v) * f);
+      const bp = bandPaths(A, low, xs, y);
+      if (bp.up || bp.down) shapes.push(bp);
+    }
+    return { opacity: 1 - Math.pow(1 - alpha, 1 / n), shapes };
+  }
+
+  /**
+   * The stretches of a series that are not zero, as [first, last] positions (inclusive), each widened by the zero position before and after it
+   * (so that a line which starts at a sale begins on the line it sits on, and ends there when the value is zero again). A value counts as zero
+   * below eps (half a cent in the page). Used for a stacked series that must not be drawn where it has not started yet.
+   */
+  function nonZeroRuns(values, eps) {
+    const out = [];
+    let from = -1;
+    for (let i = 0; i <= values.length; i++) {
+      const on = i < values.length && Math.abs(values[i]) >= eps;
+      if (on && from < 0) from = i;
+      if (!on && from >= 0) {
+        out.push([Math.max(0, from - 1), Math.min(values.length - 1, i)]);
+        from = -1;
+      }
+    }
+    return out;
+  }
+
   /**
    * One to four lines over a stretch of days, many points (the caller thins them): the value of a portfolio, the growth of 100.
    * The pointer, a finger or the arrow keys move a cross hair that shows the exact values of that day.
@@ -13037,8 +13563,9 @@ span.hc { cursor: default; }
    *         downColor, endText }], format: (number) => text (tooltip and the end of the lines), tickFormat: (number, step) => text of an axis tick (default
    *         format), zero: true (the axis includes zero; without it the axis follows the lines), dateText: (iso) => text for the title of the
    *         tooltip, height, ariaLabel,
-   *         bands: [{ a, b, up, down, cls, show }]: each shades the gap between series a and series b (colour up where a is above b, down where
-   *         it is below; cls an extra class; show the list of series that must be shown for it to be drawn, default a and b),
+   *         bands: [{ a, b, up, down, cls, show, fade }]: each shades the gap between series a and series b (colour up where a is above b, down where
+   *         it is below; cls an extra class; show the list of series that must be shown for it to be drawn, default a and b; fade: an opacity
+   *         between 0 and 1 makes the shading strongest at a, with that opacity, and fading to nothing at b, see fadeShapes),
    *         a series with area: true shades between its line and zero (stronger the further from zero), with fade: true under its line,
    *         key: a name that keeps what the owner switched off in the legend when the chart is drawn again,
    *         rows: (index) => [[label, text, tone?], ...] more rows for the tooltip of a day }
@@ -13046,7 +13573,8 @@ span.hc { cursor: default; }
    * of its tooltip row and end pill (a realised gain stacked on the money put in). It is drawn behind the others (so that where it lies on the
    * line it sits on, that line stays visible), and with downColor its line, its pill and its key in the tooltip take that colour where its own
    * value is below zero (a loss). kind: "line" or "band" is the shape of its key in the legend
-   * and the tooltip, width its line width, glow: false takes its glow away, front: true draws it above the others, endText the text of its pill.
+   * and the tooltip, width its line width, glow: false takes its glow away, front: true draws it above the others, endText the text of its pill,
+   * hideZero: true leaves the line (and its glow) out where its own value is zero, so that a stacked line that has not started yet does not show round the one it sits on.
    * With two or more lines the legend is a row of buttons that hide and show a line; the axis follows what is shown (the last line stays).
    * The value of each line at its right end sits in a small pill (joined to its line by a short stroke where it had to be moved to leave
    * room for another), and the cross hair rings the points.
@@ -13116,8 +13644,20 @@ span.hc { cursor: default; }
       s("line", { x1: ml, x2: W - mr, y1: mt + ph, y2: mt + ph, class: "axis" }, svg);
       for (const bd of opts.bands || (opts.band ? [opts.band] : [])) {
         if (!(bd.show || [bd.a, bd.b]).every((i) => vis.indexOf(i) >= 0)) continue;
-        const bp = bandPaths(pos[bd.a], pos[bd.b], xs, y);
         const cls = "band" + (bd.cls ? " " + bd.cls : "");
+        if (bd.fade) {
+          const fs = fadeShapes(pos[bd.a], pos[bd.b], xs, y, bd.fade);
+          for (const bp of fs.shapes) {
+            for (const [d, color] of [[bp.up, bd.up], [bp.down, bd.down]]) {
+              if (!d) continue;
+              const p = s("path", { d, class: cls + " fade" }, svg);
+              p.style.fill = color;
+              p.style.fillOpacity = fs.opacity;
+            }
+          }
+          continue;
+        }
+        const bp = bandPaths(pos[bd.a], pos[bd.b], xs, y);
         if (bp.up) s("path", { d: bp.up, class: cls }, svg).style.fill = bd.up;
         if (bp.down) s("path", { d: bp.down, class: cls }, svg).style.fill = bd.down;
       }
@@ -13148,30 +13688,40 @@ span.hc { cursor: default; }
       // that says "front" last so that nothing covers it
       const rank = (i) => (series[i].front ? 2 : series[i].stackOn !== undefined ? 0 : 1);
       const order = vis.slice().sort((p, q) => rank(p) - rank(q));
-      const pathOf = (i) => pos[i].map((v, k) => (k ? "L" : "M") + xs[k].toFixed(1) + " " + y(v).toFixed(1)).join("");
       // the colour of a series on a day: a stacked one with a loss colour changes to it where its own value is below zero
       const colorAt = (i, k) => (series[i].downColor !== undefined && series[i].stackOn !== undefined && series[i].values[k] < 0 ? series[i].downColor : series[i].color);
+      // the pieces of a line, each with its colour: one piece for an ordinary line; a stacked line with a loss colour is cut where its own value
+      // crosses zero, and with hideZero it is drawn only where its own value is not zero
+      const piecesOf = (i) => {
+        const x = series[i];
+        const out = [];
+        for (const [from, to] of x.hideZero ? nonZeroRuns(x.values, 0.005) : [[0, n - 1]]) {
+          if (x.downColor !== undefined && x.stackOn !== undefined) {
+            const sp = splitLinePaths(x.values.slice(from, to + 1), pos[i].slice(from, to + 1), xs.slice(from, to + 1), y);
+            for (const d of sp.up) out.push({ d, color: x.color });
+            for (const d of sp.down) out.push({ d, color: x.downColor });
+          } else {
+            out.push({ d: pos[i].slice(from, to + 1).map((v, k) => (k ? "L" : "M") + xs[from + k].toFixed(1) + " " + y(v).toFixed(1)).join(""), color: x.color });
+          }
+        }
+        return out;
+      };
       for (const i of order) {
         const x = series[i];
         if (x.glow === false) continue;
-        const gl = s("path", { d: pathOf(i), class: "lineglow", filter: defs.glow }, svg);
-        gl.style.stroke = x.color;
-        if (x.dash) gl.setAttribute("stroke-dasharray", "6 4");
+        for (const pc of piecesOf(i)) {
+          const gl = s("path", { d: pc.d, class: "lineglow", filter: defs.glow }, svg);
+          gl.style.stroke = pc.color;
+          if (x.dash) gl.setAttribute("stroke-dasharray", "6 4");
+        }
       }
       for (const i of order) {
         const x = series[i];
-        const paint = (d, color) => {
-          const p = s("path", { d, class: "line" }, svg);
-          p.style.stroke = color;
+        for (const pc of piecesOf(i)) {
+          const p = s("path", { d: pc.d, class: "line" }, svg);
+          p.style.stroke = pc.color;
           if (x.width) p.style.strokeWidth = x.width;
           if (x.dash) p.setAttribute("stroke-dasharray", "6 4");
-        };
-        if (x.downColor !== undefined && x.stackOn !== undefined) {
-          const sp = splitLinePaths(x.values, pos[i], xs, y);
-          for (const d of sp.up) paint(d, x.color);
-          for (const d of sp.down) paint(d, x.downColor);
-        } else {
-          paint(pathOf(i), x.color);
         }
       }
       // the value at the right end of every line (at most four lines) in a small pill, pushed apart where they would touch (up from the
@@ -13327,6 +13877,287 @@ span.hc { cursor: default; }
     return box;
   }
 
+  // ---------------------------------------------------------------- stacked horizontal bars (architecture 27.6)
+
+  /**
+   * The pieces of one stacked horizontal bar, as offsets from the start of the bar in pixels. values: the pieces in order; unit: pixels per unit of
+   * value; gap: the space that a piece leaves after the one before it; minW: the least width of a piece that is drawn. A value that is not a number
+   * above zero is skipped, and so is a piece that would be narrower than half a pixel (it stays in the hover box and the table). A piece takes its
+   * place in the running total even when it is skipped, so the others keep theirs, and the bar ends where the sum of its pieces ends.
+   * Returns [{ i, x0, x1 }] (i: the index in values), left to right.
+   */
+  function stackRuns(values, unit, gap, minW) {
+    const out = [];
+    let acc = 0;
+    for (let i = 0; i < values.length; i++) {
+      const v = values[i];
+      if (!(typeof v === "number" && Number.isFinite(v) && v > 0)) continue;
+      const e = (acc + v) * unit;
+      const w = v * unit;
+      acc += v;
+      if (w < 0.5) continue;
+      let b = e - w + (out.length ? gap : 0);
+      if (e - b < minW) b = Math.max(0, e - minW);
+      out.push({ i, x0: b, x1: Math.max(e, b + minW) });
+    }
+    return out;
+  }
+
+  /**
+   * One stacked horizontal bar for each item, the name above its bar and the amount at its end. opts: {
+   *   items: [{ key, label, title, text, segments: [{ name, color, value, text }], ghost, details }]
+   *     label: the name above the bar (cut to fit); title: the head of the hover box (default the label); text: the amount at the end of the bar;
+   *     segments: the pieces, left to right (value decides the length, text is the amount in the hover box); ghost: { name, color, value, text } or null,
+   *     a piece that is not there, drawn after the bar as a dashed outline (a loss below the cost); details: [[label, text, tone?], ...] more rows
+   *   legend: [{ name, color, kind? }]  the keys of the pieces (kind "ghost" for the outline)
+   *   ariaLabel
+   * }
+   * The longest bar (pieces and outline) fills the width that is left of the amounts (the widest amount, measured, and a little air); the others are as long as their share of it. A piece wears the
+   * 2 px gap of the surface to its neighbour. The last piece is rounded at the end, the first starts square at the line.
+   */
+  function sbars(opts) {
+    const items = opts.items;
+    const wrap = h("div", { class: "chart-wrap" });
+    const box = h("figure", { class: "chart sbars" }, []);
+    if (opts.legend && opts.legend.length) box.appendChild(legend(opts.legend));
+    box.appendChild(wrap);
+    const tipper = makeTip(wrap);
+    const ROW = 56;
+    const BAR = 16;
+    function draw(W) {
+      for (const n of Array.from(wrap.querySelectorAll("svg"))) n.remove();
+      const H = items.length * ROW + 8;
+      const svg = s("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": opts.ariaLabel || "Chart" });
+      wrap.insertBefore(svg, wrap.firstChild);
+      const ml = 2;
+      // the room for the amount at the end of a bar: the widest amount as it is drawn (measured, so that a big number is not cut off), and a little air
+      const amountW = (text) => {
+        const t = s("text", { x: 0, y: 0, class: "dlabel" }, svg);
+        t.textContent = text;
+        const w = typeof t.getComputedTextLength === "function" ? t.getComputedTextLength() : 7.5 * text.length;
+        t.remove();
+        return w;
+      };
+      const mr = Math.ceil(Math.max.apply(null, items.map((it) => amountW(it.text)).concat([40]))) + 12;
+      const pw = Math.max(20, W - ml - mr);
+      const pos = (v) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0);
+      const lengthOf = (it) => it.segments.reduce((a, x) => a + pos(x.value), 0) + (it.ghost ? pos(it.ghost.value) : 0);
+      const max = Math.max.apply(null, items.map(lengthOf).concat([0]));
+      const unit = max > 0 ? pw / max : 0;
+      s("line", { x1: ml, x2: ml, y1: 0, y2: H, class: "axis" }, svg);
+      items.forEach((it, i) => {
+        const cy = 4 + i * ROW;
+        const by = cy + 26;
+        const lab = s("text", { x: ml + 6, y: cy + 17, class: "tick lab", "text-anchor": "start" }, svg);
+        const maxChars = Math.max(8, Math.floor((W - ml - 12) / 7));
+        lab.textContent = it.label.length > maxChars ? it.label.slice(0, maxChars - 1) + "…" : it.label;
+        const runs = stackRuns(it.segments.map((x) => x.value), unit, GAP, 1.5);
+        runs.forEach((r, k) => {
+          const x0 = ml + r.x0;
+          const x1 = ml + r.x1;
+          const d = k === runs.length - 1 ? hBarPath(by, BAR, x0, x1) : "M" + x0 + " " + by + "H" + x1 + "V" + (by + BAR) + "H" + x0 + "Z";
+          const p = s("path", { d, class: "bar sbar", "data-seg": String(r.i) }, svg);
+          p.style.fill = it.segments[r.i].color;
+        });
+        const solid = it.segments.reduce((a, x) => a + pos(x.value), 0) * unit;
+        let end = ml + solid;
+        if (it.ghost && pos(it.ghost.value) * unit >= 1) {
+          const gx = ml + solid + (solid > 0 ? GAP : 0);
+          const gw = Math.max(2, pos(it.ghost.value) * unit - (solid > 0 ? GAP : 0));
+          const g = s("rect", { x: gx + 0.75, y: by + 0.75, width: Math.max(1, gw - 1.5), height: BAR - 1.5, rx: 3, class: "ghost" }, svg);
+          g.style.stroke = it.ghost.color;
+          end = gx + gw;
+        }
+        const val = s("text", { x: end + 6, y: by + BAR / 2 + 4, class: "dlabel", "text-anchor": "start" }, svg);
+        val.textContent = it.text;
+        const rows = it.segments.filter((x) => pos(x.value) > 0).map((x) => ({ name: x.name, color: x.color, value: x.text })).concat(it.ghost ? [{ name: it.ghost.name, color: it.ghost.color, kind: "ghost", value: it.ghost.text }] : []);
+        const more = plainRows(it.details);
+        const title = it.title || it.label;
+        const hit = s("rect", { x: 0, y: cy, width: W, height: ROW, class: "hit", tabindex: 0, role: "img", "aria-label": title + ": " + it.text + rows.concat(more).map((r) => ", " + r.name + " " + r.value).join("") }, svg);
+        const on = () => tipper.show(title, rows.concat(more), Math.max(40, Math.min(W - 60, ml + solid / 2 + 20)), { y0: cy, y1: cy + ROW });
+        hit.addEventListener("mouseenter", on);
+        hit.addEventListener("focus", on);
+        hit.addEventListener("mouseleave", () => tipper.hide());
+        hit.addEventListener("blur", () => tipper.hide());
+      });
+    }
+    responsive(wrap, draw);
+    return box;
+  }
+
+  // ---------------------------------------------------------------- pie (architecture 27.3)
+
+  const TAU = Math.PI * 2;
+
+  /**
+   * The slices of a pie. items: [{ key, value, ... }] in the order they are drawn; an item whose value is not a number above zero is left out.
+   * Returns the other items with fraction (the share of the total, adding up to 1), a0 and a1: the angles in radians, clockwise from 12 o'clock,
+   * the first slice starting at 0, each one starting where the one before ended, the last one ending at a whole turn (2π) exactly.
+   * No slices when nothing is above zero.
+   */
+  function pieSlices(items) {
+    const live = items.filter((x) => Number.isFinite(x.value) && x.value > 0);
+    const total = live.reduce((a, x) => a + x.value, 0);
+    if (!(total > 0)) return [];
+    let acc = 0;
+    return live.map((x, i) => {
+      const a0 = (acc / total) * TAU;
+      acc += x.value;
+      return Object.assign({}, x, { fraction: x.value / total, a0, a1: i === live.length - 1 ? TAU : (acc / total) * TAU });
+    });
+  }
+
+  /**
+   * One slice of a ring as the d of a path: from angle a0 to angle a1 (radians, clockwise from 12 o'clock), between the inner radius r and the outer
+   * radius R around (cx, cy). A slice of a whole turn is two circles, the inner one the other way round (it is the hole), because one arc cannot
+   * start and end at the same point. A slice that leaves less than WHOLE_GAP of a whole turn is drawn the same way: its two ends would round to
+   * one point, and an arc from a point to itself is not drawn at all (a giant next to a few cents would vanish). Coordinates are rounded to a thousandth.
+   */
+  const WHOLE_GAP = 1e-4; // radians, a hundredth of a pixel on a ring of 112
+  function donutPath(cx, cy, r, R, a0, a1) {
+    const at = (rad, a) => {
+      const x = cx + rad * Math.sin(a), y = cy - rad * Math.cos(a);
+      return (+x.toFixed(3)) + " " + (+y.toFixed(3));
+    };
+    if (a1 - a0 >= TAU - WHOLE_GAP) {
+      const m = a0 + Math.PI;
+      return "M" + at(R, a0) + "A" + R + " " + R + " 0 1 1 " + at(R, m) + "A" + R + " " + R + " 0 1 1 " + at(R, a0) + "Z" +
+        "M" + at(r, a0) + "A" + r + " " + r + " 0 1 0 " + at(r, m) + "A" + r + " " + r + " 0 1 0 " + at(r, a0) + "Z";
+    }
+    const large = a1 - a0 > Math.PI ? 1 : 0;
+    return "M" + at(R, a0) + "A" + R + " " + R + " 0 " + large + " 1 " + at(R, a1) + "L" + at(r, a1) + "A" + r + " " + r + " 0 " + large + " 0 " + at(r, a0) + "Z";
+  }
+
+  /**
+   * Which places of a pie get a colour of their own and which are drawn grey. places: [{ key, value }], all places of the list in their stable
+   * order (also those that hold nothing, so that their place in the list is counted); hues: how many colours there are.
+   * Returns the places that hold something (value above zero), the largest first, equal values in the order of the list, and last the grey slice if
+   * there is one: [{ key, keys, value, slot, grey, count }].
+   *   slot (0 to hues - 1, -1 for the grey one): the colour of the place. With no more places than colours it is the position of the place in
+   *     `places`, so a place keeps its colour when another one holds nothing or is filtered away; with more places it is the position among the
+   *     coloured ones in the order of the list.
+   *   At most `hues` places are coloured: the largest. The others are one grey slice: key and name of the place when it is only one, else key
+   *     "other"; count: how many places it holds, keys: which, value: their sum.
+   */
+  function pieFold(places, hues) {
+    const held = places.map((p, i) => ({ key: p.key, value: p.value, at: i })).filter((p) => Number.isFinite(p.value) && p.value > 0);
+    if (!held.length) return [];
+    const bySize = (a, b) => b.value - a.value || a.at - b.at;
+    const sized = held.slice().sort(bySize);
+    const kept = sized.slice(0, hues);
+    const rest = sized.slice(hues).sort((a, b) => a.at - b.at);
+    const stable = places.length <= hues;
+    const inList = kept.slice().sort((a, b) => a.at - b.at);
+    const out = kept.map((p) => ({ key: p.key, keys: [p.key], value: p.value, slot: stable ? p.at : inList.indexOf(p), grey: false, count: 1 }));
+    if (rest.length) out.push({ key: rest.length === 1 ? rest[0].key : "other", keys: rest.map((p) => p.key), value: rest.reduce((a, p) => a + p.value, 0), slot: -1, grey: true, count: rest.length });
+    return out;
+  }
+
+  /**
+   * A ring with the total in its hole, and a legend (swatch, name, share, amount). opts: {
+   *   items: [{ key, label, value, text, share, color, tip, title, details, node }]  in the order of the slices (the biggest first): value decides the
+   *     angle; text is the amount, share its share as text; color a CSS colour; tip the first row of the hover box (default "Value"), title its head
+   *     (default the label), details [[label, text, tone?], ...] more rows; node: an element (a button) that stands for the name in the legend,
+   *     the label as plain text when there is none
+   *   total: { label, text }  what the hole says when nothing is pointed at ("Total", "€1,234.00")
+   *   ariaLabel
+   * }
+   * A slice and its row in the legend light up together while the other slices dim; both can be reached with the keyboard and open the hover box.
+   * The share is written on the slices that are at least 8 % of the ring. A value that is not above zero has no slice and no row.
+   */
+  function pie(opts) {
+    const slices = pieSlices(opts.items);
+    const SIZE = 240, C = SIZE / 2, R = 112, r = 66, POP = 4;
+    const box = h("figure", { class: "chart pie" }, []);
+    const body = h("div", { class: "pie-body" }, []);
+    const ring = h("div", { class: "chart-wrap pie-ring" }, []);
+    const tipper = makeTip(ring);
+    const svg = s("svg", { viewBox: "0 0 " + SIZE + " " + SIZE, role: "img", "aria-label": opts.ariaLabel || "Pie chart" });
+    ring.insertBefore(svg, ring.firstChild);
+    const total = opts.total || { label: "Total", text: "" };
+    const centre = [s("text", { x: C, y: C - 16, class: "pie-c1", "text-anchor": "middle" }, svg), s("text", { x: C, y: C + 6, class: "pie-c2", "text-anchor": "middle" }, svg), s("text", { x: C, y: C + 25, class: "pie-c3", "text-anchor": "middle" }, svg)];
+    // The first line of the hole is the name of a place, which can be long or made of wide letters: it is cut (with …) at 20 characters and then
+    // shortened until it fits the hole, measured when the drawing is on the page (the chord of the hole at that height, less a margin).
+    const HOLE_W = 112;
+    const fit = (node, full) => {
+      const text = String(full || "");
+      const at = (k) => (k < text.length ? text.slice(0, k - 1).replace(/\s+$/, "") + "…" : text);
+      let n = Math.min(text.length, 20);
+      node.textContent = at(n);
+      while (n > 2 && typeof node.getComputedTextLength === "function" && node.getComputedTextLength() > HOLE_W) node.textContent = at(--n);
+    };
+    const say = (a, b, c) => {
+      fit(centre[0], a);
+      centre[1].textContent = b;
+      centre[1].setAttribute("font-size", Math.max(11, Math.min(19, Math.floor(112 / (0.62 * Math.max(1, b.length))))));
+      centre[2].textContent = c || "";
+    };
+    const legendList = h("ul", { class: "pie-legend", "aria-label": "Legend" }, []);
+    const parts = new Map(); // key -> { path, row, mid, it, more, title }
+    const layer = s("g", { class: "pie-slices" }, svg);
+    const pop = slices.length > 1 ? POP : 0; // a whole ring does not move
+    slices.forEach((it) => {
+      const mid = (it.a0 + it.a1) / 2;
+      const more = plainRows(it.details);
+      const title = it.title || it.label;
+      const aria = title + ": " + it.text + (it.share ? ", " + it.share : "") + more.map((x) => ", " + x.name + " " + x.value).join("");
+      const path = s("path", { d: donutPath(C, C, r, R, it.a0, it.a1), class: "slice", "data-slice": it.key, tabindex: 0, role: "img", "aria-label": aria }, layer);
+      path.style.fill = it.color;
+      path.style.setProperty("--dx", (pop * Math.sin(mid)).toFixed(2) + "px");
+      path.style.setProperty("--dy", (-pop * Math.cos(mid)).toFixed(2) + "px");
+      if (it.fraction >= 0.08) {
+        const lab = s("text", { x: +(C + ((R + r) / 2) * Math.sin(mid)).toFixed(2), y: +(C - ((R + r) / 2) * Math.cos(mid) + 4).toFixed(2), class: "dlabel pie-pct", "text-anchor": "middle" }, svg);
+        lab.textContent = Math.round(it.fraction * 100) + " %";
+      }
+      const row = h("li", { "data-slice": it.key }, [keyOf({ color: it.color }), h("span", { class: "pl-name" }, it.node ? [it.node] : [h("span", { text: it.label })]), h("span", { class: "pl-share", text: it.share || "" }), h("span", { class: "pl-val", text: it.text })]);
+      legendList.appendChild(row);
+      parts.set(it.key, { path, row, mid, it, more, title });
+    });
+    let active = null;
+    function off() {
+      if (active === null) return;
+      active = null;
+      for (const p of parts.values()) {
+        p.path.classList.remove("on");
+        p.row.classList.remove("on");
+      }
+      box.classList.remove("has-on");
+      tipper.hide();
+      say(total.label, total.text, "");
+    }
+    function on(key) {
+      const p = parts.get(key);
+      if (!p || active === key) return;
+      off();
+      active = key;
+      for (const q of parts.values()) {
+        const me = q === p;
+        q.path.classList.toggle("on", me);
+        q.row.classList.toggle("on", me);
+      }
+      box.classList.add("has-on");
+      say(p.it.label, p.it.text, p.it.share ? p.it.share + " of the total" : "");
+      const w = ring.clientWidth || SIZE;
+      const cx = (C + ((R + r) / 2) * Math.sin(p.mid)) * (w / SIZE);
+      tipper.show(p.title, [{ name: p.it.tip || "Value", color: p.it.color, value: p.it.text }].concat(p.more), cx);
+    }
+    for (const [key, p] of parts) {
+      for (const node of [p.path, p.row]) {
+        node.addEventListener("mouseenter", () => on(key));
+        node.addEventListener("mouseleave", off);
+      }
+      p.path.addEventListener("focus", () => on(key));
+      p.path.addEventListener("blur", off);
+      p.row.addEventListener("focusin", () => on(key));
+      p.row.addEventListener("focusout", off);
+    }
+    say(total.label, total.text, "");
+    body.appendChild(ring);
+    body.appendChild(legendList);
+    box.appendChild(body);
+    return box;
+  }
+
   // ---------------------------------------------------------------- table twin
 
   /**
@@ -13362,7 +14193,204 @@ span.hc { cursor: default; }
     return h("div", { class: "tbl-wrap" }, [t]);
   }
 
-  return { niceScale, niceScaleFree, timeTicks, nearestIndex, barPath, hBarPath, compactEuro, bandPaths, splitLinePaths, bars, line, timeLines, hbars, tableOf, legend, constants: { MAX_BAR, RADIUS, GAP } };
+  return { niceScale, niceScaleFree, widenRange, timeTicks, nearestIndex, barPath, hBarPath, compactEuro, bandPaths, splitLinePaths, fadeShapes, nonZeroRuns, pieSlices, donutPath, pieFold, bars, line, timeLines, hbars, stackRuns, sbars, pie, tableOf, legend, constants: { MAX_BAR, RADIUS, GAP, PIE_HUES } };
+});
+
+/* ---- src/app/hold-view.js ---- */
+/*
+ * HoldView: the figures and words of the three pictures on the Holdings tab (architecture section 27.6), as plain data.
+ *
+ * It takes the result of Liquidate.compute (the card "If you sold everything today", section 26) and decides what each picture shows:
+ *   value  "What you hold": a ring, one slice for each security by its value today.
+ *   after  "After tax": one bar for each security, split into the tax cost, the gain that is left after tax and the tax on selling.
+ *   fund   "Fund income tax": bars by year, the KESt on the fund income (agE) of each year, split by security.
+ * and, for each, the table that carries the same figures (the table twin).
+ *
+ * Nothing here works out tax. Every amount is an exact decimal text from the engine, shown with Model.fmtMoney; the only arithmetic is exact too
+ * (sums, and the split of a bar into the pieces that add up to the value). The numbers for the geometry (a slice's angle, a bar's length) are
+ * plain floating-point numbers made from those texts, and the shares in words are rounded to one decimal from them.
+ *
+ * The positions that could not be valued are not in the pictures (as they are not in the tiles of the card), so the total of the ring is the
+ * tile "Value today" to the cent; `left` says how many are out.
+ *
+ * Pure functions, no DOM, no clock. Runs in Node (tests) and in the page.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("../lib/decimal.js"), require("./model.js"), require("./charts.js"));
+  else root.HoldView = factory(root.Dec, root.Model, root.Charts);
+})(typeof self !== "undefined" ? self : this, function (Dec, Model, Charts) {
+  "use strict";
+
+  const VERSION = "holdview-0.1.0";
+  const DP = 2;
+  const Z = Dec.mk(0n, DP);
+  const fm = (t, o) => Model.fmtMoney(t, o);
+  const plural = (n, one, many) => n + " " + (n === 1 ? one : many || one + "s");
+  const dec = (t) => Dec.parse(t) || Z;
+  const text = (d) => Dec.str(d, DP);
+  const num = (t) => {
+    const n = Number(t);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const tone = (t) => {
+    const d = Dec.parse(t);
+    return !d || Dec.isZero(d) ? undefined : Dec.isNeg(d) ? "neg" : "pos";
+  };
+  const isZero = (t) => Dec.isZero(dec(t));
+  /** A share of a total as text with one decimal ("23.4 %"), "–" when there is no total. */
+  const share = (part, total) => (total > 0 ? ((100 * part) / total).toFixed(1) + " %" : "–");
+  const byText = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
+  /** The colour of a security: the hue of its slot (the pie hues of the style), or the grey of the others. */
+  const hue = (slot) => (slot >= 0 ? "var(--c-pie-" + (slot + 1) + ")" : "var(--c-pie-other)");
+
+  const COLORS = { cost: "var(--c-put)", gain: "var(--c-gain)", tax: "var(--c-austria)", loss: "var(--c-more)" };
+  const VIEWS = { value: "What you hold", after: "After tax", fund: "Fund income tax" };
+
+  /**
+   * res: the result of Liquidate.compute. ctx: { nameOf(isin), labelOf(isin), orphans } (all optional). nameOf: the full name of a security (the head of
+   * a hover box); labelOf: its compact form for labels, legends and tables (Names: "tight places"), the full name when there is none; orphans: how
+   * many securities the performance figures hold that the tax data does not (they are left out of the pictures too).
+   * Returns { version, ok, sub, views: [{ id, label }], left, value, after, fund }; ok is false (and the rest empty) when nothing could be valued.
+   */
+  function build(res, ctx) {
+    const c = ctx || {};
+    const nameOf = typeof c.nameOf === "function" ? c.nameOf : (x) => x;
+    const labelOf = typeof c.labelOf === "function" ? c.labelOf : nameOf;
+    const full = (isin) => String(nameOf(isin) || isin);
+    const short = (isin) => String(labelOf(isin) || full(isin));
+    const v = { version: VERSION, ok: false, sub: "", views: [], left: 0, value: null, after: null, fund: null };
+    if (!res || res.ok !== true || !res.totals || !(res.totals.positions > 0)) return v;
+    v.ok = true;
+    v.sub = "position as filed · " + Model.fmtDate(res.date);
+    v.left = res.totals.left + (Number.isFinite(c.orphans) ? c.orphans : 0);
+
+    // ---- the securities, in the order of their names (the order that decides the colours)
+    const secs = Object.keys(res.securities || {}).map((isin) => {
+      const s = res.securities[isin];
+      return { isin, name: full(isin), label: short(isin), valued: s.positions > 0, left: s.left, value: s.valueEur, taxCost: s.taxCostEur, gain: s.taxGainEur, tax: s.kestAloneEur };
+    });
+    const byName = (a, b) => byText(a.label.toLowerCase(), b.label.toLowerCase()) || byText(a.name.toLowerCase(), b.name.toLowerCase()) || byText(a.isin, b.isin);
+    const byValue = (a, b) => num(b.value) - num(a.value) || byName(a, b);
+    secs.sort(byName);
+    const folded = Charts.pieFold(secs.map((x) => ({ key: x.isin, value: x.valued ? num(x.value) : 0 })), Charts.constants.PIE_HUES);
+    const slotOf = new Map();
+    for (const g of folded) if (!g.grey) slotOf.set(g.key, g.slot);
+    const colorOf = (isin) => hue(slotOf.has(isin) ? slotOf.get(isin) : -1);
+    const held = secs.filter((x) => x.valued && num(x.value) > 0).sort(byValue);
+    const byIsin = new Map(secs.map((x) => [x.isin, x]));
+
+    // ---- what you hold
+    const total = res.totals.valueEur;
+    const totalNum = num(total);
+    const sumOf = (xs, f) => text(xs.reduce((a, x) => Dec.add(a, dec(f(x))), Z));
+    const details = (x) => [["Share of the value", share(num(x.value), totalNum)], ["Tax cost", fm(x.taxCost)], ["Taxable gain", fm(x.gain, { plus: true }), tone(x.gain)], ["Tax on this gain alone", fm(x.tax)]].concat(x.left > 0 ? [["Not valued", plural(x.left, "position")]] : []);
+    const items = folded.map((g) => {
+      if (g.grey && g.count > 1) {
+        const xs = g.keys.map((k) => byIsin.get(k)).sort(byValue);
+        const sum = sumOf(xs, (x) => x.value);
+        return { key: "other", label: "Other (" + g.count + ")", title: "Other: " + plural(g.count, "security", "securities"), value: num(sum), text: fm(sum), share: share(num(sum), totalNum), color: hue(-1), tip: "Value today", details: xs.map((x) => [x.label, fm(x.value)]) };
+      }
+      const x = byIsin.get(g.key);
+      return { key: x.isin, label: x.label, title: x.name, value: num(x.value), text: fm(x.value), share: share(num(x.value), totalNum), color: hue(g.slot), tip: "Value today", details: details(x) };
+    });
+    v.value = {
+      total: { label: "Total", text: fm(total) },
+      items,
+      twin: {
+        cols: ["Security", "Value", "Share", "Tax cost", "Taxable gain"],
+        main: 1,
+        rows: held.map((x) => ({ key: x.isin, cells: [x.label, fm(x.value), share(num(x.value), totalNum), fm(x.taxCost), fm(x.gain, { plus: true })] })),
+        total: ["Total", fm(total), totalNum > 0 ? "100.0 %" : "–", fm(res.totals.taxCostEur), fm(res.totals.taxGainNetEur, { plus: true })],
+      },
+      note: "",
+    };
+
+    // ---- after tax: value = tax cost + gain left after tax + tax on selling (the engine's value, cost and tax; a loss has no tax and a bar that stops short)
+    const pieces = (x) => {
+      const value = dec(x.value);
+      const cost = dec(x.taxCost);
+      const gain = dec(x.gain);
+      const tax = dec(x.tax);
+      if (Dec.isNeg(gain)) return { cost: value, gain: Z, tax: Z, loss: Dec.sub(cost, value), left: value };
+      return { cost, gain: Dec.sub(gain, tax), tax, loss: Z, left: Dec.sub(value, tax) };
+    };
+    const after = held.map((x) => ({ x, p: pieces(x) }));
+    const anyLoss = after.some((a) => !Dec.isZero(a.p.loss));
+    v.after = {
+      legend: [{ name: "Tax cost", color: COLORS.cost }, { name: "Gain left after tax", color: COLORS.gain }, { name: "Tax on selling", color: COLORS.tax }].concat(anyLoss ? [{ name: "Loss: below the tax cost", color: COLORS.loss, kind: "ghost" }] : []),
+      items: after.map(({ x, p }) => ({
+        key: x.isin,
+        label: x.label,
+        title: x.name,
+        text: fm(x.value),
+        segments: [
+          { name: "Tax cost", color: COLORS.cost, value: num(text(p.cost)), text: fm(x.taxCost) }, // a loss: the bar is the value and the outline after it the rest of the cost; the text is the whole cost
+          { name: "Gain left after tax", color: COLORS.gain, value: num(text(p.gain)), text: fm(text(p.gain)) },
+          { name: "Tax on selling", color: COLORS.tax, value: num(text(p.tax)), text: fm(text(p.tax)) },
+        ],
+        ghost: Dec.isZero(p.loss) ? null : { name: "Loss: below the tax cost", color: COLORS.loss, value: num(text(p.loss)), text: fm(text(p.loss)) },
+        details: [["Value today", fm(x.value)], ["Taxable gain", fm(x.gain, { plus: true }), tone(x.gain)], ["Left after tax", fm(text(p.left))]],
+      })),
+      twin: {
+        cols: ["Security", "Value", "Tax cost", "Taxable gain", "Tax on selling", "Left after tax"],
+        main: 1,
+        rows: after.map(({ x, p }) => ({ key: x.isin, cells: [x.label, fm(x.value), fm(x.taxCost), fm(x.gain, { plus: true }), fm(text(p.tax)), fm(text(p.left))] })),
+        total: ["Total", fm(total), fm(res.totals.taxCostEur), fm(res.totals.taxGainNetEur, { plus: true }), "–", "–"],
+      },
+      note: "The tax of each bar is the tax on that security alone. When everything is sold together, a loss in one security offsets a gain in another, so the tax on all of it can be lower than the bars add up to: the card above has the figure for the year (Extra tax).",
+    };
+
+    // ---- fund income tax: the KESt on the fund income (agE) of each year, by security
+    const hist = res.prepaid && res.prepaid.byIsin ? res.prepaid.byIsin : {};
+    const years = new Set();
+    for (const isin of Object.keys(hist)) for (const y of hist[isin].years) if (/^\d{4}$/.test(String(y.year))) years.add(Number(y.year));
+    if (years.size) {
+      const first = Math.min.apply(null, Array.from(years));
+      const last = Math.max.apply(null, Array.from(years));
+      const cats = [];
+      for (let y = first; y <= last; y++) cats.push(String(y));
+      const rate = Dec.parse(res.kestRate) ? " " + Dec.str(Dec.normalize(Dec.mul(Dec.parse(res.kestRate), Dec.mk(100n, 0)))) + " %" : "";
+      const cell = (isin, y) => {
+        const h = hist[isin];
+        const r = h ? h.years.find((q) => String(q.year) === y) : null;
+        return r ? { age: dec(r.ageEur), kest: dec(r.kestEur) } : { age: Z, kest: Z };
+      };
+      // the series: the securities that have a colour, in the order of their colours, then the grey one of the rest (also the securities that are
+      // not held any more or have no price: they are in the history of fund income only)
+      const coloured = Array.from(slotOf.entries()).filter(([isin]) => hist[isin]).sort((a, b) => a[1] - b[1]).map(([isin]) => isin);
+      const rest = Object.keys(hist).filter((isin) => !slotOf.has(isin)).sort((a, b) => byText(short(a).toLowerCase(), short(b).toLowerCase()) || byText(a, b));
+      const series = coloured.map((isin) => ({ id: isin, name: short(isin), color: colorOf(isin), isins: [isin] }));
+      if (rest.length === 1) series.push({ id: rest[0], name: short(rest[0]), color: hue(-1), isins: rest });
+      else if (rest.length > 1) series.push({ id: "other", name: "Other (" + rest.length + ")", color: hue(-1), isins: rest });
+      const amount = (s, y) => s.isins.reduce((a, isin) => Dec.add(a, cell(isin, y).kest), Z);
+      const income = (s, y) => s.isins.reduce((a, isin) => Dec.add(a, cell(isin, y).age), Z);
+      const dash = (d) => (Dec.isZero(d) ? "–" : fm(text(d)));
+      const sums = cats.map((y) => series.reduce((a, s) => Dec.add(a, amount(s, y)), Z));
+      const incomes = cats.map((y) => series.reduce((a, s) => Dec.add(a, income(s, y)), Z));
+      const grand = sums.reduce((a, d) => Dec.add(a, d), Z);
+      const negative = series.some((s) => cats.some((y) => Dec.isNeg(amount(s, y)) && !Dec.isZero(amount(s, y))));
+      const other = series.find((s) => s.id === "other");
+      v.fund = {
+        categories: cats,
+        series: series.map((s) => ({ id: s.id, name: s.name, color: s.color, values: cats.map((y) => num(text(amount(s, y)))), texts: cats.map((y) => dash(amount(s, y))) })),
+        totalTexts: sums.map((d) => dash(d)),
+        details: cats.map((y, i) => [["Fund income (agE)", dash(incomes[i])]].concat(other ? other.isins.filter((isin) => !Dec.isZero(cell(isin, y).kest)).map((isin) => ["in " + other.name + ": " + short(isin), fm(text(cell(isin, y).kest))]) : [])),
+        twin: {
+          cols: ["Year"].concat(series.map((s) => s.name), ["Total"]),
+          main: series.length + 1,
+          rows: cats.map((y, i) => ({ key: y, cells: [y].concat(series.map((s) => dash(amount(s, y))), [dash(sums[i])]) })),
+          total: ["All years"].concat(series.map((s) => dash(cats.reduce((a, y) => Dec.add(a, amount(s, y)), Z))), [dash(grand)]),
+        },
+        note: "KESt" + rate + " on the fund income (agE) that the OeKB reported for each year, before the foreign-tax credit and before the loss offset of that year. It is what the fund income cost in tax, not what was paid: the Overview has what was paid." + (negative ? " A year with a negative figure is in the table and is not drawn." : ""),
+      };
+    }
+
+    v.views = [{ id: "value", label: VIEWS.value }, { id: "after", label: VIEWS.after }].concat(v.fund ? [{ id: "fund", label: VIEWS.fund }] : []);
+    return v;
+  }
+
+  return { VERSION, VIEWS, build };
 });
 
 /* ---- src/app/persist.js ---- */
@@ -16202,8 +17230,9 @@ const PerfUI = (function () {
   const plural = (n, one, many) => num(n) + " " + (n === 1 ? one : many || one + "s");
   const button = (text, onclick, cls, key, extra) => el("button", Object.assign({ type: "button", class: "btn" + (cls ? " " + cls : ""), "data-key": key || false, onclick, text }, extra || {}));
 
-  const toneOf = (x) => (Number.isFinite(x) && Math.abs(x) >= 0.005 ? (x > 0 ? "pos" : "neg") : undefined);
-  const toneP = (x) => (Number.isFinite(x) && Math.abs(x) >= 0.00005 ? (x > 0 ? "pos" : "neg") : undefined);
+  // The green or red of a figure comes from one rule, the one the hover boxes use too (PerfTips.tone, see there).
+  const toneOf = PerfTips.tone;
+  const toneP = PerfTips.toneP;
   // What the hover box says over each number: PerfTips only puts into words what the engine worked out.
   const Tips = PerfTips.create({ money, pct, date: fd, plural, units: PerfTips.unitsText });
 
@@ -16528,7 +17557,8 @@ const PerfUI = (function () {
         el("div", { class: "ychips", role: "radiogroup", "aria-label": "Calendar year" }, ys.map((y) => el("label", { class: "ychip" }, el("input", { type: "radio", name: "Calendar year", value: String(y), checked: st.win === "Y" + y, "data-key": "pf-win:Y" + y, onchange: () => { st.win = "Y" + y; host.refresh(); } }), el("span", { text: String(y) })))));
     }
 
-    const kpi = (label, value, sub, key, spec) => el("div", tipped(spec, { class: "kpi", "data-k": "pk:" + key }), el("span", { class: "label", text: label }), el("span", { class: "value", text: value }), sub ? el("span", { class: "subline", text: sub }) : null);
+    /** One tile. tone: "pos" or "neg" turns the figure green or red (never the label, the line under it or the tile), undefined leaves it white. */
+    const kpi = (label, value, sub, key, spec, tone) => el("div", tipped(spec, { class: "kpi", "data-k": "pk:" + key }), el("span", { class: "label", text: label }), el("span", { class: "value" + (tone ? " " + tone : ""), text: value }), sub ? el("span", { class: "subline", text: sub }) : null);
 
     // ------------------------------------------------------------ the choice of a view: where, and what
 
@@ -16602,7 +17632,7 @@ const PerfUI = (function () {
             el("div", { class: "field" }, el("label", { for: "f-pf-from", text: "From the close of" }), el("input", { type: "date", "data-key": "pf-from", value: st.from || w.from, min: m.start, max: m.end, onchange: (e) => { st.from = e.target.value; host.refresh(); } })),
             el("div", { class: "field" }, el("label", { for: "f-pf-to", text: "To the close of" }), el("input", { type: "date", "data-key": "pf-to", value: st.to || w.to, min: m.start, max: m.end, onchange: (e) => { st.to = e.target.value; host.refresh(); } })))
         : null;
-      const mwr = s.xirr !== null ? [pct(s.xirr, true), "per year (money-weighted, XIRR)"] : s.moneyWeighted !== null ? [pct(s.moneyWeighted, true), "over this time-frame, not per year"] : ["–", "not defined here"];
+      const mwr = s.xirr !== null ? [pct(s.xirr, true), "per year (money-weighted, XIRR)", toneP(s.xirr)] : s.moneyWeighted !== null ? [pct(s.moneyWeighted, true), "over this time-frame, not per year", toneP(s.moneyWeighted)] : ["–", "not defined here", undefined];
       return el("section", { class: "card", "data-k": "pf-top" },
         el("div", { class: "card-head" }, el("h2", { text: "Performance" }), el("span", { class: "sub", text: "Before Austrian tax · prices up to " + fd(m.pricesUntil || m.end) })),
         bar,
@@ -16613,8 +17643,8 @@ const PerfUI = (function () {
         el("p", { class: "note", text: "From the close of " + fd(w.from) + " to the close of " + fd(w.to) + " (" + plural(w.days, "day") + ")." }),
         el("div", { class: "kpis six" },
           kpi("Time-weighted return", pct(s.twr, true), s.twrAnnual !== null ? pct(s.twrAnnual, true) + " per year" : "how the holdings did, whatever you added", "twr", Tips.twr(s)),
-          kpi("Money-weighted return", mwr[0], mwr[1], "mwr", Tips.mwr(s)),
-          kpi("Gain", money(s.gain, true), "with dividends of " + money(s.dividends), "gain", Tips.gain(s, b)),
+          kpi("Money-weighted return", mwr[0], mwr[1], "mwr", Tips.mwr(s), mwr[2]),
+          kpi("Gain", money(s.gain, true), "with dividends of " + money(s.dividends), "gain", Tips.gain(s, b), toneOf(s.gain)),
           kpi("Value", money(s.valueEnd), s.valueStart > 0 ? "at the start " + money(s.valueStart) : "on " + fd(w.to), "value", Tips.value(s)),
           kpi("Money put in, net", money(s.net, true), "paid " + money(s.inflow) + " · received " + money(s.outflow), "net", Tips.net(s, b)),
           kpi("Dividends", money(s.dividends), "after tax withheld at the source", "div", Tips.dividends(b))));
@@ -16632,17 +17662,18 @@ const PerfUI = (function () {
       const openAt = (k) => cs.value[k] - cs.stack[k]; // the part of it that is not realised, after fees (see the note of chartSeries in perf.js)
       const short = (v) => C.compactEuro(v, 100); // "€457", "€11.4k": the end of a line; the exact figure is in the hover and the table
       const signed = (v) => (v > 0 ? "+" : "") + short(v);
-      // The lines: the value is the green one (the main thing), the money put in a thin light-neutral one, the realised gain a light orange band (his choice, 10 Nov)
-      // stacked on the money put in (its figures are the gain itself; the line is drawn at money put in plus that gain). Red stays for a loss.
+      // The lines: the value is the green one (the main thing), the money put in a thin light-neutral one, the realised gain a deeper orange line (orange: his choice,
+      // 10 Nov; drawn like the value line since 17 Nov: the same width, a glow, and a shading under it that fades toward the white line) stacked on the money put in
+      // (its figures are the gain itself; the line is drawn at money put in plus that gain, and only from the first sale on). Red stays for a loss.
       const series = [
         { name: "Value", color: "var(--c-gain)", kind: "line", width: 2.6, front: true, values: cs.value, texts: cs.value.map((v) => money(v)), endText: short(cs.value[last]) },
         { name: "Money put in", color: "var(--c-put)", kind: "line", width: 1.8, glow: false, values: cs.capital, texts: cs.capital.map((v) => money(v)), endText: short(cs.capital[last]) },
       ];
-      if (sold) series.push({ name: "Realised gain", tipName: "Realised gain, added on top", color: "var(--c-real)", downColor: "var(--c-more)", kind: "band", width: 1.3, glow: false, stackOn: 1, values: cs.realized, texts: cs.realized.map((v) => money(v, true)), endText: signed(cs.realized[last]) });
-      // the shading: the gain so far between the value and the money put in (green above the white line, red below), and on top of it, stronger,
-      // the realised band between the white line and its own upper edge (orange above, red below); the two lie one inside the other and never blur
+      if (sold) series.push({ name: "Realised gain", tipName: "Realised gain, added on top", color: "var(--c-real-line)", downColor: "var(--c-more)", kind: "band", width: 2.6, hideZero: true, stackOn: 1, values: cs.realized, texts: cs.realized.map((v) => money(v, true)), endText: signed(cs.realized[last]) });
+      // the shading: the gain so far between the value and the money put in (green above the white line, red below), and on top of it the realised
+      // shading between the white line and the realised line, strongest at that line (40 %) and fading to nothing at the white line (orange above, red below)
       const bands = [{ a: 0, b: 1, up: "var(--c-gain)", down: "var(--c-more)", cls: "soft" }];
-      if (sold) bands.push({ a: 2, b: 1, up: "var(--c-real)", down: "var(--c-more)", cls: "real", show: [2] });
+      if (sold) bands.push({ a: 2, b: 1, up: "var(--c-real-line)", down: "var(--c-more)", cls: "real", show: [2], fade: 0.4 });
       const chart = C.timeLines({
         days: cs.days,
         series,
@@ -16657,7 +17688,7 @@ const PerfUI = (function () {
       const table = C.tableOf(["Date", "Value", "Money put in", "Realised gain", "Not yet realised, after fees", "Gain so far", "Dividends so far"], t.days.map((d, k) => [fd(d), money(t.value[k]), money(t.capital[k]), money(t.realized[k], true), money(t.value[k] - t.stack[k], true), money(t.value[k] - t.capital[k], true), money(t.dividends[k])]), "Value of the portfolio, the money put in, the realised gain, the gain not yet realised, the gain so far and the dividends");
       const note = "White: the money put in (what the holdings were worth when the time-frame began, plus purchases less sales, fees included). Green: the value. "
         + (sold
-          ? "The orange band on the white line is the gain you have already realised by selling, before tax (the hover shows it as a figure); between the band and the green line is what is not yet realised, after fees. Red is a loss."
+          ? "Orange: the gain you have already realised by selling, before tax, stacked on the white line (the hover shows it as a figure); between it and the green line is what is not yet realised, after fees. Red is a loss."
           : "No units were sold in this time-frame, so there is no realised gain. The shaded gap is the gain so far, before dividends: green above the white line, red below it.");
       return chartCard("value", "Value and money put in", note, chart, table);
     }
@@ -17000,12 +18031,29 @@ const PerfUI = (function () {
       body.push({ cells: ["Total"].concat(withUnits ? [unitsTotal > 0 ? PerfTips.unitsText(unitsTotal) : "sold"] : [], [money(s.valueEnd), s.valueEnd > 0 ? "100.0 %" : "–", money(s.gain, true), pct(s.twr, true), money(s.net, true), money(s.dividends)]), cls: "strong" });
       const table = C.tableOf(["Place"].concat(withUnits ? ["Units"] : [], ["Value", "Share", "Gain", "Return", "Net put in", "Dividends"]), body, "Where it is held, over the time-frame");
       table.classList.add("perf-tbl");
-      // the value of each place as bars (the places that add up to the view; the accounts below a broker are in the table and the list)
-      const chart = C.hbars({
-        items: top.map((x) => ({ label: x.row.label, title: x.row.label, value: x.f.valueEnd, text: money(x.f.valueEnd), tip: "Value at the end", details: [["Share of the value", shareText(x.f)], ["Gain", money(x.f.gain, true), toneOf(x.f.gain)], ["Return", pct(x.f.twr, true), toneP(x.f.twr)]].concat(withUnits ? [["Units held", unitsOf(x.f)]] : []) })),
-        color: "var(--c-gain)",
-        ariaLabel: "Value at the end of each place, over the time-frame",
+      // the places that hold something, as a pie (architecture 27.3). A place has the colour of its position in the list of its level before the
+      // security filter, so that choosing a security does not repaint the places that stay; when the filter leaves one broker, the places are its
+      // accounts (a list of another level) and the position in the list shown decides. The table and the list below hold every place.
+      const unfiltered = placeList({ where: sel.where, ticker: "" });
+      const full = top.every((x) => unfiltered.some((u) => u.where === x.row.where)) ? unfiltered : list;
+      const heldBy = new Map(top.map((x) => [x.row.where, x]));
+      const folded = C.pieFold(full.map((row) => ({ key: row.where, value: heldBy.has(row.where) ? heldBy.get(row.where).f.valueEnd : 0 })), C.constants.PIE_HUES);
+      const pieDetails = (x) => [["Share of the value", shareText(x.f)], ["Gain", money(x.f.gain, true), toneOf(x.f.gain)], ["Return", pct(x.f.twr, true), toneP(x.f.twr)]].concat(withUnits ? [["Units held", unitsOf(x.f)]] : []);
+      const pieItems = folded.map((g) => {
+        if (g.grey && g.count > 1) {
+          const xs = g.keys.map((k) => heldBy.get(k)).sort(byValue);
+          const part = xs.reduce((a, x) => a + (x.f.share || 0), 0);
+          return { key: "other", label: "Other (" + g.count + ")", title: "Other: " + g.count + " places", value: g.value, text: money(g.value), share: (part * 100).toFixed(1) + " %", color: "var(--c-pie-other)", tip: "Value at the end", details: xs.map((x) => [x.row.label, money(x.f.valueEnd)]) };
+        }
+        const x = heldBy.get(g.key);
+        return { key: x.row.where, label: x.row.label, title: x.row.label, value: x.f.valueEnd, text: money(x.f.valueEnd), share: shareText(x.f), color: g.grey ? "var(--c-pie-other)" : "var(--c-pie-" + (g.slot + 1) + ")", tip: "Value at the end", details: pieDetails(x), node: rowLink("pf-go-p:" + x.row.where, x.row.label, "", "Look at " + x.row.label + " alone", () => pick(x.row.where, sel.ticker)) };
       });
+      const sliceCount = folded.reduce((a, g) => a + g.count, 0);
+      const chart = pieItems.length ? C.pie({ items: pieItems, total: { label: "Total", text: money(s.valueEnd) }, ariaLabel: "Value at the end of each place, over the time-frame, as a pie" }) : null;
+      const noSlice = top.length - sliceCount;
+      const sliceNote = !chart
+        ? "Nothing is held at the end of this time-frame, so there is no pie. The table shows each place."
+        : noSlice > 0 ? plural(noSlice, "place") + (noSlice === 1 ? " holds" : " hold") + " nothing at the end of this time-frame and " + (noSlice === 1 ? "has" : "have") + " no slice; " + (noSlice === 1 ? "it is" : "they are") + " in the table." : "";
       // the same rows as a list for a phone, where eight columns do not fit
       const rowsList = flat.map(({ x, child }) => el("li", tipped(Tips.place(x.f, x.row.kind), { class: child ? "sub" : false, "data-k": "plc:" + x.row.where }),
         el("div", { class: "sec-top" }, el("strong", { class: "sec-name" }, rowLink((child ? "pf-go-lc:" : "pf-go-l:") + x.row.where, x.row.label, "", "Look at " + x.row.label + " alone", () => pick(x.row.where, sel.ticker))), x.f.valueEnd > 0 ? null : chip("nothing held", "neutral"), el("span", { class: "num sec-value", text: money(x.f.valueEnd) })),
@@ -17017,7 +18065,7 @@ const PerfUI = (function () {
       const by = top[0].row.kind === "broker" ? "broker" : "account";
       return el("section", { class: "card", "data-k": "pf-places" },
         el("div", { class: "card-head" }, el("h2", { text: "Where it is held" }), el("span", { class: "sub", text: "same time-frame · press a name to look at it alone" })),
-        el("div", { class: "stack", "data-k": "pf-place-bars" }, el("h3", { text: "Value at the end, by " + by }), chart),
+        el("div", { class: "stack", "data-k": "pf-place-bars" }, el("h3", { text: "Value at the end, by " + by }), chart, sliceNote ? el("p", { class: "note", text: sliceNote }) : null),
         el("div", { class: "sec-table" }, table),
         list2,
         el("p", { class: "note", text: "Each line is worked from the transactions of that place alone, as if it were your whole portfolio. The gains add up to the total; the returns do not, each place has its own." + (flat.some((r) => r.child) ? " The lines below a broker are its accounts: they are part of that broker, not added to it." : "") }));
@@ -17402,7 +18450,116 @@ const SellUI = (function () {
       return el("div", { class: "rows sell-years", "data-k": "sell-years:" + isin }, el("h3", { text: y.caption }), C.tableOf(y.cols, y.rows.map((r) => [r[0]].concat(r.slice(1))).concat([{ cells: y.total, cls: "strong" }]), y.caption + " by year"));
     }
 
-    return { render, head, depotLine, depotBlock, yearsBlock, state: st };
+    return { render, result, head, depotLine, depotBlock, yearsBlock, state: st };
+  }
+
+  return { create };
+})();
+
+/* ---- src/app/ui-hold-charts.js ---- */
+/*
+ * "Your holdings in pictures" on the Holdings tab (browser only; architecture section 27.6).
+ *
+ * One card under "If you sold everything today", three pictures of the same position as filed, one at a time (a switch above them):
+ *   What you hold      a ring of the value of each security (the pie of section 27.3)
+ *   After tax          one bar for each security: tax cost, gain left after tax, tax on selling
+ *   Fund income tax    bars by year: the KESt on the fund income (agE) of each year, split by security
+ * Each has its table (from 640 px) or list (below), with every figure of the picture.
+ *
+ * This file only draws. The figures and words come from HoldView (hold-view.js), made from the result of the card above (SellUI.result); the
+ * charts from Charts (charts.js). Nothing is worked out here and text is always put in with textContent. The picture chosen is kept while the
+ * page is open; it is not saved.
+ */
+const HoldCharts = (function () {
+  "use strict";
+
+  const { el } = Dom;
+  const C = Charts;
+  const plural = (n, one, many) => n + " " + (n === 1 ? one : many || one + "s");
+
+  /** The small switch of the Performance tab (the same markup, so the same style): options [[id, label]], value the one that is on. */
+  function seg(name, options, value, onchange) {
+    return el("div", { class: "seg", role: "radiogroup", "aria-label": name }, options.map((o) => el("label", {}, el("input", { type: "radio", name, value: o[0], checked: value === o[0], "data-key": "hold-view:" + o[0], onchange: () => onchange(o[0]) }), el("span", { text: o[1] }))));
+  }
+
+  /**
+   * The table of a picture and, for a phone, the same rows as a list (the pair the Performance tab uses). t: { cols, main, rows: [{ key, cells }], total }.
+   * In the list a row is its name and its main figure on one line and the other figures under them (a figure that is "–" is left out).
+   */
+  function twin(t, caption) {
+    const table = C.tableOf(t.cols, t.rows.map((r) => ({ cells: r.cells })).concat([{ cells: t.total, cls: "strong" }]), caption);
+    const line = (key, cells, cls) =>
+      el("li", { class: cls || false, "data-k": "hold-li:" + key },
+        el("div", { class: "sec-top" }, el("strong", { class: "sec-name", text: cells[0] }), el("span", { class: "num sec-value", text: cells[t.main] })),
+        el("div", { class: "sec-sub" }, t.cols.map((name, i) => (i === 0 || i === t.main || cells[i] === "–" ? null : el("span", { text: name + " " + cells[i] })))));
+    const list = el("ul", { class: "sec-list", "aria-label": caption }, t.rows.map((r) => line(r.key, r.cells)).concat([line("total", t.total, "total")]));
+    return [el("div", { class: "sec-table" }, table), list];
+  }
+
+  /**
+   * host: {
+   *   result()      what SellUI.result gives: { res, orphans, view } or { error }, or null while there is nothing yet
+   *   secName(isin) the full name of a security, secLabel(isin) its compact form
+   *   refresh()
+   * }
+   */
+  function create(host) {
+    const st = { view: "value" };
+    let memo = { res: null, names: "", out: null };
+
+    /** HoldView.build of the result on screen, kept until the result or a name changes (the page is drawn on every keystroke). */
+    function built(x) {
+      const res = x.res;
+      const hist = res.prepaid && res.prepaid.byIsin ? Object.keys(res.prepaid.byIsin) : [];
+      const names = Object.keys(res.securities || {}).concat(hist).map((i) => host.secName(i) + "~" + host.secLabel(i)).join("|") + "#" + (x.orphans || []).length;
+      if (memo.out && memo.res === res && memo.names === names) return memo.out;
+      memo = { res, names, out: HoldView.build(res, { nameOf: host.secName, labelOf: host.secLabel, orphans: (x.orphans || []).length }) };
+      return memo.out;
+    }
+
+    function ringBody(v) {
+      const a = v.value;
+      const chart = a.items.length ? C.pie({ items: a.items, total: a.total, ariaLabel: "Value today of each security, as a ring" }) : null;
+      return [el("h3", { text: "Value today, by security" }), chart || el("p", { class: "note", text: "Nothing that could be valued has a value above zero, so there is no ring. The table shows each security." }), twin(a.twin, "Value today, by security")];
+    }
+
+    function afterBody(v) {
+      const a = v.after;
+      return [
+        el("h3", { text: "What would be yours after tax, by security" }),
+        C.sbars({ items: a.items, legend: a.legend, ariaLabel: "Each security's value today, split into the tax cost, the gain left after tax and the tax on selling, as bars" }),
+        el("p", { class: "note", text: a.note }),
+        twin(a.twin, "What would be yours after tax, by security"),
+      ];
+    }
+
+    function fundBody(v) {
+      const f = v.fund;
+      return [
+        el("h3", { text: "KESt on fund income, by year" }),
+        C.bars({ categories: f.categories, series: f.series, mode: "stacked", legend: true, totalTexts: f.totalTexts, details: f.details, height: 240, ariaLabel: "KESt on the fund income of each year, split by security, as bars" }),
+        el("p", { class: "note", text: f.note }),
+        twin(f.twin, "KESt on fund income, by year"),
+      ];
+    }
+
+    /** The card, or nothing while the figures are being worked out, when they stopped, or when no position could be valued. */
+    function render(root) {
+      const x = host.result();
+      if (!x || x.error || !x.res || x.res.ok !== true) return;
+      const v = built(x);
+      if (!v.ok) return;
+      const id = v.views.some((q) => q.id === st.view) ? st.view : "value";
+      const body = id === "fund" ? fundBody(v) : id === "after" ? afterBody(v) : ringBody(v);
+      root.appendChild(
+        el("section", { class: "card", "data-k": "hold-pics" },
+          el("div", { class: "card-head" }, el("h2", { text: "Your holdings in pictures" }), el("span", { class: "sub", text: v.sub })),
+          seg("Picture", v.views.map((q) => [q.id, q.label]), id, (to) => { st.view = to; host.refresh(); }),
+          el("div", { class: "stack", "data-k": "hold-pic:" + id }, body),
+          v.left > 0 ? el("p", { class: "note", "data-k": "hold-left", text: plural(v.left, "position") + (v.left === 1 ? " is" : " are") + " left out of these pictures because " + (v.left === 1 ? "it" : "they") + " could not be valued; the card above lists " + (v.left === 1 ? "it" : "them") + ". Nothing is estimated." }) : null));
+    }
+
+    return { render, state: st };
   }
 
   return { create };
@@ -17413,9 +18570,12 @@ const SellUI = (function () {
  * "Normal tax scale instead?" on the Tax tab (browser only).
  *
  * The owner can ask the Finanzamt to tax the capital income of a year with the normal income-tax scale instead of the special rates
- * (Regelbesteuerungsoption, § 27a Abs 5 EStG). This card asks for the two figures only he knows (his other taxable income of the year and the
- * tax credits he can use), lets Model/Regular work out both ways, and draws the answer: the verdict, the two columns, the break-even
- * and a chart of the saving by other income. It calculates nothing about tax itself. Text is always put in with textContent.
+ * (Regelbesteuerungsoption, § 27a Abs 5 EStG). This card asks for the figures only he knows (his other income of the year before deductions,
+ * the tax credits he can use and, optionally, deduction lines: Sonderausgaben and außergewöhnliche Belastungen as his assessment notice shows
+ * them), lets Model/Regular work out both ways, and draws the answer: the verdict, the two columns, the break-even and a chart of the saving
+ * by other income. It calculates nothing about tax itself. Text is always put in with textContent.
+ *
+ * It also asks how the return of the year was filed (normal scale, special rates, not sure): the way the Overview counts the tax paid (27.1).
  *
  * What was typed is kept in the owner's document (host.commit, which saves it); in the demo it is kept in the page only.
  */
@@ -17433,14 +18593,35 @@ const RegularUI = (function () {
   const floorEuro = (s) => euro0(String(s).replace(/\.\d+$/, "")); // the break-even is shown in whole euros, rounded down
   const same = (a, b) => a === b;
 
+  /** A text field. By default a money field (monospaced, decimal keypad, 20 characters, a full row); o.mono / o.wide / o.maxlength / o.inputmode change that. */
   function field(o) {
     const bad = !!o.error;
-    return el("div", { class: "field wide" },
+    return el("div", { class: "field" + (o.wide === false ? "" : " wide") },
       el("label", { for: fid(o.key), text: o.label }),
-      el("input", { type: "text", "data-key": o.key, value: o.value === undefined || o.value === null ? "" : o.value, placeholder: o.placeholder || false, maxlength: 20, inputmode: "decimal", autocomplete: "off", autocapitalize: "off", spellcheck: "false", class: "mono" + (bad ? " invalid" : ""), "aria-invalid": bad ? "true" : false, onchange: (e) => o.onCommit(e.target.value.trim()) }),
+      el("input", { type: "text", "data-key": o.key, value: o.value === undefined || o.value === null ? "" : o.value, placeholder: o.placeholder || false, maxlength: o.maxlength || 20, inputmode: o.inputmode === undefined ? "decimal" : o.inputmode, autocomplete: "off", autocapitalize: "off", spellcheck: "false", class: [o.mono === false ? "" : "mono", bad ? "invalid" : ""].filter(Boolean).join(" "), "aria-invalid": bad ? "true" : false, onchange: (e) => o.onCommit(e.target.value.trim()) }),
       o.hint ? el("span", { class: "hint", text: o.hint }) : null,
       bad ? el("span", { class: "err", text: o.error }) : null);
   }
+
+  function selectField(o) {
+    const bad = !!o.error;
+    return el("div", { class: "field" },
+      el("label", { for: fid(o.key), text: o.label }),
+      el("select", { "data-key": o.key, class: bad ? "invalid" : "", "aria-invalid": bad ? "true" : false, onchange: (e) => o.onCommit(e.target.value) }, o.options.map((x) => el("option", { value: x[0], selected: x[0] === o.value, text: x[1] }))),
+      bad ? el("span", { class: "err", text: o.error }) : null);
+  }
+
+  const button = (text, onclick, cls, key) => el("button", { type: "button", class: "btn" + (cls ? " " + cls : ""), "data-key": key || false, onclick, text });
+
+  /** The kinds of deduction line (the same keys as Regular and the store) and the lines the three buttons add (labels at most 60 characters). */
+  const KINDS = [["SA", "Sonderausgaben"], ["AB", "Außergewöhnliche Belastungen"], ["OTHER", "Other deduction"]]; // as the notice calls them (the paragraphs are in the explanation)
+  // A new line starts with a text in its description: the store drops a line with no description and no amount, so an empty one would vanish at once.
+  const PRESETS = [
+    { id: "advice", text: "Tax advisor costs", kind: "SA", label: "Steuerberatungskosten" },
+    { id: "flat", text: "Pauschbeträge", kind: "AB", label: "Pauschbeträge (Verordnung über außergewöhnliche Belastungen)" },
+    { id: "other", text: "Other deduction", kind: "OTHER", label: "Other deduction" },
+  ];
+  const MAX_LINES = 12;
 
   function create(host) {
     const st = { open: {}, demo: {} };
@@ -17451,23 +18632,31 @@ const RegularUI = (function () {
     };
 
     function inputsOf(year) {
-      if (!host.mine()) return Object.assign({ otherEur: "", creditsEur: "" }, st.demo[year] || {});
-      const r = host.doc().regular && host.doc().regular[year];
-      return { otherEur: r ? r.otherEur : "", creditsEur: r ? r.creditsEur : "" };
+      const r = host.mine() ? host.doc().regular && host.doc().regular[year] : st.demo[year];
+      return { otherEur: r && r.otherEur ? r.otherEur : "", creditsEur: r && r.creditsEur ? r.creditsEur : "", deductions: r && Array.isArray(r.deductions) ? r.deductions : [], filed: r && (r.filed === "SPECIAL" || r.filed === "OPTION") ? r.filed : "" };
     }
 
-    function setInput(year, name, value) {
+    /** Changes what was typed for one year: fn gets a copy of the entry (with its own copy of the deduction lines) and changes it. */
+    function edit(year, fn) {
+      const next = (r) => {
+        const e = { otherEur: r && r.otherEur ? r.otherEur : "", creditsEur: r && r.creditsEur ? r.creditsEur : "", deductions: r && Array.isArray(r.deductions) ? r.deductions.map((l) => Object.assign({}, l)) : [] };
+        if (r && (r.filed === "SPECIAL" || r.filed === "OPTION")) e.filed = r.filed;
+        fn(e);
+        if (e.deductions.length === 0) delete e.deductions; // no line, no key: a document that never used deductions stays as it was
+        if (!e.filed) delete e.filed; // "not sure" is the same as never said
+        return e;
+      };
       if (!host.mine()) {
-        st.demo[year] = Object.assign({ otherEur: "", creditsEur: "" }, st.demo[year] || {}, { [name]: value });
+        st.demo[year] = next(st.demo[year]);
         host.refresh();
         return;
       }
       host.commit((d) => {
-        const r = Object.assign({ otherEur: "", creditsEur: "" }, d.regular[year] || {});
-        r[name] = value;
-        d.regular[year] = r;
+        d.regular[year] = next(d.regular[year]);
       });
     }
+
+    const setInput = (year, name, value) => edit(year, (e) => { e[name] = value; });
 
     // ------------------------------------------------------------ pieces
 
@@ -17505,6 +18694,9 @@ const RegularUI = (function () {
       return kv;
     }
 
+    /** True when deduction lines add up to something (the figures of the year then have two more rows each). */
+    const hasDeductions = (r) => !!(r.deductions && !M.isZeroText(r.deductions.totalEur));
+
     /** The two ways side by side (stacked on a phone): what the tax is made of with the special rates, and with the normal scale. */
     function compareBlocks(r) {
       const a = r.at;
@@ -17513,9 +18705,12 @@ const RegularUI = (function () {
       const better = a.verdict === "OPTION_CHEAPER" ? "option" : a.verdict === "SPECIAL_CHEAPER" ? "special" : "";
       const usesCredits = !M.isZeroText(sp.creditsUsedEur) || !M.isZeroText(op.creditsUsedEur);
       const hasForeign = !M.isZeroText(sp.foreignCreditHighEur) || !M.isZeroText(op.foreignCreditHighEur);
+      const ded = hasDeductions(r);
       const side = (id, title, pairs) => el("div", { class: "cmp-side" + (better === id ? " better" : ""), "data-k": "reg-side:" + id }, el("h3", {}, title, better === id ? chip("cheaper", "ok") : null), kvList(pairs));
       const specialSide = side("special", "With the special rates", [
         ["Other income", fm(a.otherEur)],
+        ded ? ["Deductions used", "−" + fm(sp.deductionsUsedEur)] : null,
+        ded ? ["Taxable income", fm(sp.taxableIncomeEur)] : null,
         ["Tax on it, normal scale", fm(sp.tariffTaxEur)],
         usesCredits ? ["Tax credits used", "−" + fm(sp.creditsUsedEur)] : null,
         ["KESt on the capital income", fm(sp.kestEur)],
@@ -17524,7 +18719,9 @@ const RegularUI = (function () {
         ["Total tax", range(sp.totalLowEur, sp.totalHighEur), true],
       ]);
       const optionSide = side("option", "With the normal scale", [
-        ["Other income + capital income", fm(op.taxableIncomeEur)],
+        ["Other income + capital income", fm(op.totalIncomeEur)],
+        ded ? ["Deductions used", "−" + fm(op.deductionsUsedEur)] : null,
+        ded ? ["Taxable income", fm(op.taxableIncomeEur)] : null,
         ["Tax on it, normal scale", fm(op.tariffTaxEur)],
         usesCredits ? ["Tax credits used", "−" + fm(op.creditsUsedEur)] : null,
         hasForeign ? ["Foreign tax credit", "−" + range(op.foreignCreditLowEur, op.foreignCreditHighEur)] : null,
@@ -17539,8 +18736,9 @@ const RegularUI = (function () {
       const lines = [];
       lines.push("The capital income of " + fm(r.capital.totalEur) + " raises your tax on the normal scale by " + fm(a.extraTaxEur) + ", which is " + a.extraRatePercent + " % of it. The special rate takes " + a.kestRatePercent + " %.");
       lines.push("Your next euro of other income is taxed at " + a.marginalOtherPercent + " %; the last euro of the capital income at " + a.marginalTotalPercent + " % (before credits).");
+      if (hasDeductions(r)) lines.push("Deductions come off the sum of all your incomes. The capital income at the special rates is not part of that sum, so with the special rates they can only lower your other income; with the normal scale they lower the capital income too.");
       if (!M.isZeroText(a.option.creditsUsedEur) || !M.isZeroText(a.special.creditsUsedEur)) lines.push("Tax credits only reduce tax on the normal scale, and only down to zero.");
-      if (!M.isZeroText(a.option.foreignCreditHighEur) || !M.isZeroText(a.special.foreignCreditHighEur)) lines.push("Foreign tax is credited at most with the Austrian tax on that income. On the normal scale that is the average rate (" + a.option.averageRatePercent + " %) times the foreign income.");
+      if (!M.isZeroText(a.option.foreignCreditHighEur) || !M.isZeroText(a.special.foreignCreditHighEur)) lines.push("Foreign tax is credited at most with the Austrian tax on that income. On the normal scale that is the average rate (" + a.option.averageRatePercent + " %" + (hasDeductions(r) ? ", the tax divided by the income before the deductions" : "") + ") times the foreign income.");
       if (!M.isZeroText(a.kestWithheldEur)) lines.push("KESt already withheld (" + fm(a.kestWithheldEur) + ") is credited either way and does not change the difference.");
       return el("div", { class: "stack" }, lines.map((t) => el("p", { class: "note", text: t })));
     }
@@ -17548,13 +18746,14 @@ const RegularUI = (function () {
     function breakEvenText(r) {
       const be = r.breakEven;
       const withCredits = r.creditsEntered ? "" : " (without tax credits)";
+      const income = hasDeductions(r) ? "other income before the deductions" : "other taxable income"; // the break-even is always in terms of what the field asks for
       const lowEnd = be.lowEnd;
       const highEnd = be.highEnd;
       if (lowEnd.state === "NEVER" && highEnd.state === "NEVER") return "Break-even: the normal scale is not cheaper at any other income" + withCredits + ". Even with none, the tax on this capital income would be higher than the special rate.";
       if (lowEnd.state === "ABOVE_LIMIT" && highEnd.state === "ABOVE_LIMIT") return "Break-even: the normal scale is cheaper at every other income up to " + euro0(Regular.SEARCH_LIMIT_EUR) + withCredits + ".";
       const say = (e) => (e.state === "FOUND" ? floorEuro(e.eur) : e.state === "NEVER" ? "nothing" : euro0(Regular.SEARCH_LIMIT_EUR));
-      if (be.same) return "Break-even: with these figures the normal scale is cheaper as long as your other taxable income is at or below about " + say(lowEnd) + withCredits + ". Above that the special rates are cheaper.";
-      return "Break-even: the normal scale is cheaper as long as your other taxable income is at or below about " + say(lowEnd) + " to " + say(highEnd) + withCredits + " (two readings of the foreign-tax credit). Above that the special rates are cheaper.";
+      if (be.same) return "Break-even: with these figures the normal scale is cheaper as long as your " + income + " is at or below about " + say(lowEnd) + withCredits + ". Above that the special rates are cheaper.";
+      return "Break-even: the normal scale is cheaper as long as your " + income + " is at or below about " + say(lowEnd) + " to " + say(highEnd) + withCredits + " (two readings of the foreign-tax credit). Above that the special rates are cheaper.";
     }
 
     function chart(r) {
@@ -17571,7 +18770,7 @@ const RegularUI = (function () {
         colorPos: "var(--c-gain)",
         colorNeg: "var(--c-more)",
         splitLegend: [{ name: "Normal scale cheaper", color: "var(--c-gain)" }, { name: "Special rates cheaper", color: "var(--c-more)" }],
-        ariaLabel: "What the normal tax scale saves or costs in " + r.year + ", for other taxable incomes from " + euro0(pts[0].otherEur) + " to " + euro0(pts[pts.length - 1].otherEur),
+        ariaLabel: "What the normal tax scale saves or costs in " + r.year + ", for other incomes from " + euro0(pts[0].otherEur) + " to " + euro0(pts[pts.length - 1].otherEur),
         height: 210,
         labelMax: false,
       });
@@ -17579,9 +18778,10 @@ const RegularUI = (function () {
       const table = ranged
         ? C.tableOf(["Other income", "Saving", "Saving (other reading)"], pts.map((p) => [euro0(p.otherEur), fm(p.savingLowEur, { plus: true }), fm(p.savingHighEur, { plus: true })]), "Saving of the normal scale by other taxable income")
         : C.tableOf(["Other income", "Saving"], pts.map((p) => [euro0(p.otherEur), fm(p.savingLowEur, { plus: true })]), "Saving of the normal scale by other taxable income");
-      const note = r.at ? "Your figure is " + euro0(r.at.otherEur) + "." : "Enter your other taxable income above to see where you are.";
+      const withDed = hasDeductions(r) ? " Other income is before the deductions; your deductions of " + fm(r.deductions.totalEur) + " are in every bar." : "";
+      const note = r.at ? "Your figure is " + euro0(r.at.otherEur) + "." : "Enter your other income above to see where you are.";
       return el("div", { class: "stack" },
-        el("p", { class: "note", text: "Green bars: the normal scale is cheaper at that other income. Red bars: the special rates are cheaper. " + note }),
+        el("p", { class: "note", text: "Green bars: the normal scale is cheaper at that other income. Red bars: the special rates are cheaper. " + note + withDed }),
         chartNode,
         fold({ class: "mini", "data-k": "reg-table:" + r.year }, isOpen("table:" + r.year), (v) => setOpen("table:" + r.year, v), "Show the numbers as a table", el("div", { class: "body" }, table)));
     }
@@ -17591,17 +18791,93 @@ const RegularUI = (function () {
       const bullets = [
         "All capital income taxed at a special rate goes into the normal scale together with your other income, or none of it does. You cannot pick single items.",
         "The income that goes in is the net taxable base of the 27.5 % income (after the losses of the year were set off) plus bank interest. The loss rules do not change with the option (§ 27 Abs 8 EStG): a loss is set against income at the special rate only, and an unused loss is not carried forward.",
-        "No expenses can be deducted from this income, with or without the option (§ 20 Abs 2 EStG).",
+        "No expenses can be deducted from this income, with or without the option (§ 20 Abs 2 EStG). Sonderausgaben and außergewöhnliche Belastungen are different: they are personal deductions from the sum of all incomes, not expenses of this income, and this page treats them that way (§ 2 Abs 2 EStG).",
+        "Deductions (Sonderausgaben, § 18 EStG; außergewöhnliche Belastungen, §§ 34 and 35 EStG) come off the sum of all incomes before the scale is applied. Income at the special rates is not part of that sum (§ 27a Abs 1 EStG), so with the special rates a deduction can only lower your other income; with the normal scale it lowers the capital income too. Einkommen cannot go below zero. No rule that carries an unused deduction to another year was found, so it is counted as lost. Ask your Steuerberater if a large part of your deductions is lost this way.",
+        "Tax advisor costs are Sonderausgaben (§ 18 Abs 1 Z 6 EStG) only if they were paid to an authorised person and are not business expenses or Werbungskosten; the cost of advice on investments or wealth does not count (Lohnsteuerrichtlinien 2002, Rz 561 to 564). This page takes the amounts as you type them and does not decide what is allowed or how large it may be.",
+        "A burden with a Selbstbehalt (§ 34 Abs 4 EStG) is worked out from your Einkommen, which is different with the two ways, so the amount you type is exact only for the way you filed. Flat amounts (Verordnung über außergewöhnliche Belastungen, BGBl. Nr. 303/1996) and the burdens of § 34 Abs 6 EStG have no Selbstbehalt.",
         "Tax credits (Absetzbeträge) are deducted from the tax on the normal scale, not from the 27.5 % tax (§ 33 Abs 2 EStG), and not below zero. That is why the option can make credits useful that would otherwise stay unused.",
         "Leave out credits that are paid out even when you owe no tax (Alleinverdiener- and Alleinerzieherabsetzbetrag, § 33 Abs 8 Z 1 EStG): they are the same with or without the option. Not covered here: the Kindermehrbetrag and the income limits that decide who can claim which credit. Ask your Steuerberater if you claim these.",
-        "Foreign tax is credited at most with the Austrian tax on that income. On the normal scale this page takes the average rate of your tax (tax before credits divided by total income) times the foreign income. That is an approximation; the Finanzamt may work it out slightly differently.",
+        "Foreign tax is credited at most with the Austrian tax on that income. On the normal scale this page takes the average rate of your tax (tax before credits divided by total income before deductions) times the foreign income. The law gives no formula for this, so it is an approximation; the Finanzamt may work it out slightly differently.",
         "The Finanzamt does not compare the two ways for you (there is no automatic Günstigkeitsvergleich); it applies the option only when you ask for it in the return. It rounds the final amount to whole euros; this page shows cents.",
       ];
       return fold({ class: "mini", "data-k": "reg-how:" + r.year }, isOpen("how"), (v) => setOpen("how", v), "How this is worked out, and what it does not cover", el("div", { class: "body" },
         el("ul", { class: "list" }, bullets.map((t) => listItem("info", t))),
         el("p", { class: "note", text: "Tax scale of " + r.year + " (§ 33 Abs 1 EStG; source: usp.gv.at, Tarifstufen):" }),
         C.tableOf(["From", "Up to", "Rate"], scaleRows, "Income tax scale " + r.year),
-        el("p", { class: "note", text: "Sources: § 27a Abs 1 and 5, § 27 Abs 8, § 20 Abs 2 and § 33 Abs 1, 2, 8 EStG 1988; the Ministry of Finance explanation of form E 1kv; the tax scales as published by the business service portal (usp.gv.at)." })));
+        el("p", { class: "note", text: "Sources: § 2 Abs 2, § 18 Abs 1 Z 6, § 20 Abs 2, § 27 Abs 8, § 27a Abs 1 and 5, § 33 Abs 1, 2, 8 and §§ 34, 35 EStG 1988; the Lohnsteuerrichtlinien 2002 (Rz 561 to 564, 834 to 843); the Ministry of Finance explanation of form E 1kv; the tax scales as published by the business service portal (usp.gv.at)." })));
+    }
+
+    // ------------------------------------------------------------ the deduction lines
+
+    /** Adds a line with the kind and description of a preset (and no amount yet). At most MAX_LINES lines are kept. */
+    function addLine(year, preset) {
+      edit(year, (e) => {
+        if (e.deductions.length < MAX_LINES) e.deductions.push({ kind: preset.kind, label: preset.label, amountEur: "" });
+      });
+    }
+
+    /**
+     * The deductions of one year: a small card per line (kind, description, amount, remove), buttons that add a line and the total. What is
+     * typed is kept as typed; a wrong amount is shown next to its field and stops the figures of the year (see Regular.compare).
+     */
+    function deductionsBlock(r, year, inputs, problemOf) {
+      const lines = inputs.deductions;
+      const rows = lines.map((l, i) => {
+        const k = year + ":" + i;
+        const change = (name) => (v) => edit(year, (e) => {
+          if (e.deductions[i]) e.deductions[i][name] = v;
+        });
+        return el("div", { class: "row-card ded-row", "data-k": "ded:" + k },
+          el("div", { class: "fields tight" },
+            selectField({ key: "reg-ded-kind:" + k, label: "Kind", value: l.kind, options: KINDS, error: problemOf("deductionKind:" + i), onCommit: change("kind") }),
+            field({ key: "reg-ded-label:" + k, label: "Description", value: l.label, placeholder: "for example Steuerberatungskosten", maxlength: 60, mono: false, inputmode: false, wide: false, onCommit: change("label") }),
+            field({ key: "reg-ded-amount:" + k, label: "Amount (€)", value: l.amountEur, placeholder: "for example 500", error: problemOf("deductionEur:" + i), wide: false, onCommit: change("amountEur") })),
+          el("div", { class: "btn-row" }, button("Remove this line", () => edit(year, (e) => { e.deductions.splice(i, 1); }), "small danger", "reg-ded-del:" + k)));
+      });
+      const full = lines.length >= MAX_LINES;
+      const total = !r.blocked && hasDeductions(r) ? el("p", { class: "note", "data-k": "reg-ded-total:" + year, text: "Deductions in " + year + " together: " + fm(r.deductions.totalEur) + "." }) : null;
+      const adders = full
+        ? el("p", { class: "note", text: "That is the most lines (" + MAX_LINES + "). Remove one to add another." })
+        : el("div", { class: "btn-row" }, PRESETS.map((p) => button("+ " + p.text, () => addLine(year, p), "small", "reg-ded-add:" + year + ":" + p.id)));
+      return el("div", { class: "stack", "data-k": "reg-ded:" + year },
+        el("h3", { text: "Deductions (optional)" }),
+        el("p", { class: "note", text: "Sonderausgaben and außergewöhnliche Belastungen as your income-tax notice shows them, for example tax advisor costs. They come off your income before the tax scale is applied. Amounts are taken as you type them; this page does not decide what is allowed." }),
+        rows.length ? el("div", { class: "rows" }, rows) : null,
+        total,
+        adders);
+    }
+
+    // ------------------------------------------------------------ how the return was filed
+
+    const WAY_TEXT = { SPECIAL: "the special rates", OPTION: "the normal scale" };
+
+    /**
+     * How the return of the year was filed (27.1): the normal scale, the special rates, or not sure. It decides which tax the Overview shows as
+     * paid; it changes nothing in the comparison below. Without an answer the Overview assumes a way from the year's own figures (Model.filedWay)
+     * and this block says so. Only a year with capital income gets it.
+     */
+    function filedBlock(summary, year, inputs) {
+      const y = summary && summary.years ? summary.years[year] : null;
+      if (!y) return null;
+      const probe = Regular.paid(y, {}, "SPECIAL");
+      if (!probe.ok || probe.state === "NOTHING") return null;
+      const fw = M.filedWay(y, inputs.filed);
+      const row = M.taxPaid(summary, [year], () => inputs).rows[0];
+      const name = "filed-" + year;
+      const pick = (v) => () => edit(year, (e) => { e.filed = v; });
+      const radio = (value, text) => el("label", {}, el("input", { type: "radio", name, value, checked: (inputs.filed || "") === value, "data-key": "reg-filed:" + year + ":" + (value || "none"), onchange: pick(value) }), el("span", { text }));
+      const said = fw.assumed
+        ? "Not said, so the Overview assumes " + WAY_TEXT[fw.way] + ": " + (fw.way === "OPTION" ? "no KESt was withheld for " + year + "." : "KESt was withheld for " + year + ".")
+        : "The Overview counts the tax of " + year + " as paid with " + WAY_TEXT[fw.way] + ".";
+      const result = row.missing
+        ? "Austrian tax for " + year + ": " + row.why + ". Paid abroad: " + fm(row.abroadEur) + "."
+        : "Tax paid for " + year + " this way: " + range(row.austriaLowEur, row.austriaHighEur) + " in Austria and " + fm(row.abroadEur) + " abroad.";
+      return el("div", { class: "stack", "data-k": "reg-filed:" + year },
+        el("h3", { text: "How did you file " + year + "?" }),
+        el("div", { class: "seg", role: "radiogroup", "aria-label": "How the return of " + year + " was filed" }, radio("OPTION", "Normal scale"), radio("SPECIAL", "Special rates"), radio("", "Not sure")),
+        el("p", { class: "note", "data-k": "reg-filed-said:" + year, text: said }),
+        el("p", { class: "note", "data-k": "reg-filed-result:" + year, text: result }),
+        el("p", { class: "note", text: "Special rates: 27.5 % (25 % on bank interest), whether a bank withheld it or you declared it. Normal scale: you asked the Finanzamt for it (Regelbesteuerungsoption). This only decides which tax the Overview shows as paid; the comparison below does not change." }));
     }
 
     // ------------------------------------------------------------ the card
@@ -17614,6 +18890,7 @@ const RegularUI = (function () {
       const kids = [head];
       if (!r.ok) {
         kids.push(el("p", { class: "note", text: r.text }));
+        kids.push(filedBlock(summary, year, inputs)); // the special rates need no scale: a year without one can still be said to be filed that way
         return el("section", { class: "card", "data-k": "regular:" + year }, kids);
       }
       kids.push(el("p", { class: "note", text: "You can ask the Finanzamt to tax all your capital income of " + year + " with the normal income-tax scale instead of 27.5 % (25 % on bank interest). The Finanzamt does not check for you which way is cheaper. This does." }));
@@ -17625,23 +18902,26 @@ const RegularUI = (function () {
         const p = r.problems.find((x) => x.field === name);
         return p ? p.text : "";
       };
+      kids.push(filedBlock(summary, year, inputs));
       kids.push(el("div", { class: "fields" },
-        field({ key: "reg-other:" + year, label: "Your other taxable income in " + year + " (€)", value: inputs.otherEur, placeholder: "for example 30000", error: problemOf("otherEur"), hint: "What your income-tax notice shows as “Einkommen”, without the capital income here. Enter 0 if there is none.", onCommit: (v) => setInput(year, "otherEur", v) }),
+        field({ key: "reg-other:" + year, label: "Your other income in " + year + ", before deductions (€)", value: inputs.otherEur, placeholder: "for example 30000", error: problemOf("otherEur"), hint: "Take the “Gesamtbetrag der Einkünfte” of your income-tax notice and leave out the capital income shown here. Not the “Einkommen”: that has the deductions taken off already. Enter 0 if there is no other income.", onCommit: (v) => setInput(year, "otherEur", v) }),
         field({ key: "reg-credits:" + year, label: "Tax credits you can use (€), optional", value: inputs.creditsEur, placeholder: "for example 2000", error: problemOf("creditsEur"), hint: "Credits that only reduce tax, such as the Familienbonus Plus (your share). Leave empty if unsure; see the notes at the bottom.", onCommit: (v) => setInput(year, "creditsEur", v) })));
+      kids.push(deductionsBlock(r, year, inputs, problemOf));
       if (r.at) {
         kids.push(verdictBanner(r, year));
         kids.push(compareBlocks(r));
         kids.push(facts(r));
       }
-      kids.push(el("p", { class: "note", text: breakEvenText(r) }));
-      kids.push(chart(r));
+      // while a deduction cannot be read the engine gives no break-even and no curve (r.blocked): only the message is shown
+      if (r.breakEven) kids.push(el("p", { class: "note", text: breakEvenText(r) }));
+      if (r.curve) kids.push(chart(r));
       if (r.notes.length) kids.push(el("ul", { class: "list" }, r.notes.map((n) => listItem(n.level === "warn" ? "warn" : "info", n.text))));
       kids.push(howItWorks(r));
       if (!host.mine()) kids.push(el("p", { class: "note", text: "Demo: what you type here is not saved." }));
       return el("section", { class: "card", "data-k": "regular:" + year }, kids);
     }
 
-    return { render, state: st };
+    return { render, state: st, inputsOf };
   }
 
   return { create };
@@ -18146,8 +19426,10 @@ const RegularUI = (function () {
 
   const dirClass = (s) => (M.num(s) > 0 ? "delta-up" : M.num(s) < 0 ? "delta-down" : "delta-flat");
 
+  /** A tile. `sub` is a line of text or a list of lines. */
   function kpi(label, value, sub, delta) {
-    return el("div", { class: "kpi" }, el("span", { class: "label", text: label }), el("span", { class: "value", text: value }), sub ? el("span", { class: "subline", text: sub }) : null, delta !== undefined && delta !== null ? el("span", { class: "subline " + dirClass(delta), text: fm(delta, { plus: true }) + " vs as filed" }) : null);
+    const subs = (Array.isArray(sub) ? sub : [sub]).filter(Boolean);
+    return el("div", { class: "kpi" }, el("span", { class: "label", text: label }), el("span", { class: "value", text: value }), subs.map((t) => el("span", { class: "subline", text: t })), delta !== undefined && delta !== null ? el("span", { class: "subline " + dirClass(delta), text: fm(delta, { plus: true }) + " vs as filed" }) : null);
   }
 
   // ---------------------------------------------------------------- empty and not-ready states (my data)
@@ -18189,6 +19471,19 @@ const RegularUI = (function () {
 
   // ---------------------------------------------------------------- Overview
 
+  // ---------------------------------------------------------------- Overview: the tax that was actually paid (27.1)
+  // The words come from the model (Model.austriaText and the others, with their own tests); the screen only places them.
+
+  /** The notes under the chart (what is missing, what rests on an assumption, two readings) with the button to the Tax tab, or nothing to say. */
+  function paidNotesFor(t) {
+    const items = M.paidNotes(t);
+    if (!items.length) return null;
+    const first = (t.missingYears.length ? t.missingYears : t.assumedYears)[0];
+    return el("div", { class: "stack", "data-k": "paid-notes" },
+      el("ul", { class: "list" }, items.map((x) => listItem(x.tone, x.text))),
+      first ? el("div", { class: "btn-row" }, btn("Open the Tax tab", () => { ui.year = first; savePrefs(); goTab("tax"); }, "small", "paid-open-tax")) : null);
+  }
+
   function renderOverview(root) {
     const v = cur();
     const f = R.filed;
@@ -18202,10 +19497,16 @@ const RegularUI = (function () {
 
     const row = v.byYear ? v.byYear[yr] : null;
     const held = v.pools.filter((p) => !M.isZeroText(p.qty)).map((p) => p.tax.total);
+    const cats = R.years;
+    // the tax that was actually paid (27.1): what was withheld abroad and the Austrian tax as the return was filed, for this view and, under a selection, for as filed
+    const inputsFor = (y) => regularUI.inputsOf(y);
+    const paidV = M.taxPaid(v.summary, cats, inputsFor);
+    const paidF = sel ? M.taxPaid(f.summary, cats, inputsFor) : paidV;
+    const paidYr = paidV.byYear[yr];
     root.appendChild(
       el("div", { class: "kpis" },
-        kpi("KESt, all years", fm(v.totals.kestBeforeCreditEur), "before foreign-tax credit", sel ? v.delta.totals.kestBeforeCreditEur : null),
-        kpi("KESt " + yr + " so far", row ? fm(row.kestBeforeCreditEur) : "–", row ? "on a base of " + fm(row.netBaseEur) : null, sel && row ? v.delta.byYear[yr].kestBeforeCreditEur : null),
+        kpi("Tax paid, all years", fm(paidV.totals.totalEur), M.paidTotalLines(paidV.totals), sel ? M.subMoney(paidV.totals.totalEur, paidF.totals.totalEur) : null),
+        kpi("Tax paid " + yr + " so far", row && paidYr ? fm(paidYr.totalEur) : "–", row && paidYr ? M.paidYearLines(paidYr) : null, sel && row && paidYr ? M.subMoney(paidYr.totalEur, paidF.byYear[yr].totalEur) : null),
         kpi("Realized result " + yr, row ? fm(row.realizedNetEur) : "–", "gains minus losses from sales", sel && row ? v.delta.byYear[yr].realizedNetEur : null),
         kpi("Tax cost of holdings", fm(M.sumMoney(held)), "what the average cost adds up to", sel ? v.delta.endingTaxCostEur : null)
       )
@@ -18214,11 +19515,25 @@ const RegularUI = (function () {
       root.appendChild(el("div", { class: "banner info" }, el("strong", { text: "Your selection is on" }), el("span", {}, "The figures above and the charts show: " + v.label + ". ", explainSpan(v)), el("div", {}, btn("Clear selection", () => setState((s) => Object.assign(s, M.defaultState(meta)))))));
     }
 
-    const cats = R.years;
-    const series = [{ id: "filed", name: "As filed", color: "var(--c-filed)", values: cats.map((y) => M.num(f.byYear[y].kestBeforeCreditEur)), texts: cats.map((y) => fm(f.byYear[y].kestBeforeCreditEur)) }];
-    if (R.selection) series.push({ id: "sel", name: R.selection.label, color: "var(--c-sel)", values: cats.map((y) => M.num(R.selection.byYear[y].kestBeforeCreditEur)), texts: cats.map((y) => fm(R.selection.byYear[y].kestBeforeCreditEur)) });
-    const kestChart = C.bars({ categories: cats, series, mode: "grouped", ariaLabel: "KESt per year" + (R.selection ? ", as filed and your selection" : ""), height: 230 });
-    const kestTable = C.tableOf(["Year"].concat(series.map((x) => x.name)), cats.map((y, i) => [y].concat(series.map((x) => x.texts[i]))), "KESt per year");
+    // Tax paid by year: the foreign tax withheld at the source at the baseline, the Austrian tax on top, KESt as a tick that can be switched on
+    const paidRows = cats.map((y) => paidV.byYear[y]);
+    const paidSeries = [
+      { id: "abroad", name: "Withheld abroad", color: "var(--c-abroad)", values: paidRows.map((r) => M.num(r.abroadEur)), texts: paidRows.map((r) => fm(r.abroadEur)) },
+      { id: "austria", name: "Austria", color: "var(--c-austria)", values: paidRows.map((r) => M.num(r.austriaEur)), texts: paidRows.map(M.austriaText) },
+    ];
+    const paidChart = C.bars({
+      categories: cats,
+      series: paidSeries,
+      mode: "stacked",
+      totalTexts: paidRows.map(M.paidTotalText),
+      labelTexts: paidRows.map((r) => fm(r.totalEur)),
+      markers: { name: "KESt", color: "var(--c-put)", values: paidRows.map((r) => M.num(r.kestEur)), texts: paidRows.map((r) => fm(r.kestEur)), key: "overview-kest-tick", defaultOn: false },
+      details: paidRows.map((r) => (r.way ? [["Filed with", M.wayText(r)]] : [])),
+      ariaLabel: "Tax paid per year: withheld abroad and Austrian tax" + (sel ? ", for your selection" : ""),
+      height: 230,
+    });
+    const paidTable = C.tableOf(["Year", "Filed with", "Withheld abroad", "Austria", "Total", "KESt before credit"], paidRows.map((r) => [r.year, M.wayText(r), fm(r.abroadEur), M.austriaText(r), M.paidTotalText(r), fm(r.kestEur)]), "Tax paid per year");
+    const paidNotes = paidNotesFor(paidV.totals);
 
     const comp = cats.map((y) => {
       const yy = v.summary.years[y];
@@ -18239,7 +19554,7 @@ const RegularUI = (function () {
     const holdTable = C.tableOf(["Security", "Tax cost"], hold.map((g) => [secName(g.isin), fm(g.taxCostText)]), "Tax cost by security");
 
     root.appendChild(el("div", { class: "grid2" },
-      chartCard("kest", "KESt by year", "27.5 % of the taxable base, before foreign-tax credit. Hover or tab to a year for the exact amounts.", kestChart, kestTable),
+      chartCard("paid", "Tax paid by year", "The tax withheld abroad at the source (amber) and the Austrian tax as your return was filed (blue). The KESt button adds a tick: the 27.5 % KESt on the same income, before foreign-tax credit. Hover or tab to a year for the exact amounts.", paidChart, paidTable, paidNotes),
       chartCard("comp", "What the taxable income is made of", "Positive items before losses are set off (see the Tax tab for the loss offset).", compChart, compTable),
       chartCard("hold", "Tax cost of what you hold", "The cost the tax uses (average cost, step-up and fund corrections), not today’s value.", holdChart, holdTable)
     ));
@@ -18559,7 +19874,10 @@ const RegularUI = (function () {
     // what selling everything would cost is worked out for the position as filed; a ticked selection has its own pools
     const asFiled = v === R.filed;
     if (!groups.length) root.appendChild(card("Holdings", null, el("p", { class: "note", text: "No open positions." })));
-    else if (asFiled) sellUI.render(root);
+    else if (asFiled) {
+      sellUI.render(root);
+      holdUI.render(root);
+    }
     else root.appendChild(el("p", { class: "note", "data-k": "sell-selection", text: "“If you sold everything today” is worked out for the position as filed. Choose “As filed” above to see it." }));
     for (const g of groups) {
       const inner = el("div", { class: "rows" });
@@ -18863,6 +20181,9 @@ const RegularUI = (function () {
     relocation: () => (base && base.settings ? base.settings.relocationDate : ""),
     refresh: () => render(),
   });
+
+  // "Your holdings in pictures" under that card (architecture section 27.6): drawn from the result of the card above. Read-only.
+  const holdUI = HoldCharts.create({ result: () => sellUI.result(), secName, secLabel: secShort, refresh: () => render() });
 
   async function init() {
     loadPrefs();
