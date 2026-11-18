@@ -301,10 +301,9 @@ details .body { padding-top: 8px; display: grid; gap: 10px; }
 .pie.has-on:not(.has-sel) .pie-legend li:not(.on) { opacity: 0.6; }
 .pie.has-sel .pie-legend li:not(.sel) { opacity: 0.6; }
 .pie.has-sel .pie-legend li.on:not(.sel) { opacity: 1; }
-/* a legend row that can be pressed (28.5): the button is the whole row; the box in front of it is ticked when the place is chosen (a dash: only some of the places of the grey slice) */
+/* a legend row that can be pressed (28.5): the button is the whole row; the row of a chosen place is bold (no box in front of it) */
 .pie-legend li.press { display: block; padding: 0; }
-.pie-legend .pl-btn { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto; align-items: center; gap: 4px 10px; width: 100%; min-height: 36px; padding: 6px 8px; border: 0; border-radius: 8px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.pie-legend .pl-btn.go { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+.pie-legend .pl-btn { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 4px 10px; width: 100%; min-height: 36px; padding: 6px 8px; border: 0; border-radius: 8px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .pie-legend .pl-btn .chev { color: var(--accent); font-weight: 400; margin-left: 8px; }
 .pie-legend .pl-btn:hover .pl-name { text-decoration: underline; text-underline-offset: 3px; }
 /* the bar "Looking at 2 of 7 securities" and the name that chooses a security in a table (28.5) */
@@ -313,11 +312,6 @@ details .body { padding-top: 8px; display: grid; gap: 10px; }
 button.pick-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 3px 0; margin: 0; border: 0; background: none; color: var(--fg); font: inherit; font-weight: 650; text-align: left; cursor: pointer; }
 button.pick-btn:hover .pb-name { text-decoration: underline; text-underline-offset: 3px; }
 .tbl tr.dim, .sec-list li.dim { opacity: 0.6; }
-.pl-box { box-sizing: border-box; display: inline-grid; place-items: center; width: 18px; height: 18px; border: 1.5px solid var(--muted); border-radius: 5px; font: 700 12px/1 var(--font-body); background: transparent; flex: none; }
-.pl-box.on { background: var(--fg); border-color: var(--fg); }
-.pl-box.on::after { content: "✓"; color: var(--accent-ink); }
-.pl-box.part { border-style: dashed; }
-.pl-box.part::after { content: "–"; color: var(--fg); }
 .pie-legend .pl-name { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
 .pie-legend .pl-share { color: var(--muted); font-family: var(--font-mono); font-size: 12px; text-align: right; white-space: nowrap; }
 .pie-legend .pl-val { font-family: var(--font-mono); font-size: 12.5px; text-align: right; white-space: nowrap; min-width: 8ch; }
@@ -394,7 +388,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
 footer { margin-top: 28px; color: var(--muted); font-size: 12px; display: grid; gap: 4px; max-width: 80ch; }
 
 /* the Data tab: a checklist of folds, each with a status */
-.stack { display: grid; gap: 8px; }
+.stack { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
 .steps { display: grid; gap: 10px; }
 details.step { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 0; }
 details.step > summary { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 4px 12px; align-items: center; padding: 12px 14px; min-height: 60px; cursor: pointer; }
@@ -449,7 +443,7 @@ button.pick-btn .pb-name { min-width: 0; overflow-wrap: anywhere; }
 .card-head.sub-head { margin-top: 6px; }
 .risk-controls { display: grid; gap: 10px; min-width: 0; }
 .sec-sub { display: flex; flex-wrap: wrap; gap: 2px 14px; color: var(--muted); font-size: 13px; }
-@media (min-width: 640px) { .sec-table { display: block; } .sec-list { display: none; } }
+@media (min-width: 640px) { .sec-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; } .sec-list { display: none; } }
 /* the choice of a view (where, what) and the places where a security or the whole portfolio is held: a name that is a button */
 .viewbar { display: grid; gap: 8px; min-width: 0; }
 .viewbar .fields.tight { flex: none; }
@@ -516,13 +510,31 @@ span.hc { cursor: default; }
 .hm-n5 { background-color: color-mix(in srgb, var(--c-more) 68%, var(--surface-2)); color: #fff; }
 /* a loss is also hatched, so it can be told from a gain without colour */
 .hm-n1, .hm-n2, .hm-n3, .hm-n4, .hm-n5 { background-image: repeating-linear-gradient(135deg, transparent 0 5px, rgba(11, 14, 20, 0.32) 5px 7px); }
-/* "Fund income against the price" (architecture 28.3): the share of the price taxed, five steps of the blue of Austrian tax over the card; white text from the third step (contrast at least 5.6:1) */
+/* "Fund income against the price" (architecture 28.3, the colours 29.4): six FIXED steps of the share of the price taxed, so that a share has the same colour in every year and every
+   fund. Under 3 % three calm blues (manageable), 3 to 10 % two lighter blues, 10 % and more orange (the outliers) with a ring and heavy type besides, so that it never rests on colour alone.
+   Checked on the dark card: neighbours differ by at least 15 (OKLab x 100) in normal sight and 13.8 under colour-blind simulation, text contrast at least 4.8:1. */
 .ft-0 { background-color: var(--surface-2); }
-.ft-1 { background-color: color-mix(in srgb, var(--c-austria) 14%, var(--surface-2)); }
-.ft-2 { background-color: color-mix(in srgb, var(--c-austria) 28%, var(--surface-2)); }
-.ft-3 { background-color: color-mix(in srgb, var(--c-austria) 42%, var(--surface-2)); color: #fff; }
-.ft-4 { background-color: color-mix(in srgb, var(--c-austria) 56%, var(--surface-2)); color: #fff; }
-.ft-5 { background-color: color-mix(in srgb, var(--c-austria) 70%, var(--surface-2)); color: #fff; }
+.ft-1 { background-color: #1B2B4D; color: var(--fg); }
+.ft-2 { background-color: #254C98; color: var(--fg); }
+.ft-3 { background-color: #4080DF; color: #0B1020; }
+.ft-4 { background-color: #7FB0EE; color: #0B1020; }
+.ft-5 { background-color: #C4DCFA; color: #0B1020; }
+.ft-6 { background-color: #FF8F3F; color: #0B1020; font-weight: 700; box-shadow: inset 0 0 0 2px #FFE3C7; }
+.hc.sel.ft-6 { box-shadow: inset 0 0 0 2px #FFE3C7, 0 0 0 2px var(--accent); }
+.hc.part.ft-3, .hc.part.ft-4, .hc.part.ft-5, .hc.part.ft-6 { outline-color: #0B1020; }
+.ftlegend { gap: 6px 14px; }
+.ftlegend .hl-item { display: inline-flex; align-items: center; gap: 6px; }
+/* "Fund income tax" on the Holdings tab (architecture 29.3, 29.4): the KESt of a security in a year, five steps of the blue of Austrian tax over the card (12, 29, 46, 63 and 80 %: the lightness steps are at least 0.06 apart in OKLCH; white text from the third step) */
+.fi-0 { background-color: var(--surface-2); color: var(--muted); }
+.fi-1 { background-color: color-mix(in srgb, var(--c-austria) 12%, var(--surface-2)); }
+.fi-2 { background-color: color-mix(in srgb, var(--c-austria) 29%, var(--surface-2)); }
+.fi-3 { background-color: color-mix(in srgb, var(--c-austria) 46%, var(--surface-2)); color: #fff; }
+.fi-4 { background-color: color-mix(in srgb, var(--c-austria) 63%, var(--surface-2)); color: #fff; }
+.fi-5 { background-color: color-mix(in srgb, var(--c-austria) 80%, var(--surface-2)); color: #fff; }
+.heat.fi td { min-width: 56px; }
+.heat.fi thead th:first-child, .heat.fi tbody th { white-space: normal; width: 200px; max-width: 200px; padding-right: 4px; overflow-wrap: anywhere; }
+.heat.fi tbody th { font-weight: 600; }
+.heat.fi tr.fi-sum th, .heat.fi tr.fi-sum td { border-top: 1px solid var(--line); padding-top: 4px; }
 .heat.ft td { min-width: 32px; }
 .heat.ft tbody th { white-space: normal; width: 92px; max-width: 92px; padding-right: 4px; }
 @media (min-width: 640px) { .heat.ft tbody th { width: 200px; max-width: 200px; } }
@@ -13980,16 +13992,147 @@ span.hc { cursor: default; }
   }
 
   /**
+   * A line as the points of its polyline taken along x, one every `step` pixels (4 when not given), the first and the last included: the same density for every line
+   * however many days it has, and a long stretch between two days is not empty (a box can cover a stretch of a line without covering a day). xs ascend (a
+   * place twice is allowed), ys are the pixel heights. Returns [[x, y], …]; no points give none, one point gives that point.
+   */
+  function lineSamples(xs, ys, step) {
+    const n = Math.min(xs.length, ys.length);
+    if (n === 0) return [];
+    if (n === 1) return [[xs[0], ys[0]]];
+    const st = step > 0 ? step : 4;
+    const x0 = xs[0], x1 = xs[n - 1];
+    const count = Math.max(1, Math.ceil((x1 - x0) / st));
+    const out = [];
+    let k = 0;
+    for (let j = 0; j <= count; j++) {
+      const px = j === count ? x1 : x0 + j * st;
+      while (k < n - 2 && xs[k + 1] <= px) k++;
+      const dx = xs[k + 1] - xs[k];
+      const t = dx > 0 ? Math.max(0, Math.min(1, (px - xs[k]) / dx)) : 0;
+      out.push([px, ys[k] + (ys[k + 1] - ys[k]) * t]);
+    }
+    return out;
+  }
+
+  /**
+   * The free room in the window above and under an element, in pixels, as { above, below }: above is counted from the bar of tabs that sticks to the top of the window
+   * (a box must not go under it), below from the bottom edge of the window; both keep a margin of a few pixels.
+   */
+  function roomAround(el) {
+    const doc = el.ownerDocument;
+    const win = doc.defaultView;
+    const rect = el.getBoundingClientRect();
+    const tabs = doc.querySelector(".tabs");
+    const edge = Math.max(8, (tabs ? tabs.getBoundingClientRect().bottom : 0) + 6);
+    return { above: rect.top - edge, below: win.innerHeight - rect.bottom - 8 };
+  }
+
+  /**
+   * Where the hover box of a line chart goes (architecture 29.1): in pixels from the top left corner of the chart (W x H), the box being tw x th big and about
+   * the point (x, y) (the line that is followed, on the day pointed at). Two cases.
+   *
+   * 1. A chart at least twice as wide as its box and the gap on both sides of it (W >= 2 x (tw + gap)) always has one side of the point where the box fits, at every day.
+   * The box takes one of six places round the point, always `gap` (12) away from it, so that it never covers the point: above it and to the left ("tl") or to the right ("tr"),
+   * under it ("bl", "br"), or beside it, centred on its height ("l", "r"). Every place is moved into the chart sideways; up and down it may also go out of the chart, above
+   * its top edge or under its bottom edge, as far as the free room in the window goes (`room`: { above, below }, see roomAround; none when it is not given), so that a box that
+   * is nearly as tall as the chart can ride above a line that is low in the chart. The place that costs least wins. A place costs the share of the line samples under
+   * the box, in per cent of all the samples of `lines` (arrays of [x, y]: the lines as drawn, in the same pixels, taken with lineSamples), plus 1 for 20 pixels that it
+   * has to be moved, 1 for 40 pixels that it sticks out of the chart, 4 when it is beside the point and 8 when it is under it (the box likes to be above the point, where a
+   * tooltip is looked for and a finger does not hide it), and a million when it covers the point itself (a place that covers it wins only when all of them do).
+   * A tie goes to `prev` (the place of a moment ago, so that the box does not jump from side to side while the pointer moves: it also keeps its place while it costs at most 6 more
+   * than the best one), then to the order above.
+   *
+   * 2. A narrower chart (a phone) has days where the box covers the point on both sides, and a box that is as wide as the chart hides most of every line. Its box goes out of it:
+   * above it ("oa") or under it ("ob"), 8 pixels from its edge, centred on the point and moved inside the chart sideways, when the free room in the window has the height of the
+   * box and the gap (above first; the side of a moment ago stays while it has the room). Without that room the six places of 1. are used.
+   *
+   * Returns { left, top, side }.
+   */
+  function tipSpot(o) {
+    const gap = o.gap === undefined ? 12 : o.gap;
+    const W = o.W, H = o.H, tw = o.tw, th = o.th, x = o.x, y = o.y;
+    const lines = Array.isArray(o.lines) ? o.lines : [];
+    const room = o.room && typeof o.room === "object" ? o.room : null;
+    const above = room ? Math.max(0, Number(room.above) || 0) : 0;
+    const below = room ? Math.max(0, Number(room.below) || 0) : 0;
+    const OUT_GAP = 8; // the distance of a box outside the chart from its edge
+    if (room && W < 2 * (tw + gap)) {
+      const outs = [];
+      if (above >= th + OUT_GAP) outs.push("oa");
+      if (below >= th + OUT_GAP) outs.push("ob");
+      if (outs.length) {
+        const side = o.prev && outs.includes(o.prev) ? o.prev : outs[0];
+        return { left: Math.max(0, Math.min(x - tw / 2, Math.max(0, W - tw))), top: side === "oa" ? -th - OUT_GAP : H + OUT_GAP, side };
+      }
+    }
+    const lo = -above || 0; // the highest the top of the box can be; its bottom can go as low as hi
+    const hi = H + below;
+    const STAY = 6; // how much more than the best place the place of a moment ago may cost and still be kept
+    const places = tipPlaces({ gap, W, H, tw, th, x, y, lines, lo, hi });
+    let best = places.order[0];
+    for (const side of places.order) if (places.cost[side] < places.cost[best]) best = side;
+    if (o.prev && places.cost[o.prev] !== undefined && places.cost[o.prev] <= places.cost[best] + STAY) best = o.prev;
+    return places.spot[best];
+  }
+
+  /**
+   * The six places of tipSpot with what each costs: { order, cost, spot } (cost[side] a number, spot[side] = { left, top, side }). o: { gap, W, H, tw, th, x, y, lines, lo, hi },
+   * lo and hi being the highest the top of the box and the lowest its bottom can be (in the chart: 0 and H).
+   */
+  function tipPlaces(o) {
+    const { gap, W, H, tw, th, x, y, lines, lo, hi } = o;
+    const raw = { tl: [x - gap - tw, y - gap - th], tr: [x + gap, y - gap - th], bl: [x - gap - tw, y + gap], br: [x + gap, y + gap], l: [x - gap - tw, y - th / 2], r: [x + gap, y - th / 2] };
+    const COVER = 9; // the halo of the marker
+    const LIKE = { tl: 0, tr: 0, l: 4, r: 4, bl: 8, br: 8 }; // the box likes to be above the point, where a tooltip is looked for and where a finger does not hide it
+    const total = lines.reduce((n, l) => n + l.length, 0);
+    const order = ["tl", "tr", "bl", "br", "l", "r"];
+    const cost = {};
+    const spot = {};
+    for (const side of order) {
+      const left = Math.max(0, Math.min(raw[side][0], Math.max(0, W - tw)));
+      const top = Math.max(lo, Math.min(raw[side][1], Math.max(lo, hi - th)));
+      let hits = 0;
+      for (const line of lines) for (const p of line) if (p[0] >= left && p[0] <= left + tw && p[1] >= top && p[1] <= top + th) hits++;
+      const covers = x >= left - COVER && x <= left + tw + COVER && y >= top - COVER && y <= top + th + COVER;
+      const out = Math.max(0, -top) + Math.max(0, top + th - H); // how far it sticks out of the chart
+      const moved = Math.abs(left - raw[side][0]) + Math.abs(top - raw[side][1]);
+      cost[side] = (total > 0 ? (100 * hits) / total : 0) + (covers ? 1000000 : 0) + moved / 20 + out / 40 + LIKE[side];
+      spot[side] = { left, top, side };
+    }
+    return { order, cost, spot };
+  }
+
+  /**
+   * Where the hover box of a ring goes (architecture 29.2): outside the ring, above or under it, so that it never covers a slice or the hole. ring: { W, H } (the
+   * box of the ring), tw and th the size of the box, x the middle of the slice pointed at (pixels from the left of the ring), upper whether that slice lies in the upper
+   * half, from "slice" or "row" (the legend, which can sit under the ring: its box goes above), room { above, below } the free pixels in the window above and under the
+   * ring, win { left, width } the ring's left edge in the window and the window's width. A slice in the upper half gets the box under the ring and one in the lower half above it;
+   * the other side when the first has no room for it and the other has, else the side with more room. It is centred on x and kept inside the window. Returns { left, top, side }.
+   */
+  function tipSpotRing(o) {
+    const gap = o.gap === undefined ? 8 : o.gap;
+    const need = o.th + gap;
+    const first = o.from === "row" ? "above" : o.upper ? "below" : "above";
+    const other = first === "above" ? "below" : "above";
+    const side = o.room[first] >= need ? first : o.room[other] >= need ? other : o.room.below >= o.room.above ? "below" : "above";
+    const w0 = o.win.left + o.x - o.tw / 2;
+    const w1 = Math.max(8, Math.min(w0, o.win.width - 8 - o.tw));
+    return { left: w1 - o.win.left, top: side === "below" ? o.ring.H + gap : -o.th - gap, side };
+  }
+
+  /**
    * Tooltip that follows keyboard focus and the pointer. Text only (textContent), never markup. Rows: { name, value, color?, kind? ("line", "band", "hatch" or "ghost":
    * the shape of the key), tone?, plain?, head? (a row that opens a new group: a line above it and its words in the main ink) }. The box sits at the top of the chart; a tall chart passes box ({ y0, y1 }: the vertical extent of the row it
    * describes, in pixels from the top of the chart) and the box then opens under that row when it fits in the chart there, else above the row when it
-   * fits there, else under the row anyway (running over what is below the chart): it never covers the row it describes (architecture 27.6).
+   * fits there, else under the row anyway (running over what is below the chart): it never covers the row it describes (architecture 27.6). A line chart and a ring pass
+   * `place(tw, th, W, H)` instead (architecture 29): it says where the box goes ({ left, top } in pixels from the top left corner of the chart; see tipSpot and tipSpotRing).
    */
   function makeTip(wrap) {
     const tip = h("div", { class: "tip", role: "status", hidden: "" });
     wrap.appendChild(tip);
     return {
-      show(title, rows, cx, box) {
+      show(title, rows, cx, box, place) {
         tip.textContent = "";
         tip.appendChild(h("div", { class: "tip-title", text: title }));
         for (const r of rows) {
@@ -14000,10 +14143,16 @@ span.hc { cursor: default; }
           tip.appendChild(line);
         }
         tip.hidden = false;
+        // a box that is placed by the caller keeps its own natural width (up to the style's maximum) wherever it goes, also out of a narrow container (a ring)
+        tip.style.width = typeof place === "function" ? "max-content" : "";
         const W = wrap.clientWidth;
         const tw = tip.offsetWidth;
         tip.style.left = Math.max(0, Math.min(W - tw, cx - tw / 2)) + "px";
-        if (box) {
+        if (typeof place === "function") {
+          const p = place(tw, tip.offsetHeight, W, wrap.clientHeight);
+          tip.style.left = Math.round(p.left) + "px";
+          tip.style.top = Math.round(p.top) + "px";
+        } else if (box) {
           // under the row when the box fits in the chart there, else above it when it fits there, else under it anyway (over what is below the chart):
           // the box never covers the row it describes
           const th = tip.offsetHeight;
@@ -14111,7 +14260,7 @@ span.hc { cursor: default; }
       // a label with a line break (a month with its year under it) needs a second line of room under the bars
       const twoLines = !!(opts.tickLabels && opts.tickLabels.some((t) => t && t.indexOf("\n") >= 0));
       const ml = 46, mr = 8, mt = 18, mb = twoLines ? 36 : 24;
-      const pw = W - ml - mr, ph = H - mt - mb;
+      const pw = Math.max(20, W - ml - mr), ph = H - mt - mb; // never narrower than 20: a box a few dozen pixels wide must not make a rectangle of negative width
       const svg = s("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": opts.ariaLabel || "Chart" });
       wrap.insertBefore(svg, wrap.firstChild);
       const defs = defsOf(svg, W, H);
@@ -14270,7 +14419,7 @@ span.hc { cursor: default; }
       const endText = opts.endLabel !== false && opts.texts ? opts.texts[cats.length - 1] : null;
       const ml = 46, mt = 18, mb = 24;
       const mr = endText ? Math.max(14, Math.round(endText.length * 7.2 + 8 - (W - ml - 14) / cats.length / 2)) : 14;
-      const pw = W - ml - mr, ph = H - mt - mb;
+      const pw = Math.max(20, W - ml - mr), ph = H - mt - mb; // never narrower than 20: a box a few dozen pixels wide must not make a rectangle of negative width
       const svg = s("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": opts.ariaLabel || "Chart" });
       wrap.insertBefore(svg, wrap.firstChild);
       const defs = defsOf(svg, W, H);
@@ -14526,7 +14675,7 @@ span.hc { cursor: default; }
       const pills = vis.length <= 4;
       const pillW = (i) => Math.round(endTexts[i].length * 6.8 + 22);
       const mr = pills ? Math.min(100, Math.max(14, Math.max.apply(null, vis.map(pillW)) + 12)) : 14;
-      const pw = W - ml - mr, ph = H - mt - mb;
+      const pw = Math.max(20, W - ml - mr), ph = H - mt - mb; // never narrower than 20: a box a few dozen pixels wide must not make a rectangle of negative width
       const svg = s("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H, role: "group", "aria-label": (opts.ariaLabel || "Chart") + ". Use the left and right arrow keys to read the values of each day." });
       wrap.insertBefore(svg, wrap.firstChild);
       const defs = defsOf(svg, W, H);
@@ -14652,6 +14801,16 @@ span.hc { cursor: default; }
         m.style.fill = x.color;
         return m;
       });
+      // where the hover box goes (architecture 29.1): next to the line that is followed (the first one shown, or opts.follow), on the side that covers the least of the lines; outside the chart (above or under it, where the window has room) when the chart is too small for its box
+      let linePts = null;
+      let side = "";
+      const place = (tw, th, Wd, Hd) => {
+        if (!linePts) linePts = vis.map((i) => lineSamples(xs, pos[i].map((v) => y(v)), 4));
+        const f = opts.follow !== undefined && vis.includes(opts.follow) ? opts.follow : vis[0];
+        const p = tipSpot({ W: Wd, H: Hd, tw, th, x: xs[current], y: y(pos[f][current]), lines: linePts, prev: side, room: roomAround(wrap) });
+        side = p.side;
+        return p;
+      };
       const show = (k) => {
         current = Math.max(0, Math.min(n - 1, k));
         cross.setAttribute("x1", xs[current]);
@@ -14666,7 +14825,7 @@ span.hc { cursor: default; }
           }
         }
         const rows = vis.map((i) => ({ name: series[i].tipName || series[i].name, color: colorAt(i, current), kind: series[i].kind, value: series[i].texts && series[i].texts[current] ? series[i].texts[current] : fmt(series[i].values[current]) }));
-        tipper.show((opts.dateText || String)(days[current]), rows.concat(plainRows(opts.rows ? opts.rows(current) : null)), xs[current]);
+        tipper.show((opts.dateText || String)(days[current]), rows.concat(plainRows(opts.rows ? opts.rows(current) : null)), xs[current], null, vis.length ? place : undefined);
       };
       const hide = () => {
         cross.style.display = "none";
@@ -14994,7 +15153,7 @@ span.hc { cursor: default; }
    *   ariaLabel
    *   select: { id, toggle(keys, item), on?, pressable(item)?, keyOf(item)?, label(item)?, hole? }  makes the slices pressable (architecture 28.5):
    *     toggle gets the places the slice stands for. With `on` (the keys of the places chosen now) a press is a choice that stays: the slice is outlined
-   *     and its legend row has a ticked box, the others fade, `hole` { label, text, sub } is what the hole says while something is chosen and nothing is
+   *     and the others fade (no box to tick: the name is the button, aria-pressed says the state), `hole` { label, text, sub } is what the hole says while something is chosen and nothing is
    *     pointed at, and the legend rows are toggle buttons (aria-pressed, "mixed" when only some of the places of a grey slice are chosen). Without `on`
    *     a press goes somewhere (the page draws something else): plain buttons. pressable(item): false for a slice that cannot be pressed (default true);
    *     keyOf(item): the data-key of its legend button (default id:key); label(item): the accessible name of the button, the text of the row when absent.
@@ -15080,8 +15239,6 @@ span.hc { cursor: default; }
         if (keeps) {
           btn.setAttribute("tabindex", "-1"); // the slice is the stop of the keyboard
           btn.setAttribute("aria-pressed", mine === "all" ? "true" : mine === "some" ? "mixed" : "false");
-          // the tick is drawn by the style sheet (a text of "✓" would be read with the name)
-          cells.unshift(h("span", { class: "pl-box" + (mine === "all" ? " on" : mine === "some" ? " part" : ""), "aria-hidden": "true" }));
         } else name.appendChild(h("span", { class: "chev", "aria-hidden": "true", text: "›" }));
         for (const c of cells) btn.appendChild(c);
         row = h("li", { "data-slice": it.key, class: "press" + (mine !== "none" ? " sel" : "") }, [btn]);
@@ -15108,7 +15265,7 @@ span.hc { cursor: default; }
       tipper.hide();
       idle();
     }
-    function on(key) {
+    function on(key, via) {
       const p = parts.get(key);
       if (!p || active === key) return;
       off();
@@ -15123,7 +15280,14 @@ span.hc { cursor: default; }
       say(p.it.label, p.it.text, p.it.share ? p.it.share + " of the total" : "");
       const w = ring.clientWidth || SIZE;
       const cx = (C + ((R + r) / 2) * Math.sin(p.mid)) * (w / SIZE);
-      tipper.show(p.title, [{ name: p.it.tip || "Value", color: p.it.color, value: p.it.text }].concat(p.more), cx);
+      // outside the ring, so that no slice and not the hole is covered (architecture 29.2): under it for a slice in the upper half, above it for one in the lower half
+      // and for a press on the legend (which can sit under the ring); the sticky tabs at the top are not part of the room above
+      const upper = Math.cos(p.mid) > 0;
+      const place = (tw, th, Wd, Hd) => {
+        const win = ring.ownerDocument.defaultView;
+        return tipSpotRing({ ring: { W: Wd, H: Hd }, tw, th, x: cx, upper, from: via, room: roomAround(ring), win: { left: ring.getBoundingClientRect().left, width: win.innerWidth } });
+      };
+      tipper.show(p.title, [{ name: p.it.tip || "Value", color: p.it.color, value: p.it.text }].concat(p.more), cx, null, place);
     }
     /** A press on a slice or on its legend row: the page is drawn again (this figure is replaced) and the place on the screen and, after the keyboard, the focus are kept. via: "slice" or "row" when the press came from the keyboard, else null. */
     function press(key, via) {
@@ -15147,13 +15311,13 @@ span.hc { cursor: default; }
       }
     }
     for (const [key, p] of parts) {
-      for (const node of [p.path, p.row]) {
-        node.addEventListener("mouseenter", () => on(key));
+      for (const [node, via] of [[p.path, "slice"], [p.row, "row"]]) {
+        node.addEventListener("mouseenter", () => on(key, via));
         node.addEventListener("mouseleave", off);
       }
-      p.path.addEventListener("focus", () => on(key));
+      p.path.addEventListener("focus", () => on(key, "slice"));
       p.path.addEventListener("blur", off);
-      p.row.addEventListener("focusin", () => on(key));
+      p.row.addEventListener("focusin", () => on(key, "row"));
       p.row.addEventListener("focusout", off);
       if (p.press) {
         p.path.addEventListener("click", () => press(key, null));
@@ -15209,7 +15373,7 @@ span.hc { cursor: default; }
     return h("div", { class: "tbl-wrap" }, [t]);
   }
 
-  return { niceScale, niceScaleFree, timeTicks, nearestIndex, barPath, hBarPath, compactEuro, bandPaths, splitLinePaths, fadeShapes, nonZeroRuns, pieSlices, donutPath, pieFold, pieChosen, pieToggle, bars, line, timeLines, hbars, stackRuns, sbars, pie, tableOf, legend, constants: { MAX_BAR, RADIUS, GAP, PIE_HUES } };
+  return { niceScale, niceScaleFree, timeTicks, nearestIndex, barPath, hBarPath, compactEuro, bandPaths, splitLinePaths, fadeShapes, nonZeroRuns, pieSlices, donutPath, pieFold, pieChosen, pieToggle, lineSamples, roomAround, tipSpot, tipPlaces, tipSpotRing, bars, line, timeLines, hbars, stackRuns, sbars, pie, tableOf, legend, constants: { MAX_BAR, RADIUS, GAP, PIE_HUES } };
 });
 
 /* ---- src/app/hold-view.js ---- */
@@ -15219,7 +15383,7 @@ span.hc { cursor: default; }
  * It takes the result of Liquidate.compute (the card "If you sold everything today", section 26) and decides what each picture shows:
  *   value  "What you hold": a ring, one slice for each security by its value today.
  *   after  "After tax": one bar for each security, split into the tax cost, the gain that is left after tax and the tax on selling.
- *   fund   "Fund income tax": bars by year, the KESt on the fund income (agE) of each year, split by security.
+ *   fund   "Fund income tax": the KESt on the fund income (agE) of each year: a bar for each year (the total) and a grid with a row for each security (architecture 29.3).
  * and, for each, the table that carries the same figures (the table twin).
  *
  * Securities chosen in the ring (architecture 28.5): build(res, { all }) takes the result for the chosen securities as `res` (it has `only`) and the result
@@ -15383,7 +15547,11 @@ span.hc { cursor: default; }
       note: "The tax of each bar is the tax on that security alone. When " + (some ? "these are" : "everything is") + " sold together, a loss in one security offsets a gain in another, so the tax on all of it can be lower than the bars add up to: the card above has the figure for the year (Extra tax).",
     };
 
-    // ---- fund income tax: the KESt on the fund income (agE) of each year, by security
+    // ---- fund income tax: the KESt on the fund income (agE) of each year, for every security one by one (architecture 29.3)
+    // One row for each security that has a history of fund income (also one that is not held any more or has no price: it is in the history of fund income only),
+    // the biggest total first, one column for each year from the first to the last and a total; a cell is tinted by its amount in five steps of the biggest cell.
+    // There is no "Other": a colour cannot tell more than a handful of securities apart, so the security is told by its name in its row, and the grid never gets wider
+    // than the years it has. Above it one bar for each year with the total of that year.
     const hist = res.prepaid && res.prepaid.byIsin ? res.prepaid.byIsin : {};
     const years = new Set();
     for (const isin of Object.keys(hist)) for (const y of hist[isin].years) if (/^\d{4}$/.test(String(y.year))) years.add(Number(y.year));
@@ -15398,33 +15566,51 @@ span.hc { cursor: default; }
         const r = h ? h.years.find((q) => String(q.year) === y) : null;
         return r ? { age: dec(r.ageEur), kest: dec(r.kestEur) } : { age: Z, kest: Z };
       };
-      // the series: the securities that have a colour, in the order of their colours, then the grey one of the rest (also the securities that are
-      // not held any more or have no price: they are in the history of fund income only)
-      const coloured = Array.from(slotOf.entries()).filter(([isin]) => hist[isin]).sort((a, b) => a[1] - b[1]).map(([isin]) => isin);
-      const rest = Object.keys(hist).filter((isin) => !slotOf.has(isin)).sort((a, b) => byText(short(a).toLowerCase(), short(b).toLowerCase()) || byText(a, b));
-      const series = coloured.map((isin) => ({ id: isin, name: short(isin), color: colorOf(isin), isins: [isin] }));
-      if (rest.length === 1) series.push({ id: rest[0], name: short(rest[0]), color: hue(-1), isins: rest });
-      else if (rest.length > 1) series.push({ id: "other", name: "Other (" + rest.length + ")", color: hue(-1), isins: rest });
-      const amount = (s, y) => s.isins.reduce((a, isin) => Dec.add(a, cell(isin, y).kest), Z);
-      const income = (s, y) => s.isins.reduce((a, isin) => Dec.add(a, cell(isin, y).age), Z);
       const dash = (d) => (Dec.isZero(d) ? "–" : fm(text(d)));
-      const sums = cats.map((y) => series.reduce((a, s) => Dec.add(a, amount(s, y)), Z));
-      const incomes = cats.map((y) => series.reduce((a, s) => Dec.add(a, income(s, y)), Z));
-      const grand = sums.reduce((a, d) => Dec.add(a, d), Z);
-      const negative = series.some((s) => cats.some((y) => Dec.isNeg(amount(s, y)) && !Dec.isZero(amount(s, y))));
-      const other = series.find((s) => s.id === "other");
+      const rows = Object.keys(hist)
+        .filter((isin) => hist[isin].years.some((q) => /^\d{4}$/.test(String(q.year))))
+        .map((isin) => {
+          const kest = cats.map((y) => cell(isin, y).kest);
+          const age = cats.map((y) => cell(isin, y).age);
+          return { isin, kest, age, total: kest.reduce((s, d) => Dec.add(s, d), Z) };
+        });
+      rows.sort((p, q) => num(text(q.total)) - num(text(p.total)) || byText(short(p.isin).toLowerCase(), short(q.isin).toLowerCase()) || byText(p.isin, q.isin));
+      const sums = cats.map((y, i) => rows.reduce((s, r) => Dec.add(s, r.kest[i]), Z));
+      const incomes = cats.map((y, i) => rows.reduce((s, r) => Dec.add(s, r.age[i]), Z));
+      const grand = sums.reduce((s, d) => Dec.add(s, d), Z);
+      const negative = rows.some((r) => r.kest.some((d) => Dec.isNeg(d) && !Dec.isZero(d)));
+      // the tint: five steps of the biggest cell, worked on whole cents (a cell of nothing, or less, is not tinted; a cell of exactly a fifth is the first step)
+      const cents = (d) => Math.round(num(text(d)) * 100);
+      const big = rows.reduce((m, r) => r.kest.reduce((n, d) => Math.max(n, cents(d)), m), 0);
+      const step = (d) => (cents(d) > 0 && big > 0 ? Math.min(5, Math.max(1, Math.ceil((5 * cents(d)) / big))) : 0);
       v.fund = {
         categories: cats,
-        series: series.map((s) => ({ id: s.id, name: s.name, color: s.color, values: cats.map((y) => num(text(amount(s, y)))), texts: cats.map((y) => dash(amount(s, y))) })),
-        totalTexts: sums.map((d) => dash(d)),
-        details: cats.map((y, i) => [["Fund income (agE)", dash(incomes[i])]].concat(other ? other.isins.filter((isin) => !Dec.isZero(cell(isin, y).kest)).map((isin) => ["in " + other.name + ": " + short(isin), fm(text(cell(isin, y).kest))]) : [])),
+        total: { values: sums.map((d) => num(text(d))), texts: sums.map((d) => dash(d)), grandText: dash(grand) },
+        details: cats.map((y, i) => [["Fund income (agE)", dash(incomes[i])], ["Securities with fund income", String(rows.filter((r) => !Dec.isZero(r.kest[i])).length)]]),
+        rows: rows.map((r) => ({
+          id: r.isin,
+          name: full(r.isin),
+          label: short(r.isin),
+          totalText: dash(r.total),
+          totalSay: short(r.isin) + ", all years: " + (Dec.isZero(r.total) ? "no KESt on fund income" : "KESt " + fm(text(r.total))),
+          totalTip: { t: short(r.isin) + ", all years", r: [["KESt on fund income", fm(text(r.total))], ["Fund income (agE)", fm(text(r.age.reduce((s, d) => Dec.add(s, d), Z)))]] },
+          cells: cats.map((y, i) => ({
+            year: y,
+            text: dash(r.kest[i]),
+            cls: "fi-" + step(r.kest[i]),
+            say: short(r.isin) + ", " + y + ": " + (Dec.isZero(r.kest[i]) ? "no fund income counted" : "KESt " + fm(text(r.kest[i]))),
+            tip: Dec.isZero(r.kest[i]) && Dec.isZero(r.age[i]) ? { t: short(r.isin) + ", " + y, r: [["Fund income (agE)", "none counted"]] } : { t: short(r.isin) + ", " + y, r: [["KESt on fund income", fm(text(r.kest[i]))], ["Fund income (agE)", fm(text(r.age[i]))]] },
+          })),
+        })),
+        totalRow: { label: "All securities", totalText: dash(grand), totalSay: "All securities, all years: " + (Dec.isZero(grand) ? "no KESt on fund income" : "KESt " + fm(text(grand))), totalTip: { t: "All securities, all years", r: [["KESt on fund income", fm(text(grand))], ["Fund income (agE)", fm(text(incomes.reduce((s, d) => Dec.add(s, d), Z)))]] }, cells: cats.map((y, i) => ({ year: y, text: dash(sums[i]), say: "All securities, " + y + ": " + (Dec.isZero(sums[i]) ? "no KESt on fund income" : "KESt " + fm(text(sums[i]))), tip: { t: "All securities, " + y, r: [["KESt on fund income", fm(text(sums[i]))], ["Fund income (agE)", fm(text(incomes[i]))]] } })) },
+        legend: { from: fm(text(Z)), to: fm(Dec.str(Dec.mk(BigInt(big), 2), DP)), steps: [1, 2, 3, 4, 5].map((k) => ({ cls: "fi-" + k, text: "up to " + fm(Dec.str(Dec.mk(BigInt(Math.round((big * k) / 5)), 2), DP)) })) },
         twin: {
-          cols: ["Year"].concat(series.map((s) => s.name), ["Total"]),
-          main: series.length + 1,
-          rows: cats.map((y, i) => ({ key: y, cells: [y].concat(series.map((s) => dash(amount(s, y))), [dash(sums[i])]) })),
-          total: ["All years"].concat(series.map((s) => dash(cats.reduce((a, y) => Dec.add(a, amount(s, y)), Z))), [dash(grand)]),
+          cols: ["Security"].concat(cats, ["Total"]),
+          main: cats.length + 1,
+          rows: rows.map((r) => ({ key: r.isin, cells: [short(r.isin)].concat(cats.map((y, i) => dash(r.kest[i])), [dash(r.total)]) })),
+          total: ["All securities"].concat(sums.map((d) => dash(d)), [dash(grand)]),
         },
-        note: "KESt" + rate + " on the fund income (agE) that the OeKB reported for each year, before the foreign-tax credit and before the loss offset of that year. It is what the fund income cost in tax, not what was paid: the Overview has what was paid." + (negative ? " A year with a negative figure is in the table and is not drawn." : ""),
+        note: "KESt" + rate + " on the fund income (agE) that the OeKB reported for each year, before the foreign-tax credit and before the loss offset of that year. It is what the fund income cost in tax, not what was paid: the Overview has what was paid. In the grid the darker a cell, the more tax: five steps up to the biggest cell." + (negative ? " A year with a negative figure is in the table and is not tinted." : ""),
       };
     }
 
@@ -15472,8 +15658,10 @@ span.hc { cursor: default; }
   const MAX_GAP = 15; // no two closes of the window are further apart than this many days
   const MAX_RATE_LAG = 14; // the ECB rate of a day may be this many days old
   const CHANGE_LAG = 10; // a year-end close may be this many days before the year end
-  const SCALE_STEPS = [0.5, 1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 30, 50]; // the scale of the grid ends at the first of these that holds the largest share (in %)
-  const CLASSES = 5;
+  // The grid is tinted in six FIXED steps (architecture 29.4), so that the same share always has the same colour, whatever the other cells are: under 1 %, 1 to 2, 2 to 3
+  // (the calm blues: manageable), 3 to 5, 5 to 10 (the lighter blues) and 10 % and more (orange, the outliers). A step starts at its lower limit; the share is the one the cell shows
+  // (rounded to one decimal), so a cell that reads 10.0 is in the last step.
+  const THRESHOLDS = [1, 2, 3, 5, 10];
 
   const isObj = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
   const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -15730,18 +15918,16 @@ span.hc { cursor: default; }
   /** The text of a cell of the grid: the share with one decimal, a minus sign for a negative one (never "-0.0"). */
   const cellText = (x) => (x <= -0.05 ? "−" : "") + Math.abs(x <= -0.05 ? x : Math.max(0, x)).toFixed(1);
 
-  /** The scale of the grid: the top of it (in %) and five steps. Shares at or below zero have no tint. */
-  function scaleOf(maxPct) {
-    const top = SCALE_STEPS.find((s) => s >= maxPct) || SCALE_STEPS[SCALE_STEPS.length - 1];
-    const w = top / CLASSES;
-    const steps = [];
-    for (let k = 1; k <= CLASSES; k++) steps.push({ cls: "ft-" + k, from: w * (k - 1), to: w * k });
-    return { top, width: w, steps };
-  }
-  /** The class of a share: ft-1 .. ft-5 by the steps of the scale, "ft-0" for zero or below, the last step for anything above the top. */
-  function classOf(sharePct, scale) {
+  /** The words of the six steps (the legend): "under 1 %", "1 to 2 %", ..., "10 % and more". */
+  const STEP_TEXT = ["under 1 %", "1 to 2 %", "2 to 3 %", "3 to 5 %", "5 to 10 %", "10 % and more"];
+  /** The class of a share (in %): ft-1 .. ft-6 by the fixed steps, "ft-0" for a share that shows as zero or below. The share is first rounded as the cell shows it. */
+  function classOf(sharePct) {
     if (!(sharePct > 0)) return "ft-0";
-    return "ft-" + Math.min(CLASSES, Math.floor(sharePct / scale.width) + 1);
+    const shown = Number(sharePct.toFixed(1));
+    if (!(shown > 0)) return "ft-0";
+    let k = 1;
+    for (const t of THRESHOLDS) if (shown >= t) k++;
+    return "ft-" + k;
   }
 
   /**
@@ -15756,17 +15942,11 @@ span.hc { cursor: default; }
     const c = ctx || {};
     const nameOf = typeof c.nameOf === "function" ? c.nameOf : (x) => x;
     const labelOf = typeof c.labelOf === "function" ? c.labelOf : nameOf;
-    const out = { version: VERSION, ok: !!(data && data.ok), years: [], scale: null, legend: [], rows: [], left: [], note: "", twin: () => null };
+    const out = { version: VERSION, ok: !!(data && data.ok), years: [], thresholds: THRESHOLDS.slice(), legend: STEP_TEXT.map((text, k) => ({ cls: "ft-" + (k + 1), text })), rows: [], left: [], note: "", twin: () => null };
     out.left = (data && data.left ? data.left : []).map((l) => ({ isin: l.isin, name: nameOf(l.isin), reason: l.reason, text: l.text }));
     const funds = data && data.ok ? data.funds.filter((f) => f.figures > 0) : [];
     if (!funds.length) return out;
     out.years = data.years;
-    let maxShare = 0;
-    for (const f of funds) for (const y of data.years) if (f.cells[y].state === "OK" && f.cells[y].sharePct > maxShare) maxShare = f.cells[y].sharePct;
-    const scale = scaleOf(maxShare);
-    out.scale = scale;
-    const fmtTop = (x) => (Number.isInteger(x * 10) ? x.toFixed(Number.isInteger(x) ? 0 : 1) : x.toFixed(2));
-    out.legend = scale.steps.map((s) => ({ cls: s.cls, text: fmtTop(s.from) + " to " + fmtTop(s.to) + " %" }));
     const cellTip = (f, cell) => {
       const t = labelOf(f.isin) + ", " + cell.year + (cell.partial ? " (so far)" : "");
       if (cell.state === "NONE") return { t, n: cell.text };
@@ -15788,7 +15968,7 @@ span.hc { cursor: default; }
       cells: data.years.map((y) => {
         const cell = f.cells[y];
         const ok = cell.state === "OK";
-        return { year: y, state: cell.state, text: ok ? cellText(cell.sharePct) : "–", cls: ok ? classOf(cell.sharePct, scale) : "ft-none", partial: cell.partial, tip: cellTip(f, cell) };
+        return { year: y, state: cell.state, text: ok ? cellText(cell.sharePct) : "–", cls: ok ? classOf(cell.sharePct) : "ft-none", partial: cell.partial, tip: cellTip(f, cell) };
       }),
     }));
     const rate = c.rateText ? " At the KESt rate of " + c.rateText + " a share of 1 % costs " + (Number.parseFloat(c.rateText) * 0.01).toFixed(3).replace(/0+$/, "").replace(/\.$/, "") + " % of the price." : "";
@@ -15828,7 +16008,7 @@ span.hc { cursor: default; }
     return out;
   }
 
-  return { VERSION, MIN_CLOSES, MIN_CLOSES_PARTIAL, START_BY, END_WITHIN, MAX_GAP, MAX_RATE_LAG, CHANGE_LAG, SCALE_STEPS, symbolsFor, series, yearFigures, compute, scaleOf, classOf, view };
+  return { VERSION, MIN_CLOSES, MIN_CLOSES_PARTIAL, START_BY, END_WITHIN, MAX_GAP, MAX_RATE_LAG, CHANGE_LAG, THRESHOLDS, STEP_TEXT, symbolsFor, series, yearFigures, compute, classOf, view };
 });
 
 /* ---- src/app/persist.js ---- */
@@ -20337,7 +20517,7 @@ const SellUI = (function () {
  * One card under "If you sold everything today", three pictures of the same position as filed, one at a time (a switch above them):
  *   What you hold      a ring of the value of each security (the pie of section 27.3)
  *   After tax          one bar for each security: tax cost, gain left after tax, tax on selling
- *   Fund income tax    bars by year: the KESt on the fund income (agE) of each year, split by security
+ *   Fund income tax    a bar for each year (the KESt on the fund income, agE, of that year) and a grid with a row for each security (architecture 29.3)
  * Each has its table (from 640 px) or list (below), with every figure of the picture.
  *
  * Securities chosen in the ring (architecture 28.5): a press on a slice, on its row in the legend or on its name in the table chooses that security (the
@@ -20372,25 +20552,26 @@ const HoldCharts = (function () {
   }
   const barText = (n, of) => "Looking at " + n + " of " + of + (of === 1 ? " security" : " securities");
 
-  /** A name that can be pressed to choose its security: a box that is ticked when it is chosen, and the name. */
+  /** A name that can be pressed to choose its security (aria-pressed says whether it is chosen; there is no box to tick). */
   function pickName(isin, label, on, toggle) {
     return el("button", { type: "button", class: "pick-btn", "aria-pressed": String(on), "data-key": "hold-pick:" + isin, onclick: () => toggle([isin]) },
-      el("span", { class: "pl-box" + (on ? " on" : ""), "aria-hidden": "true" }), el("span", { class: "pb-name sec-name", text: label }));
+      el("span", { class: "pb-name sec-name", text: label }));
   }
 
   /**
    * The table of a picture and, for a phone, the same rows as a list (the pair the Performance tab uses). t: { cols, main, rows: [{ key, cells }], total }.
    * In the list a row is its name and its main figure on one line and the other figures under them (a figure that is "–" is left out).
    * pick (the ring only): { on: [ISINs chosen], active, toggle(keys) }: the name of each row is a button that chooses its security; with active (a choice
-   * that takes effect) the rows that are not chosen are dimmed; t.chosenRow, when there is one, follows the total.
+   * that takes effect) the rows that are not chosen are dimmed; t.chosenRow, when there is one, follows the total. custom: a table of its own (the grid of the fund income
+   * tax) in place of the plain one; the list under 640 px is the same.
    */
-  function twin(t, caption, pick) {
+  function twin(t, caption, pick, custom) {
     const on = new Set(pick ? pick.on : []);
     const dim = (r) => !!pick && pick.active && !on.has(r.key);
     const head = (r, text) => (pick && r.key !== undefined && r.pressable !== false ? pickName(r.key, text, on.has(r.key), pick.toggle) : null);
     const rows = t.rows.map((r) => ({ cells: pick ? [{ node: head(r, r.cells[0]) }].concat(r.cells.slice(1)) : r.cells, cls: dim(r) ? "dim" : "" }));
     const total = [{ cells: t.total, cls: "strong" }].concat(t.chosenRow ? [{ cells: t.chosenRow, cls: "strong" }] : []);
-    const table = C.tableOf(t.cols, rows.concat(total), caption);
+    const table = custom || C.tableOf(t.cols, rows.concat(total), caption);
     const line = (key, cells, cls, r) =>
       el("li", { class: cls || false, "data-k": "hold-li:" + key },
         el("div", { class: "sec-top" }, (r && head(r, cells[0])) || el("strong", { class: "sec-name", text: cells[0] }), el("span", { class: "num sec-value", text: cells[t.main] })),
@@ -20446,13 +20627,34 @@ const HoldCharts = (function () {
       ];
     }
 
+    /**
+     * The grid of the fund income tax (architecture 29.3): a row for each security (every one, never an "Other"), a column for each year and a total, each cell tinted by its
+     * amount and with a hover box (the keyboard reaches every cell), and under it the five steps of the tint. It is the table of this picture from 640 px; below that the list is.
+     */
+    function fundGrid(f, label) {
+      const span = (cls, say, tip, text) => el("span", { class: "hc " + cls, tabindex: "0", "aria-label": say, "data-tip": Tip.attr(tip) || false, text });
+      const head = el("tr", {}, [el("th", { scope: "col", text: "Security" })].concat(f.categories.map((y) => el("th", { scope: "col", text: y })), [el("th", { scope: "col", text: "Total" })]));
+      const rowOf = (th, cells, total, extra) => el("tr", extra || {}, [th].concat(cells.map((c) => el("td", {}, span("hc-cell " + (c.cls || "tot"), c.say, c.tip, c.text))), [el("td", {}, span("tot", total.say, total.tip, total.text))]));
+      const body = f.rows.map((r) =>
+        rowOf(el("th", { scope: "row", title: r.name, text: r.label }), r.cells, { say: r.totalSay, tip: r.totalTip, text: r.totalText }, { "data-k": "fi-row:" + r.id }));
+      body.push(rowOf(el("th", { scope: "row", text: f.totalRow.label }), f.totalRow.cells, { say: f.totalRow.totalSay, tip: f.totalRow.totalTip, text: f.totalRow.totalText }, { class: "fi-sum", "data-k": "fi-row:sum" }));
+      const legend = el("div", { class: "hlegend", "aria-hidden": "true" }, [el("span", { text: f.legend.from })]
+        .concat(f.legend.steps.map((l) => el("span", { class: "hsw " + l.cls, title: l.text })))
+        .concat([el("span", { text: f.legend.to })]));
+      return el("div", { class: "heat-box" },
+        el("div", { class: "heat-wrap" }, el("table", { class: "heat fi", "aria-label": label }, el("thead", {}, head), el("tbody", {}, body))),
+        legend);
+    }
+
+    const FUND_TWIN = "KESt on fund income, by security and year"; // the name of the grid and of the list that says the same on a phone
     function fundBody(v) {
       const f = v.fund;
       return [
         el("h3", { text: v.chosen ? "KESt on fund income, by year, the chosen securities" : "KESt on fund income, by year" }),
-        C.bars({ categories: f.categories, series: f.series, mode: "stacked", legend: true, totalTexts: f.totalTexts, details: f.details, height: 240, ariaLabel: "KESt on the fund income of each year, split by security, as bars" }),
+        C.bars({ categories: f.categories, series: [{ id: "total", name: "KESt on fund income", color: "var(--c-austria)", values: f.total.values, texts: f.total.texts }], mode: "grouped", labelMax: true, details: f.details, height: 200, ariaLabel: "KESt on the fund income of each year, as bars" }),
         el("p", { class: "note", text: f.note }),
-        twin(f.twin, "KESt on fund income, by year"),
+        el("h3", { text: "By security and year" }),
+        twin(f.twin, FUND_TWIN, null, el("div", { class: "fi-box" }, fundGrid(f, FUND_TWIN))),
       ];
     }
 
@@ -20586,12 +20788,11 @@ const FundTaxUI = (function () {
         });
         return el("tr", { class: on ? "sel" : false, "data-k": "ft-row:" + row.isin }, [name].concat(cells));
       });
-      const legend = el("div", { class: "hlegend", "aria-hidden": "true" }, [el("span", { text: "0 %" })]
-        .concat(v.legend.map((l) => el("span", { class: "hsw " + l.cls, title: l.text })))
-        .concat([el("span", { text: v.legend[v.legend.length - 1].text.split(" to ")[1] })]));
+      // the six fixed steps, each with its words (a colour is never the only sign: the cells show the number, and the last step has a ring and heavy type)
+      const legend = el("div", { class: "hlegend ftlegend", "aria-hidden": "true" }, v.legend.map((l) => el("span", { class: "hl-item" }, el("span", { class: "hsw " + l.cls }), el("span", { class: "hl-text", text: l.text }))));
       return el("div", { class: "heat-box" },
         el("div", { class: "heat-wrap" }, el("table", { class: "heat ft", "aria-label": "Share of the price taxed as fund income, by fund and year" }, el("thead", {}, head), el("tbody", {}, body))),
-        el("div", { class: "hfoot" }, legend, el("span", { class: "note", text: "Percent of the average price of the year; “–” is a year without a figure. Click a cell or a name to choose the fund below. Dashed outline: the year so far." })));
+        el("div", { class: "hfoot" }, legend, el("span", { class: "note", text: "Percent of the average price of the year; “–” is a year without a figure. The colours are fixed, so a share has the same colour in every year and every fund: calm blues under 3 %, orange from 10 %. Click a cell or a name to choose the fund below. Dashed outline: the year so far." })));
     }
 
     function fundBlock(t) {
