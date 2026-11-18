@@ -111,6 +111,7 @@ main { display: grid; gap: 16px; padding-top: 16px; }
 .card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
 .card-head .sub { color: var(--muted); font-size: 13px; }
 .note { color: var(--muted); font-size: 13px; max-width: 78ch; }
+.chart-note { margin: 8px 0 0; }
 .banner { border: 1px solid rgba(246, 194, 91, 0.35); background: var(--warn-bg); border-radius: 12px; padding: 12px 14px; font-size: 14px; display: grid; gap: 4px; }
 .banner strong { color: var(--warn); }
 .banner.info { border-color: rgba(134, 182, 255, 0.35); background: var(--info-bg); }
@@ -133,7 +134,8 @@ main { display: grid; gap: 16px; padding-top: 16px; }
 .chip span { color: var(--fg); }
 
 .kpis { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (min-width: 860px) { .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 860px) { .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } .kpis.five { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+@media (min-width: 700px) and (max-width: 859px) { .kpis.five > .kpi:last-child:nth-child(odd) { grid-column: 1 / -1; } }
 @media (max-width: 359px) { .kpis { grid-template-columns: minmax(0, 1fr); } }
 @media (min-width: 700px) { .kpis.six { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 699px) { .kpis > .kpi:last-child:nth-child(odd) { grid-column: 1 / -1; } }
@@ -260,9 +262,7 @@ details .body { padding-top: 8px; display: grid; gap: 10px; }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
 .swatch.ln { width: 16px; height: 4px; border-radius: 2px; }
 .swatch.bd { width: 16px; height: 11px; border-radius: 2px; }
-.swatch.tk { width: 16px; height: 4px; border-radius: 1px; box-shadow: 0 0 0 1px var(--surface); }
-.mk { stroke-width: 2.5; stroke-linecap: round; pointer-events: none; }
-.mk-ring { stroke: var(--surface); stroke-width: 5.5; stroke-linecap: round; pointer-events: none; }
+.swatch.hatch { background-image: repeating-linear-gradient(135deg, var(--sw) 0 2px, transparent 2px 4px) !important; background-color: transparent !important; box-shadow: inset 0 0 0 1px var(--sw); }
 .swatch.dash { background-image: repeating-linear-gradient(90deg, transparent 0 3px, var(--bg) 3px 5px) !important; }
 /* a piece that is not there but shown (27.6: the loss below the cost): a dashed outline, in the legend and on the bar */
 .swatch.gh { box-sizing: border-box; width: 14px; height: 10px; background: transparent !important; border: 1.5px dashed var(--sw, var(--muted)); }
@@ -312,6 +312,8 @@ details .body { padding-top: 8px; display: grid; gap: 10px; }
 .tip-row { display: flex; align-items: center; gap: 8px; }
 .tip-row.plain { gap: 14px; }
 .tip-row:not(.plain) + .tip-row.plain { margin-top: 5px; padding-top: 6px; border-top: 1px solid var(--line); }
+.tip-row.head { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+.tip-row.head .tip-name { color: var(--fg); font-weight: 600; }
 .tip-name { color: var(--muted); flex: 1 1 auto; }
 .tip-val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12px; text-align: right; white-space: nowrap; flex: none; }
 .tip-val.pos { color: var(--ok); }
@@ -484,6 +486,20 @@ span.hc { cursor: default; }
 .hm-n5 { background-color: color-mix(in srgb, var(--c-more) 68%, var(--surface-2)); color: #fff; }
 /* a loss is also hatched, so it can be told from a gain without colour */
 .hm-n1, .hm-n2, .hm-n3, .hm-n4, .hm-n5 { background-image: repeating-linear-gradient(135deg, transparent 0 5px, rgba(11, 14, 20, 0.32) 5px 7px); }
+/* "Fund income against the price" (architecture 28.3): the share of the price taxed, five steps of the blue of Austrian tax over the card; white text from the third step (contrast at least 5.6:1) */
+.ft-0 { background-color: var(--surface-2); }
+.ft-1 { background-color: color-mix(in srgb, var(--c-austria) 14%, var(--surface-2)); }
+.ft-2 { background-color: color-mix(in srgb, var(--c-austria) 28%, var(--surface-2)); }
+.ft-3 { background-color: color-mix(in srgb, var(--c-austria) 42%, var(--surface-2)); color: #fff; }
+.ft-4 { background-color: color-mix(in srgb, var(--c-austria) 56%, var(--surface-2)); color: #fff; }
+.ft-5 { background-color: color-mix(in srgb, var(--c-austria) 70%, var(--surface-2)); color: #fff; }
+.heat.ft td { min-width: 32px; }
+.heat.ft tbody th { white-space: normal; width: 92px; max-width: 92px; padding-right: 4px; }
+@media (min-width: 640px) { .heat.ft tbody th { width: 200px; max-width: 200px; } }
+.ft-name { display: block; width: 100%; padding: 4px 2px; border: 0; background: transparent; color: var(--fg); font: inherit; line-height: 1.25; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.ft-name:hover { text-decoration: underline; }
+.ft-name.on { color: var(--accent); font-weight: 700; }
+.ft-name:focus-visible, .hc:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .hfoot { display: grid; gap: 6px; }
 .hlegend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
 .hlegend > span:first-child { margin-right: 4px; }
@@ -10062,9 +10078,11 @@ span.hc { cursor: default; }
    * @param summary    a TaxYear summary (one view: as filed, or a selection)
    * @param years      the years to list, in order (a year the summary does not have has no investment income: a row of zeros)
    * @param inputsFor  year -> { otherEur, creditsEur, deductions, filed } as typed on the Tax tab (an empty object when nothing was typed)
+   * @param forceWay   optional "SPECIAL": work every year out as if it had been filed with the special rates (the comparison of section 28.1: what
+   *                   they would have cost). The answer is then not an assumption, and nothing typed on the Tax tab is read (the special rates need no figures).
    * @returns { rows, byYear, totals: { abroadEur, austriaEur, austriaLowEur, totalEur, totalLowEur, kestEur, range, missingYears, missingBy, assumedYears, rangeYears } }
    */
-  function taxPaid(summary, years, inputsFor) {
+  function taxPaid(summary, years, inputsFor, forceWay) {
     const rows = [];
     for (const year of years) {
       const y = summary && summary.years ? summary.years[year] : null;
@@ -10073,7 +10091,7 @@ span.hc { cursor: default; }
         continue;
       }
       const typed = (inputsFor && inputsFor(year)) || {};
-      const fw = filedWay(y, typed.filed);
+      const fw = forceWay === "SPECIAL" ? { way: "SPECIAL", assumed: false } : filedWay(y, typed.filed);
       const r = Regular.paid(y, typed, fw.way);
       const known = r.ok && r.austriaLowEur !== null;
       const abroad = r.abroadEur || "0.00";
@@ -10170,6 +10188,104 @@ span.hc { cursor: default; }
     return items;
   }
 
+  /**
+   * The tax actually paid against the tax if every year had been filed with the special rates (27.5 % and 25 %), year by year and in total
+   * (section 28.1). Both sides are taxPaid results for the same years; `special` is taxPaid(..., "SPECIAL"). The figure of a row is the higher
+   * reading when the foreign-tax credit has two (as in the bars), on both sides. difference = special - filed: above zero the special rates
+   * would have cost more. What was withheld abroad is the same on both sides, so the difference is the difference of the Austrian parts.
+   * A year whose Austrian part is missing as filed (the normal scale without the other income, an unreadable figure, no scale built in) cannot be
+   * compared, because its filed total holds the foreign part only: it is listed in notComparable, has no difference and is not in the totals.
+   * A year with nothing paid on either side is comparable but not counted in totals.years (it says nothing).
+   * @returns { rows: [{ year, way, filedEur, specialEur, differenceEur (null when not comparable), comparable, range }],
+   *            totals: { filedEur, specialEur, differenceEur, years }, notComparable: [year] }
+   */
+  function paidCompare(filed, special) {
+    const rows = [];
+    const notComparable = [];
+    for (const f of (filed && filed.rows) || []) {
+      const sp = special && special.byYear ? special.byYear[f.year] : null;
+      const comparable = !!sp && !f.missing && !sp.missing;
+      if (!comparable) notComparable.push(f.year);
+      rows.push({
+        year: f.year,
+        way: f.way,
+        filedEur: f.totalEur,
+        specialEur: sp ? sp.totalEur : "0.00",
+        differenceEur: comparable ? subMoney(sp.totalEur, f.totalEur) : null,
+        comparable,
+        range: !!f.range || !!(sp && sp.range),
+      });
+    }
+    const used = rows.filter((r) => r.comparable);
+    const counted = used.filter((r) => !isZeroText(r.filedEur) || !isZeroText(r.specialEur));
+    const totals = { filedEur: sumMoney(used.map((r) => r.filedEur)), specialEur: sumMoney(used.map((r) => r.specialEur)), years: counted.length };
+    totals.differenceEur = subMoney(totals.specialEur, totals.filedEur);
+    return { rows, totals, notComparable };
+  }
+
+  /** "€12.00 more", "€12.00 less" or "the same" for a difference (special - filed) as money text; "–" when it is not money. */
+  function moreLessText(diff) {
+    const d = typeof diff === "string" ? Dec.parse(diff) : null;
+    if (!d) return "–";
+    if (Dec.isZero(d)) return "the same";
+    return fmtMoney(Dec.str(Dec.isNeg(d) ? Dec.neg(d) : d, 2)) + (Dec.isNeg(d) ? " less" : " more");
+  }
+
+  /**
+   * The words of one year of the comparison, for the tooltip and the table: a row of paidCompare and the special-rates row of taxPaid for that year.
+   * @returns { same, comparable, austria, total, difference }
+   */
+  function paidCompareYear(c, sp) {
+    if (!c || !sp) return { same: false, comparable: false, austria: "–", total: "–", difference: "–" };
+    const same = c.comparable && isZeroText(c.differenceEur);
+    return {
+      same,
+      comparable: c.comparable,
+      austria: austriaText(sp),
+      total: paidTotalText(sp),
+      difference: !c.comparable ? "needs your figures" : same ? "the same" : moreLessText(c.differenceEur),
+    };
+  }
+
+  /** The sentence under the chart while the comparison is on: what the special rates would have cost over the years that can be compared. */
+  function paidCompareText(c) {
+    const left = c && c.notComparable && c.notComparable.length ? " " + yearsText(c.notComparable) + (c.notComparable.length === 1 ? " is" : " are") + " left out: no Austrian figure as filed." : "";
+    if (!c || !c.totals || c.totals.years === 0) return "Nothing to compare yet." + left;
+    const t = c.totals;
+    const span = t.years === 1 ? "the one year" : "the " + t.years + " years";
+    if (isZeroText(t.differenceEur)) return "In " + span + " that can be compared the special rates would have cost what you paid: " + fmtMoney(t.filedEur) + "." + left;
+    return "In " + span + " that can be compared you paid " + fmtMoney(t.filedEur) + "; with the special rates it would have been " + fmtMoney(t.specialEur) + ", " + moreLessText(t.differenceEur) + "." + left;
+  }
+
+  // ---------------------------------------------------------------- the words of the prepaid tax (28.2)
+  // The figures come from prepaid.js (with its own tests and an independent reference); the words are made here, as for the tax paid above.
+
+  /** "0.275" -> "27.5 %" (exact); "" when it is not a rate. */
+  function rateText(rate) {
+    const r = typeof rate === "string" ? Dec.parse(rate) : null;
+    return r ? Dec.str(Dec.normalize(Dec.mul(r, Dec.mk(100n, 0)))) + " %" : "";
+  }
+
+  /** True when the data holds no fund income at all (no agE ever reported and nothing waiting in the units): there is nothing to draw. */
+  function prepaidEmpty(p) {
+    return !p || !p.ok || (isZeroText(p.totals.ageEur) && isZeroText(p.totals.stillInCostEur));
+  }
+
+  /** The lines under the tile "Prepaid in your funds": what is waiting in the units held, and what the fund income cost over all the years. */
+  function prepaidLines(p) {
+    if (prepaidEmpty(p)) return ["no fund income (agE) in your data yet"];
+    const t = p.totals;
+    return [
+      isZeroText(t.stillInCostEur) ? "nothing taxed is waiting in the units you hold" : rateText(p.rate) + " of " + fmtMoney(t.stillInCostEur) + " of already-taxed gains still in your units",
+      "all years: " + fmtMoney(t.kestEur) + " on " + fmtMoney(t.ageEur) + " of fund income",
+    ];
+  }
+
+  /** The rows under the values of one year in the tooltip of the prepaid chart: [label, text]. */
+  function prepaidYearRows(y) {
+    return [["Fund income of the year (agE)", fmtMoney(y.ageEur)], ["Already-taxed gains in your units", fmtMoney(y.stillInCostEur)]];
+  }
+
   /** Estimated amount still to pay: low and high end (the foreign-tax credit is a range until the matching rule is settled). */
   function dueText(y) {
     if (!y) return { low: "0.00", high: "0.00", exact: true };
@@ -10262,6 +10378,14 @@ span.hc { cursor: default; }
     paidTotalLines,
     paidYearLines,
     paidNotes,
+    paidCompare,
+    paidCompareYear,
+    paidCompareText,
+    moreLessText,
+    rateText,
+    prepaidEmpty,
+    prepaidLines,
+    prepaidYearRows,
     dueText,
     holdings,
     history,
@@ -10269,6 +10393,156 @@ span.hc { cursor: default; }
     explainParts,
     explain,
   };
+});
+
+/* ---- src/app/prepaid.js ---- */
+/*
+ * Prepaid: the tax on fund income (agE) that was paid in advance, year by year (architecture section 28.2).
+ *
+ * The OeKB reports the deemed distributed income of an accumulating fund (agE). It is taxed in the year of the report, and the cost correction
+ * that comes with it raises the tax cost of the units, so the same income is not taxed a second time when the units are sold. Until then the
+ * tax is "prepaid": it sits in the units that are still held. This module answers two questions from the run of the tax engine, with no
+ * prices needed:
+ *   - how much tax did the fund income of each year cost (the KESt rate times the agE of the year), and
+ *   - how much of the tax on gains that are still unrealised is already paid: the KESt rate times the cost corrections that are still in the
+ *     tax cost of the units held, at the end of each year and at the end of the data.
+ *
+ * It is the same measure as the card "If you sold everything today" (architecture 26) and the Holdings pictures (27.6): the KESt rate times the
+ * agE (rounded once per security and year, as hold-view does) and times the cost corrections of each open pool (rounded once per pool, as
+ * liquidate.js does). A test holds this module to those figures. It is a measure at the KESt rate, not what the return was assessed at: the
+ * Overview says what was paid.
+ *
+ * Exact decimals only (the amounts are tax figures). Pure functions, no clock, no storage. Runs in Node (tests) and in a browser page.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("../lib/decimal.js"));
+  else root.Prepaid = factory(root.Dec);
+})(typeof self !== "undefined" ? self : this, function (Dec) {
+  "use strict";
+
+  const VERSION = "prepaid-0.1.0";
+  const DP = 2;
+  const Z = Dec.mk(0n, DP);
+  const M = (d) => Dec.str(d, DP);
+  const isObj = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
+  const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  const isYear = (y) => /^\d{4}$/.test(String(y));
+
+  /**
+   * engine: the result of one run of the tax engine (settings.kestRate, incomeLines, log). years: the years to report, as texts, in order
+   * (the Overview hands in the years of the tax summary); without it the years from the first fund income to the last row of the log.
+   * Returns { ok, rate, years: [{ year, ageEur, kestEur, stillInCostEur, stillKestEur, pools }], totals: { ageEur, kestEur, stillInCostEur, stillKestEur },
+   *           byIsin: { isin: { years: [{ year, ageEur, kestEur }] } } }
+   *   ageEur / kestEur: the fund income taxed in the year, and the KESt rate times it (per security and year, then added up);
+   *   stillInCostEur / stillKestEur: the cost corrections in the tax cost of the units held at the end of the year (the last row of the log
+   *     on or before 31 December of it), and the KESt rate times them (per open pool); `pools` is how many pools hold units then;
+   *   totals: the fund income and its tax over all the years, and the still-in-cost figures at the end of the data (what is in the units today).
+   * ok is false (and every figure empty) when the engine result cannot be read; an engine without fund income gives zeros.
+   */
+  function compute(engine, years) {
+    const out = { version: VERSION, ok: false, rate: null, years: [], totals: { ageEur: M(Z), kestEur: M(Z), stillInCostEur: M(Z), stillKestEur: M(Z) }, byIsin: {} };
+    if (!isObj(engine) || !isObj(engine.settings)) return out;
+    const rate = Dec.parse(engine.settings.kestRate);
+    if (!rate) return out;
+    const lines = Array.isArray(engine.incomeLines) ? engine.incomeLines : [];
+    const log = Array.isArray(engine.log) ? engine.log : [];
+    out.rate = engine.settings.kestRate;
+
+    // agE per security and year, as the engine's income lines say (taxable ones only: a report before the arrival date is not taxed)
+    const cell = new Map(); // isin -> Map(year -> agE)
+    for (const l of lines) {
+      if (!isObj(l) || l.kind !== "AGE" || l.taxable !== true || typeof l.isin !== "string" || !isYear(l.year)) continue;
+      const amount = Dec.parse(l.grossEur);
+      if (!amount) continue;
+      const perYear = cell.get(l.isin) || new Map();
+      perYear.set(String(l.year), Dec.add(perYear.get(String(l.year)) || Z, amount));
+      cell.set(l.isin, perYear);
+    }
+
+    // the years to report
+    let list;
+    if (Array.isArray(years) && years.length) list = years.map(String).filter(isYear);
+    else {
+      let lo = null;
+      let hi = null;
+      const see = (y) => {
+        const n = Number(y);
+        if (lo === null || n < lo) lo = n;
+        if (hi === null || n > hi) hi = n;
+      };
+      for (const m of cell.values()) for (const y of m.keys()) see(y);
+      for (const l of log) if (isObj(l) && typeof l.date === "string" && isYear(l.date.slice(0, 4))) see(l.date.slice(0, 4));
+      list = [];
+      if (lo !== null) for (let y = lo; y <= hi; y++) list.push(String(y));
+    }
+
+    // per security and year: the KESt on the agE, rounded once (the way the Holdings tab and the sell card do it)
+    const kestOf = new Map(); // year -> { age, kest }
+    for (const isin of Array.from(cell.keys()).sort(cmpStr)) {
+      const years2 = [];
+      for (const y of Array.from(cell.get(isin).keys()).sort(cmpStr)) {
+        const age = cell.get(isin).get(y);
+        const k = Dec.mulRound(rate, age, DP);
+        years2.push({ year: y, ageEur: M(age), kestEur: M(k) });
+        const t = kestOf.get(y) || { age: Z, kest: Z };
+        t.age = Dec.add(t.age, age);
+        t.kest = Dec.add(t.kest, k);
+        kestOf.set(y, t);
+      }
+      out.byIsin[isin] = { years: years2 };
+    }
+
+    // the pools of the log: the last row on or before a date
+    const byPool = new Map(); // "depot|isin" -> [{ date, qty, akk }] in the order of the log
+    for (const l of log) {
+      if (!isObj(l) || typeof l.date !== "string" || !isObj(l.after)) continue;
+      const key = String(l.depot) + "|" + String(l.isin);
+      if (!byPool.has(key)) byPool.set(key, []);
+      byPool.get(key).push({ date: l.date, qty: l.after.qty, akk: l.after.akk });
+    }
+    const stillAt = (date) => {
+      let akk = Z;
+      let kest = Z;
+      let pools = 0;
+      for (const rows of byPool.values()) {
+        let last = null;
+        for (const r of rows) {
+          if (r.date <= date) last = r;
+          else break;
+        }
+        if (!last) continue;
+        const q = Dec.parse(last.qty);
+        const a = Dec.parse(last.akk);
+        if (!q || !a || Dec.isZero(q) || Dec.isNeg(q)) continue;
+        akk = Dec.add(akk, a);
+        kest = Dec.add(kest, Dec.mulRound(rate, a, DP));
+        pools++;
+      }
+      return { akk, kest, pools };
+    };
+
+    let tAge = Z;
+    let tKest = Z;
+    for (const y of list) {
+      const k = kestOf.get(y) || { age: Z, kest: Z };
+      const s = stillAt(y + "-12-31");
+      out.years.push({ year: y, ageEur: M(k.age), kestEur: M(k.kest), stillInCostEur: M(s.akk), stillKestEur: M(s.kest), pools: s.pools });
+      tAge = Dec.add(tAge, k.age);
+      tKest = Dec.add(tKest, k.kest);
+    }
+    // fund income of a year that is not in the list still counts in the totals (the list is only what is drawn)
+    for (const [y, k] of kestOf) {
+      if (list.indexOf(y) >= 0) continue;
+      tAge = Dec.add(tAge, k.age);
+      tKest = Dec.add(tKest, k.kest);
+    }
+    const today = stillAt("9999-12-31"); // the units held at the end of the data, whatever years are listed
+    out.totals = { ageEur: M(tAge), kestEur: M(tKest), stillInCostEur: M(today.akk), stillKestEur: M(today.kest), pools: today.pools };
+    out.ok = true;
+    return out;
+  }
+
+  return { VERSION, compute };
 });
 
 /* ---- src/perf/perf.js ---- */
@@ -12866,16 +13140,6 @@ span.hc { cursor: default; }
     return { min, max, step, ticks };
   }
 
-  /** The range { lo, hi } widened to take in extra values (the ticks of a bar chart); a value that is not a finite number is ignored. */
-  function widenRange(lo, hi, values) {
-    for (const v of values || []) {
-      if (typeof v !== "number" || !isFinite(v)) continue;
-      lo = Math.min(lo, v);
-      hi = Math.max(hi, v);
-    }
-    return { lo, hi };
-  }
-
   /** Path of a vertical bar from the baseline yb to the data end yt; rounded at the data end only. */
   function barPath(x, w, yb, yt, r) {
     const h = Math.abs(yt - yb);
@@ -13061,16 +13325,24 @@ span.hc { cursor: default; }
         }
         return "url(#" + gid + ")";
       },
+      /** A hatched fill of one colour: diagonal stripes of the colour over a faint tint of it (the hatched side of a pair of bars, architecture 28.1). Returns url(#id). */
+      hatch(color) {
+        const pid = id + "-h" + ++n;
+        const p = s("pattern", { id: pid, patternUnits: "userSpaceOnUse", width: 6, height: 6, patternTransform: "rotate(45)" }, defs);
+        s("rect", { x: 0, y: 0, width: 6, height: 6 }, p).style.cssText = "fill:" + color + ";fill-opacity:0.26";
+        s("rect", { x: 0, y: 0, width: 2.4, height: 6 }, p).style.fill = color;
+        return "url(#" + pid + ")";
+      },
     };
   }
 
   /**
    * The key of a series in a legend or a tooltip: a short line for a line (kind "line"), a line with a shading that fades away under it for a
-   * band (kind "band"), a short thick tick for the tick of a bar (kind "tick"), a dashed outline for a piece that is not there but is shown
+   * band (kind "band"), a square of diagonal stripes for the hatched side of a pair of bars (kind "hatch", architecture 28.1), a dashed outline for a piece that is not there but is shown
    * (kind "ghost": a loss below the cost, architecture 27.6), a square otherwise. The colour is also kept as --sw, so that the key of a switched-off line can be drawn hollow.
    */
   function keyOf(x) {
-    const sw = h("span", { class: "swatch" + (x.kind === "line" ? " ln" : x.kind === "band" ? " bd" : x.kind === "tick" ? " tk" : x.kind === "ghost" ? " gh" : "") + (x.dash ? " dash" : "") });
+    const sw = h("span", { class: "swatch" + (x.kind === "line" ? " ln" : x.kind === "band" ? " bd" : x.kind === "hatch" ? " hatch" : x.kind === "ghost" ? " gh" : "") + (x.dash ? " dash" : "") });
     sw.style.setProperty("--sw", x.color);
     sw.style.background = x.kind === "band" ? "linear-gradient(180deg, " + x.color + " 0 3px, color-mix(in srgb, " + x.color + " 40%, transparent) 3px, transparent 100%)" : x.color;
     return sw;
@@ -13127,8 +13399,8 @@ span.hc { cursor: default; }
   }
 
   /**
-   * Tooltip that follows keyboard focus and the pointer. Text only (textContent), never markup. Rows: { name, value, color?, kind? ("line", "band", "tick" or "ghost":
-   * the shape of the key), tone?, plain? }. The box sits at the top of the chart; a tall chart passes box ({ y0, y1 }: the vertical extent of the row it
+   * Tooltip that follows keyboard focus and the pointer. Text only (textContent), never markup. Rows: { name, value, color?, kind? ("line", "band", "hatch" or "ghost":
+   * the shape of the key), tone?, plain?, head? (a row that opens a new group: a line above it and its words in the main ink) }. The box sits at the top of the chart; a tall chart passes box ({ y0, y1 }: the vertical extent of the row it
    * describes, in pixels from the top of the chart) and the box then opens under that row when it fits in the chart there, else above the row when it
    * fits there, else under the row anyway (running over what is below the chart): it never covers the row it describes (architecture 27.6).
    */
@@ -13140,7 +13412,7 @@ span.hc { cursor: default; }
         tip.textContent = "";
         tip.appendChild(h("div", { class: "tip-title", text: title }));
         for (const r of rows) {
-          const line = h("div", { class: "tip-row" + (r.plain ? " plain" : "") });
+          const line = h("div", { class: "tip-row" + (r.plain ? " plain" : "") + (r.head ? " head" : "") });
           if (r.color) line.appendChild(keyOf({ color: r.color, kind: r.kind }));
           line.appendChild(h("span", { class: "tip-name", text: r.name }));
           line.appendChild(h("span", { class: "tip-val" + (r.tone ? " " + r.tone : ""), text: r.value }));
@@ -13196,9 +13468,16 @@ span.hc { cursor: default; }
    *   the tip; "\n" starts a second line; an empty one is left out),
    *   details: [[["Gain", "+€5.00", "pos"], ...], ...] (rows under the values of each category in the tooltip: label, text, tone)
    *   labelTexts: stacked only, the text of the direct label on the largest stack when it should be shorter than the total in the tooltip (a range)
-   *   markers: { name, color, values: [number...], texts: [...], key, defaultOn } (a short tick across each bar at its own value, for a figure that is
-   *   compared with the bars and not part of them: KESt against the tax paid. It has its own button in the legend; key is where the choice is
-   *   remembered, defaultOn false means off until the button is pressed. Off, it is not drawn, not in the axis and not in the tooltip. Ticks at 0 are not drawn.)
+   *   toggle: true gives every series a button in the legend that hides and shows it (stacked and grouped: the axis, the bars, the direct label and
+   *   the tooltip follow what is shown, and the last one shown cannot be hidden); key is where the choice is remembered while the page is open.
+   *   With a series hidden the tooltip has no "Total" row (a single shown series is its own total) and the direct label is the text of that series.
+   *   pair: { name, key, defaultOn, color?, note?, series: [{ values, texts }], totalTexts, labelTexts, rows(i) } (stacked only: a second stack beside
+   *   each stack, drawn hatched in the same colours, for a figure that is compared with the bars and is not part of them: what the year would have
+   *   cost another way, architecture 28.1. `series` are the stacks of the hatched side in the order of the main series, totalTexts and labelTexts
+   *   as for the main stack, rows(i) the extra rows of the tooltip ({ name, value, color?, kind?, tone?, plain?, head?, of? }, `of` is the id, or a list
+   *   of ids, of the series that the row is about: it goes away while one of them is hidden). It has a button of its own in the legend (key is where the choice is remembered,
+   *   defaultOn false means off until the button is pressed) and its note is shown under the chart only while it is on. Off, it is not drawn,
+   *   not in the axis, not in the tooltip.)
    * }
    * Grouped and split bars are lit at the data end and have a soft glow; stacked segments are flat (neighbours of different colours).
    */
@@ -13208,24 +13487,41 @@ span.hc { cursor: default; }
     const mode = opts.mode || "grouped";
     const wrap = h("div", { class: "chart-wrap" });
     const box = h("figure", { class: "chart" }, []);
-    const mk = opts.markers && opts.markers.values ? opts.markers : null;
-    let markerOn = mk ? flagGet(mk.key, !!mk.defaultOn) : false;
+    const canHide = !!opts.toggle && series.length > 1 && mode !== "split";
+    const hidden = canHide ? hiddenFor(opts.key, series.map((x) => x.name)) : new Set();
+    const pr = mode === "stacked" && opts.pair && Array.isArray(opts.pair.series) && opts.pair.series.length === series.length ? opts.pair : null;
+    let pairOn = pr ? flagGet(pr.key, !!pr.defaultOn) : false;
     let redraw = () => {};
-    if (mk) {
-      // the bars are plain entries, the ticks have a button of their own
-      const ul = legend(series.concat([{ name: mk.name, color: mk.color, kind: "tick" }]), {
-        toggle: () => {
-          markerOn = !markerOn;
-          flagSet(mk.key, markerOn);
-          syncLegend(ul, markerOn ? new Set() : new Set([mk.name]));
+    let note = null;
+    const offNames = () => {
+      const off = new Set(hidden);
+      if (pr && !pairOn) off.add(pr.name);
+      return off;
+    };
+    if (canHide || pr) {
+      const ul = legend(series.concat(pr ? [{ name: pr.name, color: pr.color || "var(--muted)", kind: "hatch" }] : []), {
+        toggle: (name) => {
+          if (pr && name === pr.name) {
+            pairOn = !pairOn;
+            flagSet(pr.key, pairOn);
+          } else if (hidden.has(name)) hidden.delete(name);
+          else if (series.length - hidden.size > 1) hidden.add(name);
+          else return;
+          syncLegend(ul, offNames());
+          if (note) note.hidden = !pairOn;
           redraw();
         },
-        only: [mk.name],
+        only: canHide ? null : [pr.name],
       });
-      syncLegend(ul, markerOn ? new Set() : new Set([mk.name]));
+      syncLegend(ul, offNames());
       box.appendChild(ul);
     } else if (series.length > 1 || opts.legend || (mode === "split" && opts.splitLegend)) box.appendChild(mode === "split" ? legend(opts.splitLegend) : legend(series));
     box.appendChild(wrap);
+    if (pr && pr.note) {
+      note = h("p", { class: "note chart-note", text: pr.note });
+      note.hidden = !pairOn;
+      box.appendChild(note);
+    }
     const tipper = makeTip(wrap);
 
     function draw(W) {
@@ -13239,15 +13535,20 @@ span.hc { cursor: default; }
       wrap.insertBefore(svg, wrap.firstChild);
       const defs = defsOf(svg, W, H);
 
+      // what is drawn: the shown series, and beside them the hatched stacks of the pair while it is on
+      const shownIdx = series.map((_, si) => si).filter((si) => !hidden.has(series[si].name));
+      const shown = shownIdx.map((si) => series[si]);
+      const allShown = shown.length === series.length;
+      const withPair = !!pr && pairOn;
+      const pairShown = withPair ? shownIdx.map((si) => ({ color: series[si].color, values: pr.series[si].values || [], texts: pr.series[si].texts })) : [];
+      const stackSum = (list, i) => list.reduce((t, x) => t + Math.max(0, x.values[i] || 0), 0);
+
       // value range
       let lo = 0, hi = 0;
-      const totals = cats.map((_, i) => {
-        if (mode === "stacked") return series.reduce((t, x) => t + Math.max(0, x.values[i] || 0), 0);
-        return 0;
-      });
-      if (mode === "stacked") hi = Math.max.apply(null, totals.concat([0]));
-      else for (const x of series) for (const v of x.values) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
-      if (mk && markerOn) ({ lo, hi } = widenRange(lo, hi, mk.values));
+      const totals = cats.map((_, i) => (mode === "stacked" ? stackSum(shown, i) : 0));
+      const pairTotals = cats.map((_, i) => (withPair ? stackSum(pairShown, i) : 0));
+      if (mode === "stacked") hi = Math.max.apply(null, totals.concat(pairTotals, [0]));
+      else for (const x of shown) for (const v of x.values) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
       const sc = niceScale(lo, hi, 4);
       const y = (v) => mt + ph - ((v - sc.min) / (sc.max - sc.min)) * ph;
 
@@ -13258,7 +13559,7 @@ span.hc { cursor: default; }
       }
 
       const band = pw / cats.length;
-      const k = mode === "grouped" ? series.length : 1;
+      const k = mode === "grouped" ? shown.length : withPair ? 2 : 1;
       const bw = Math.max(3, Math.min(MAX_BAR, (band * 0.72 - GAP * (k - 1)) / k));
       const groupW = bw * k + GAP * (k - 1);
       const zero = y(0);
@@ -13267,9 +13568,15 @@ span.hc { cursor: default; }
       const lit = mode !== "stacked";
       const glowLayer = lit ? s("g", { class: "barglow", filter: defs.glow }, svg) : null;
       const grads = {};
-      const bar = (g, d, color, up) => {
+      const hatches = {};
+      const bar = (g, d, color, up, hatched) => {
         const p = s("path", { d, class: "bar" }, g);
-        if (lit) {
+        if (hatched) {
+          // the hatched side of a pair: stripes of the colour over a faint tint of it, and a fine outline
+          p.style.fill = hatches[color] || (hatches[color] = defs.hatch(color));
+          p.style.stroke = color;
+          p.style.strokeWidth = "1";
+        } else if (lit) {
           const key = color + (up ? "u" : "d");
           const gr = grads[key] || (grads[key] = up ? defs.gradient(color, 1, 0.62, "v") : defs.gradient(color, 0.62, 1, "v"));
           p.style.fill = gr;
@@ -13277,17 +13584,43 @@ span.hc { cursor: default; }
         } else p.style.fill = color;
         return p;
       };
+      // one stack of the shown series at x; the pair's stack is hatched
+      const stack = (g, x, list, i, hatched) => {
+        let acc = 0;
+        const lastNonZero = list.reduce((m, x2, si) => ((x2.values[i] || 0) > 0 ? si : m), -1);
+        list.forEach((x2, si) => {
+          const v = Math.max(0, x2.values[i] || 0);
+          if (v === 0) return;
+          const y0 = y(acc), y1 = y(acc + v);
+          const gap = acc === 0 ? 0 : GAP;
+          const d = si === lastNonZero ? barPath(x, bw, y0 - gap, y1) : "M" + x + " " + (y0 - gap) + "V" + (y1 + 0) + "H" + (x + bw) + "V" + (y0 - gap) + "Z";
+          bar(g, d, x2.color, true, hatched);
+          acc += v;
+        });
+      };
 
-      // direct label: the largest bar only
-      let maxI = 0, maxS = 0, maxV = 0;
-      series.forEach((x, si) => x.values.forEach((v, i) => { const a = mode === "stacked" ? totals[i] : Math.abs(v); if (a > maxV) { maxV = a; maxI = i; maxS = si; } }));
+      // direct label: the largest bar only (stacked: the largest stack, the pair's too)
+      let maxI = 0, maxS = 0, maxV = 0, maxPair = false;
+      if (mode === "stacked") {
+        cats.forEach((_, i) => {
+          if (totals[i] > maxV) { maxV = totals[i]; maxI = i; maxPair = false; }
+          if (pairTotals[i] > maxV) { maxV = pairTotals[i]; maxI = i; maxPair = true; }
+        });
+      } else shown.forEach((x, si) => x.values.forEach((v, i) => { if (Math.abs(v) > maxV) { maxV = Math.abs(v); maxI = i; maxS = si; } }));
+      // the text of the label of the largest stack: its total, or the text of the one series that is shown
+      const stackText = (i, ofPair) => {
+        const src = ofPair ? pr : opts;
+        if (allShown) return (src.labelTexts && src.labelTexts[i]) || (src.totalTexts && src.totalTexts[i]);
+        const one = shown.length === 1 ? (ofPair ? pr.series[shownIdx[0]] : series[shownIdx[0]]) : null;
+        return one && one.texts ? one.texts[i] : null;
+      };
 
       cats.forEach((c, i) => {
         const cx = ml + band * i + band / 2;
         const gx = cx - groupW / 2;
         const g = s("g", {}, svg);
         if (mode === "grouped") {
-          series.forEach((x, si) => {
+          shown.forEach((x, si) => {
             const v = x.values[i] || 0;
             const bx = gx + si * (bw + GAP);
             bar(g, barPath(bx, bw, zero, y(v)), x.color, v >= 0);
@@ -13296,18 +13629,8 @@ span.hc { cursor: default; }
           const v = series[0].values[i] || 0;
           bar(g, barPath(gx, bw, zero, y(v)), v < 0 ? opts.colorNeg : opts.colorPos, v >= 0);
         } else {
-          let acc = 0;
-          const lastNonZero = series.reduce((m, x, si) => ((x.values[i] || 0) > 0 ? si : m), -1);
-          series.forEach((x, si) => {
-            const v = Math.max(0, x.values[i] || 0);
-            if (v === 0) return;
-            const y0 = y(acc), y1 = y(acc + v);
-            const gap = acc === 0 ? 0 : GAP;
-            const top = si === lastNonZero;
-            const d = top ? barPath(gx, bw, y0 - gap, y1) : "M" + gx + " " + (y0 - gap) + "V" + (y1 + 0) + "H" + (gx + bw) + "V" + (y0 - gap) + "Z";
-            bar(g, d, x.color, true);
-            acc += v;
-          });
+          stack(g, gx, shown, i, false);
+          if (withPair) stack(g, gx + bw + GAP, pairShown, i, true);
         }
         // x label (opts.tickLabels: the text under each bar when it is shorter than the category; an empty one is left out)
         const tl = opts.tickLabels ? opts.tickLabels[i] : c;
@@ -13321,30 +13644,24 @@ span.hc { cursor: default; }
         }
         // direct label on the largest bar
         if (opts.labelMax !== false && i === maxI && maxV > 0) {
-          const v = mode === "stacked" ? totals[i] : series[maxS].values[i];
-          const text = mode === "stacked" ? (opts.labelTexts && opts.labelTexts[i]) || (opts.totalTexts && opts.totalTexts[i]) : series[maxS].texts && series[maxS].texts[i];
+          const v = mode === "stacked" ? (maxPair ? pairTotals[i] : totals[i]) : shown[maxS].values[i];
+          const text = mode === "stacked" ? stackText(i, maxPair) : shown[maxS].texts && shown[maxS].texts[i];
           if (text) {
-            const lx = mode === "grouped" ? gx + maxS * (bw + GAP) + bw / 2 : cx;
-            const tickTop = mk && markerOn && (mk.values[i] || 0) > 0 ? mk.values[i] : 0; // a tick above the bar lifts the label over it
-            const ly = v >= 0 ? y(Math.max(v, tickTop)) - 5 : y(v) + 13;
+            const lx = mode === "grouped" ? gx + maxS * (bw + GAP) + bw / 2 : gx + (maxPair ? bw + GAP : 0) + bw / 2;
+            const ly = v >= 0 ? y(v) - 5 : y(v) + 13;
             const lab = s("text", { x: Math.min(Math.max(lx, ml + 18), W - mr - 18), y: ly, class: "dlabel", "text-anchor": "middle" }, svg);
             lab.textContent = text;
           }
         }
-        // the tick of this category: a short thick line across the bar with a ring in the surface colour, so that it reads on the bar and off it
-        const tv = mk && markerOn ? mk.values[i] || 0 : 0;
-        if (tv > 0) {
-          const tx1 = gx - 4, tx2 = gx + groupW + 4, ty = y(tv);
-          s("line", { x1: tx1 - 1, x2: tx2 + 1, y1: ty, y2: ty, class: "mk-ring" }, svg);
-          s("line", { x1: tx1, x2: tx2, y1: ty, y2: ty, class: "mk" }, svg).style.stroke = mk.color;
-        }
         // hit area: the whole band, keyboard focusable
-        const rows = series.map((x) => ({ name: x.name, color: mode === "split" ? (x.values[i] < 0 ? opts.colorNeg : opts.colorPos) : x.color, value: (x.texts && x.texts[i]) || String(x.values[i]) }));
-        if (mode === "stacked" && opts.totalTexts) rows.push({ name: "Total", value: opts.totalTexts[i] });
-        if (mk && markerOn) rows.push({ name: mk.name, color: mk.color, kind: "tick", value: (mk.texts && mk.texts[i]) || String(mk.values[i]) });
+        const rows = shown.map((x) => ({ name: x.name, color: mode === "split" ? (x.values[i] < 0 ? opts.colorNeg : opts.colorPos) : x.color, value: (x.texts && x.texts[i]) || String(x.values[i]) }));
+        if (mode === "stacked" && opts.totalTexts && allShown) rows.push({ name: "Total", value: opts.totalTexts[i] });
         const more = plainRows(opts.details && opts.details[i]);
-        const hit = s("rect", { x: ml + band * i, y: mt, width: band, height: ph + mb, class: "hit", tabindex: 0, role: "img", "aria-label": c + ": " + rows.concat(more).map((r) => r.name + " " + r.value).join(", ") }, svg);
-        const on = () => tipper.show(c, rows.concat(more), cx);
+        // a row of the pair that is about series that are hidden goes away with them
+        const goneRow = (r) => [].concat(r.of || []).some((id) => hidden.has((series.find((x) => x.id === id) || {}).name));
+        const pairRows = withPair && typeof pr.rows === "function" ? (pr.rows(i) || []).filter((r) => !goneRow(r)) : [];
+        const hit = s("rect", { x: ml + band * i, y: mt, width: band, height: ph + mb, class: "hit", tabindex: 0, role: "img", "aria-label": c + ": " + rows.concat(more, pairRows).map((r) => r.name + " " + r.value).join(", ") }, svg);
+        const on = () => tipper.show(c, rows.concat(more, pairRows), cx);
         hit.addEventListener("mouseenter", on);
         hit.addEventListener("focus", on);
         hit.addEventListener("mouseleave", () => tipper.hide());
@@ -14193,7 +14510,7 @@ span.hc { cursor: default; }
     return h("div", { class: "tbl-wrap" }, [t]);
   }
 
-  return { niceScale, niceScaleFree, widenRange, timeTicks, nearestIndex, barPath, hBarPath, compactEuro, bandPaths, splitLinePaths, fadeShapes, nonZeroRuns, pieSlices, donutPath, pieFold, bars, line, timeLines, hbars, stackRuns, sbars, pie, tableOf, legend, constants: { MAX_BAR, RADIUS, GAP, PIE_HUES } };
+  return { niceScale, niceScaleFree, timeTicks, nearestIndex, barPath, hBarPath, compactEuro, bandPaths, splitLinePaths, fadeShapes, nonZeroRuns, pieSlices, donutPath, pieFold, bars, line, timeLines, hbars, stackRuns, sbars, pie, tableOf, legend, constants: { MAX_BAR, RADIUS, GAP, PIE_HUES } };
 });
 
 /* ---- src/app/hold-view.js ---- */
@@ -14391,6 +14708,402 @@ span.hc { cursor: default; }
   }
 
   return { VERSION, VIEWS, build };
+});
+
+/* ---- src/app/fund-tax.js ---- */
+/*
+ * FundTax: how much of the price of each fund is taxed as fund income, year by year (architecture section 28.3).
+ *
+ * Each year the OeKB reports the agE (deemed distributed income) of an accumulating fund per unit. This module sets it against the price:
+ *
+ *   share of the price taxed = agE per unit in euro / average price of the year in euro        (10 euro of agE on an average price of 100 euro: 10 %)
+ *   price change of the year = last close of the year / last close of the year before - 1, in euro
+ *
+ * The year is the calendar year of the report date (the year the tax falls in, the same years as everywhere else on the page). The agE per unit is
+ * what the tax engine used: the reports it counted (base.events of type OEKB that are not unresolved), each divided by the ECB rate it was
+ * converted with. The prices are the daily closes of the price file of the symbol the performance module values the fund with, each in euro at the
+ * ECB rate of its day.
+ *
+ * It is a ratio for orientation, before any tax assessment, and it feeds no tax figure. The agE per unit is an exact decimal text; the prices and
+ * the ratios are floating point numbers (as on the Performance tab).
+ *
+ * Everything fails closed: a year of a fund without enough prices, with a split of the price file in it, without an ECB rate or with a gap in the
+ * prices gets no figure and a reason in words. Nothing is estimated and nothing is taken from another year.
+ *
+ * Pure functions: no DOM, no clock (today is an input), no network, no storage. Runs in Node (tests) and in the page.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("../lib/decimal.js"), require("../prices/prices.js"), require("./model.js"));
+  else root.FundTax = factory(root.Dec, root.Prices, root.Model);
+})(typeof self !== "undefined" ? self : this, function (Dec, Prices, Model) {
+  "use strict";
+
+  const VERSION = "fundtax-0.1.0";
+  const AGE_DP = 8; // the agE per unit in euro is rounded to this many decimals, once per report
+  const MIN_CLOSES = 100; // a whole year needs at least this many usable closes ...
+  const MIN_CLOSES_PARTIAL = 15; // ... the current year, so far, this many
+  const START_BY = 10; // the first close is at most this many days after 1 January (11 January)
+  const END_WITHIN = 10; // the last close is at most this many days before the end of the window (21 December, or today)
+  const MAX_GAP = 15; // no two closes of the window are further apart than this many days
+  const MAX_RATE_LAG = 14; // the ECB rate of a day may be this many days old
+  const CHANGE_LAG = 10; // a year-end close may be this many days before the year end
+  const SCALE_STEPS = [0.5, 1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 30, 50]; // the scale of the grid ends at the first of these that holds the largest share (in %)
+  const CLASSES = 5;
+
+  const isObj = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
+  const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  const isIso = (s) => Prices.isIso(s);
+  const dn = (iso) => Prices.dayNumber(iso);
+  const isoOf = (d) => new Date(d * 86400000).toISOString().slice(0, 10);
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  /** 2026-11-13 as "13 Nov 2026", the way the rest of the page writes a day. */
+  const fd = (iso) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso));
+    return m ? +m[3] + " " + MONTHS[+m[2] - 1] + " " + m[1] : String(iso);
+  };
+  const plural = (n, one, many) => n + " " + (n === 1 ? one : many || one + "s");
+
+  // ---------------------------------------------------------------- which symbol prices a fund
+
+  /**
+   * The symbols that value the securities of one ISIN from market prices, as the card of section 26 reads them: a ticker of the ISIN counts when the
+   * performance module includes it and values it from market prices (not at the owner's own transaction prices). Returns { symbols: [], why }.
+   * tickers: conv.tables.tickers ({ ticker, isin, isinStatus }); model: the performance model of the whole portfolio (tickers[]: { ticker, state, valuedBy,
+   * symbol, reason, text }), or null.
+   */
+  function symbolsFor(isin, tickers, model) {
+    const mine = (Array.isArray(tickers) ? tickers : []).filter((t) => isObj(t) && t.isin === isin && t.isinStatus === "OK" && typeof t.ticker === "string").map((t) => t.ticker).sort();
+    if (!mine.length) return { symbols: [], why: "No security of your data has this ISIN, so there are no prices to look up." };
+    const infos = new Map();
+    if (isObj(model) && Array.isArray(model.tickers)) for (const i of model.tickers) if (isObj(i)) infos.set(i.ticker, i);
+    const symbols = [];
+    const why = [];
+    for (const t of mine) {
+      const i = infos.get(t);
+      if (!i) why.push(t + ": " + (model ? "no row of it can be used by the performance figures." : "the performance figures are not available."));
+      else if (i.state === "INCLUDED" && i.valuedBy !== "TRADES" && typeof i.symbol === "string" && i.symbol !== "") symbols.push(i.symbol);
+      else if (i.state === "INCLUDED") why.push(t + ": there are no market prices for " + (i.symbol || t) + ". The Performance tab values it at your own transaction prices.");
+      else why.push(t + ": " + (i.text || "it cannot be valued from market prices."));
+    }
+    return { symbols: Array.from(new Set(symbols)), why: why.join(" ") };
+  }
+
+  // ---------------------------------------------------------------- the prices of one symbol, in euro
+
+  /** The closes of an entry as [{ dn, day, px }] sorted by day, unreadable ones left out. */
+  function readCloses(entry) {
+    const out = [];
+    for (const c of isObj(entry) && Array.isArray(entry.closes) ? entry.closes : []) {
+      if (!Array.isArray(c) || typeof c[0] !== "string" || typeof c[1] !== "string") continue;
+      const d = dn(c[0]);
+      const p = Dec.parse(c[1]);
+      if (d === null || !p || Dec.isNeg(p) || Dec.isZero(p)) continue;
+      out.push({ dn: d, day: c[0], px: Number(c[1]) });
+    }
+    out.sort((a, b) => a.dn - b.dn);
+    return out;
+  }
+
+  /**
+   * One symbol with its closes in euro. { ok, symbol, ccy, closes: [{ dn, day, px, eur (number or null: no ECB rate) }], splits: [day numbers] } or
+   * { ok: false, reason, text }.
+   */
+  function series(symbol, entry, rateOn) {
+    const closes = readCloses(entry);
+    if (!closes.length) return { ok: false, reason: "NO_PRICES", text: "No usable closing prices of " + symbol + " are loaded. Update the prices on the Performance tab." };
+    const ccy = isObj(entry) && typeof entry.currency === "string" ? entry.currency.trim().toUpperCase() : "";
+    if (!/^[A-Z]{3}$/.test(ccy)) return { ok: false, reason: "BAD_QUOTE", text: "The price file does not say which currency " + symbol + " is quoted in." };
+    let missing = 0;
+    let lastWhy = "";
+    for (const c of closes) {
+      if (ccy === "EUR") c.eur = c.px;
+      else {
+        const r = rateOn(ccy, c.day, MAX_RATE_LAG);
+        const rate = isObj(r) && r.ok === true ? Number(r.rate) : NaN;
+        if (Number.isFinite(rate) && rate > 0) c.eur = c.px / rate;
+        else {
+          c.eur = null;
+          missing++;
+          if (isObj(r) && typeof r.reason === "string") lastWhy = r.reason;
+        }
+      }
+    }
+    if (missing === closes.length) return { ok: false, reason: "NO_RATE", text: "No usable ECB rate for " + ccy + ", so the prices of " + symbol + " cannot be turned into euro" + (lastWhy ? " (" + lastWhy.replace(/\.$/, "") + ")" : "") + ". Load a newer ECB file (step 4 of the Data tab)." };
+    const splits = [];
+    for (const s of isObj(entry) && Array.isArray(entry.splits) ? entry.splits : []) {
+      const d = isObj(s) && typeof s.date === "string" ? dn(s.date) : null;
+      if (d !== null) splits.push(d);
+    }
+    return { ok: true, symbol, ccy, closes, splits };
+  }
+
+  /**
+   * The year Y of a series: { ok, avgEur, closes, changePct (number or null), changeWhy, partial } or { ok: false, reason, text }.
+   * today: the day (ISO), the current year is taken up to it and marked partial.
+   */
+  function yearFigures(s, year, today) {
+    const y = Number(year);
+    const todayNo = dn(today);
+    const partial = String(year) === today.slice(0, 4);
+    const startNo = dn(year + "-01-01");
+    const endNo = partial ? todayNo : dn(year + "-12-31");
+    const need = partial ? MIN_CLOSES_PARTIAL : MIN_CLOSES;
+    const sym = s.symbol;
+    const inYear = s.closes.filter((c) => c.eur !== null && c.dn >= startNo && c.dn <= endNo);
+    const no = (reason, text) => ({ ok: false, reason, text });
+    if (s.splits.some((d) => d >= startNo && d <= endNo)) return no("SPLIT", "A split of " + sym + " lies in " + year + " in the price file: the closes before and after it count different units, so no average is made.");
+    if (inYear.length < need) {
+      if (!inYear.length) return no("SHORT", "The price file has no usable close of " + sym + " in " + year + (partial ? " so far" : "") + ".");
+      return no("SHORT", "Only " + plural(inYear.length, "usable close") + " of " + sym + " in " + year + (partial ? " so far" : "") + " (at least " + need + " are needed for an average).");
+    }
+    const first = inYear[0];
+    const last = inYear[inYear.length - 1];
+    if (first.dn - startNo > START_BY) return no("STARTS_LATE", "The prices of " + sym + " start on " + fd(first.day) + ": a year needs closes from " + fd(isoOf(startNo + START_BY)) + " or earlier.");
+    if (endNo - last.dn > END_WITHIN) return no("ENDS_EARLY", "The last close of " + sym + " in " + year + (partial ? " so far" : "") + " is from " + fd(last.day) + (partial ? ", more than " + END_WITHIN + " days before today" : ": a year needs closes up to " + fd(isoOf(endNo - END_WITHIN)) + " or later") + ".");
+    for (let i = 1; i < inYear.length; i++) {
+      const gap = inYear[i].dn - inYear[i - 1].dn;
+      if (gap > MAX_GAP) return no("GAP", "The prices of " + sym + " have a gap of " + plural(gap, "day") + " after " + fd(inYear[i - 1].day) + ".");
+    }
+    let sum = 0;
+    for (const c of inYear) sum += c.eur;
+    const avgEur = sum / inYear.length;
+    if (!(avgEur > 0) || !Number.isFinite(avgEur)) return no("BAD_PRICE", "The average price of " + sym + " in " + year + " is not a usable number.");
+
+    // the change of the year: the last close on or before the end of the year, against the one of the year before
+    const closeAt = (dayNo) => {
+      let best = null;
+      for (const c of s.closes) {
+        if (c.dn > dayNo) break;
+        if (c.eur !== null) best = c;
+      }
+      return best && dayNo - best.dn <= CHANGE_LAG ? best : null;
+    };
+    const prevEnd = dn((y - 1) + "-12-31");
+    let changePct = null;
+    let changeWhy = "";
+    const a = closeAt(prevEnd);
+    const b = closeAt(endNo);
+    if (s.splits.some((d) => d >= prevEnd && d <= endNo)) changeWhy = "A split of " + sym + " lies between the two year ends, so the two closes count different units.";
+    else if (!a) changeWhy = "No close of " + sym + " within " + CHANGE_LAG + " days before 31 Dec " + (y - 1) + " (the price file starts later).";
+    else if (!b) changeWhy = "No close of " + sym + " within " + CHANGE_LAG + " days before the end of " + year + ".";
+    else changePct = (b.eur / a.eur - 1) * 100;
+    return { ok: true, avgEur, closes: inYear.length, changePct, changeWhy, partial, from: first.day, to: last.day, changeFrom: a ? a.day : "", changeTo: b ? b.day : "" };
+  }
+
+  // ---------------------------------------------------------------- the whole table
+
+  /**
+   * args: {
+   *   events   base.events of the engine input: the OeKB ones are used ({ type: "OEKB", date, isin, agePerShare, fxUnitsPerEur }, not unresolved)
+   *   tickers  conv.tables.tickers, model  the performance model (see symbolsFor)
+   *   prices   (symbol) => the price entry { currency, closes: [[day, "price"], ...], splits: [{ date }] } or null
+   *   rateOn   (currency, day, maxLagDays) => { ok, rate } (never asked for EUR)
+   *   today    the day, YYYY-MM-DD
+   * }
+   * Returns { version, ok, years: ["2020", ...], funds: [{ isin, symbol, figures, cells: { year: cell } }], left: [{ isin, reason, text }], counts }
+   * (every fund with a counted report is in funds, in the order of its ISIN; figures is how many of its years have a figure).
+   * A cell is { year, state, reason, text, reports, ageEur (text, per unit in euro), avgEur, closes, sharePct, changePct, changeWhy, partial, from, to }:
+   *   state "NONE": no report of the fund was counted in the year; "NO_FIGURE": there is a report, but no price figure (reason, text say why);
+   *   "OK": sharePct = 100 * ageEur / avgEur, changePct (number or null with changeWhy).
+   * left: the funds without a figure in any year, with the reason of their first year without one.
+   */
+  function compute(args) {
+    const out = { version: VERSION, ok: false, years: [], funds: [], left: [], counts: { reports: 0 } };
+    if (!isObj(args)) return out;
+    const today = typeof args.today === "string" && isIso(args.today) ? args.today : null;
+    if (!today) return out;
+    const rateOn = typeof args.rateOn === "function" ? args.rateOn : () => ({ ok: false, reason: "no ECB rates were handed in." });
+    const priceOf = typeof args.prices === "function" ? args.prices : () => null;
+
+    // the reports the engine counted: per ISIN and year the agE per unit in euro (exact) and how many reports
+    const per = new Map(); // isin -> Map(year -> { age (Dec), reports })
+    let minYear = null;
+    let maxYear = null;
+    for (const e of Array.isArray(args.events) ? args.events : []) {
+      if (!isObj(e) || e.type !== "OEKB" || e.unresolved || typeof e.isin !== "string" || typeof e.date !== "string" || !isIso(e.date)) continue;
+      const age = Dec.parse(e.agePerShare);
+      const fx = Dec.parse(e.fxUnitsPerEur);
+      if (!age || !fx || Dec.isNeg(fx) || Dec.isZero(fx)) continue;
+      const year = e.date.slice(0, 4);
+      if (year > today.slice(0, 4)) continue; // a report dated after today is not counted yet
+      const eur = Dec.divRound(age, fx, AGE_DP);
+      const years = per.get(e.isin) || new Map();
+      const cell = years.get(year) || { age: Dec.mk(0n, AGE_DP), reports: 0 };
+      cell.age = Dec.add(cell.age, eur);
+      cell.reports++;
+      years.set(year, cell);
+      per.set(e.isin, years);
+      out.counts.reports++;
+      if (minYear === null || year < minYear) minYear = year;
+      if (maxYear === null || year > maxYear) maxYear = year;
+    }
+    out.ok = true;
+    if (minYear === null) return out;
+    for (let y = Number(minYear); y <= Number(maxYear); y++) out.years.push(String(y));
+
+    const seriesMemo = new Map();
+    const seriesOf = (symbol) => {
+      if (!seriesMemo.has(symbol)) seriesMemo.set(symbol, series(symbol, priceOf(symbol), rateOn));
+      return seriesMemo.get(symbol);
+    };
+    // the symbol of an ISIN: the one with the most recent close, ties to the symbol that sorts first (the rule of section 26)
+    const pick = (list) => {
+      let best = null;
+      for (const sym of list.slice().sort()) {
+        const s = seriesOf(sym);
+        const last = s.ok ? s.closes[s.closes.length - 1].dn : -1;
+        if (best === null || last > best.last) best = { sym, last };
+      }
+      return best ? best.sym : null;
+    };
+
+    for (const isin of Array.from(per.keys()).sort()) {
+      const years = per.get(isin);
+      const found = symbolsFor(isin, args.tickers, args.model);
+      const symbol = found.symbols.length ? pick(found.symbols) : null;
+      const s = symbol ? seriesOf(symbol) : null;
+      const fund = { isin, symbol: symbol || "", cells: {} };
+      let withFigure = 0;
+      let firstWhy = null;
+      for (const year of out.years) {
+        const r = years.get(year);
+        if (!r) {
+          fund.cells[year] = { year, state: "NONE", reason: "NONE", text: "No OeKB report of this fund was counted in " + year + " (it was not held around the report date, or the report is not in yet).", reports: 0, ageEur: "", avgEur: null, closes: 0, sharePct: null, changePct: null, changeWhy: "", partial: year === today.slice(0, 4) };
+          continue;
+        }
+        const base = { year, reports: r.reports, ageEur: Dec.str(r.age), avgEur: null, closes: 0, sharePct: null, changePct: null, changeWhy: "", partial: year === today.slice(0, 4) };
+        let fig;
+        if (!symbol) fig = { ok: false, reason: "NO_SYMBOL", text: found.why || "There are no market prices for this fund." };
+        else if (!s.ok) fig = s;
+        else fig = yearFigures(s, year, today);
+        if (!fig.ok) {
+          fund.cells[year] = Object.assign(base, { state: "NO_FIGURE", reason: fig.reason, text: fig.text });
+          if (!firstWhy) firstWhy = { reason: fig.reason, text: fig.text };
+          continue;
+        }
+        withFigure++;
+        fund.cells[year] = Object.assign(base, { state: "OK", reason: "", text: "", avgEur: fig.avgEur, closes: fig.closes, sharePct: (100 * Number(Dec.str(r.age))) / fig.avgEur, changePct: fig.changePct, changeWhy: fig.changeWhy, partial: fig.partial, from: fig.from, to: fig.to, changeFrom: fig.changeFrom, changeTo: fig.changeTo });
+      }
+      fund.figures = withFigure;
+      out.funds.push(fund);
+      if (withFigure === 0) out.left.push({ isin, reason: firstWhy ? firstWhy.reason : "NO_SYMBOL", text: firstWhy ? firstWhy.text : "" });
+    }
+    return out;
+  }
+
+  // ---------------------------------------------------------------- words, classes, rows
+
+  const pct = (x, dp) => (x < 0 && Math.abs(x) >= 0.5 * Math.pow(10, -dp) ? "−" : "") + Math.abs(x).toFixed(dp) + " %";
+  const signed = (x, dp) => (x >= 0.5 * Math.pow(10, -dp) ? "+" : "") + pct(x, dp);
+  const eur2 = (x) => Model.fmtMoney(x.toFixed(2));
+  /** The agE per unit as text with at most four decimals, trailing zeros down to two ("€1.20", "€0.1235"). */
+  const unit4 = (t) => {
+    const d = Dec.parse(t);
+    return d ? Model.fmtUnit(Dec.str(d, 4)) : "–";
+  };
+
+  /** The text of a cell of the grid: the share with one decimal, a minus sign for a negative one (never "-0.0"). */
+  const cellText = (x) => (x <= -0.05 ? "−" : "") + Math.abs(x <= -0.05 ? x : Math.max(0, x)).toFixed(1);
+
+  /** The scale of the grid: the top of it (in %) and five steps. Shares at or below zero have no tint. */
+  function scaleOf(maxPct) {
+    const top = SCALE_STEPS.find((s) => s >= maxPct) || SCALE_STEPS[SCALE_STEPS.length - 1];
+    const w = top / CLASSES;
+    const steps = [];
+    for (let k = 1; k <= CLASSES; k++) steps.push({ cls: "ft-" + k, from: w * (k - 1), to: w * k });
+    return { top, width: w, steps };
+  }
+  /** The class of a share: ft-1 .. ft-5 by the steps of the scale, "ft-0" for zero or below, the last step for anything above the top. */
+  function classOf(sharePct, scale) {
+    if (!(sharePct > 0)) return "ft-0";
+    return "ft-" + Math.min(CLASSES, Math.floor(sharePct / scale.width) + 1);
+  }
+
+  /**
+   * The words and rows for the card, from the result of compute.
+   * ctx: { nameOf(isin), labelOf(isin), rateText } (all optional).
+   * Returns { version, ok, years, scale, legend, rows, left, note, twin(isin) } ...
+   *   rows: [{ isin, name, label, cells: [{ year, text, cls, partial, tip: { t, r, n } }], best: first year with a figure }]
+   *   twin(isin): the figures of one fund for its charts and tables: { categories, tickLabels, share: { values, texts }, change: { values, texts },
+   *     table: { cols, rows: [{ key, cells }] }, tipRows }
+   */
+  function view(data, ctx) {
+    const c = ctx || {};
+    const nameOf = typeof c.nameOf === "function" ? c.nameOf : (x) => x;
+    const labelOf = typeof c.labelOf === "function" ? c.labelOf : nameOf;
+    const out = { version: VERSION, ok: !!(data && data.ok), years: [], scale: null, legend: [], rows: [], left: [], note: "", twin: () => null };
+    out.left = (data && data.left ? data.left : []).map((l) => ({ isin: l.isin, name: nameOf(l.isin), reason: l.reason, text: l.text }));
+    const funds = data && data.ok ? data.funds.filter((f) => f.figures > 0) : [];
+    if (!funds.length) return out;
+    out.years = data.years;
+    let maxShare = 0;
+    for (const f of funds) for (const y of data.years) if (f.cells[y].state === "OK" && f.cells[y].sharePct > maxShare) maxShare = f.cells[y].sharePct;
+    const scale = scaleOf(maxShare);
+    out.scale = scale;
+    const fmtTop = (x) => (Number.isInteger(x * 10) ? x.toFixed(Number.isInteger(x) ? 0 : 1) : x.toFixed(2));
+    out.legend = scale.steps.map((s) => ({ cls: s.cls, text: fmtTop(s.from) + " to " + fmtTop(s.to) + " %" }));
+    const cellTip = (f, cell) => {
+      const t = labelOf(f.isin) + ", " + cell.year + (cell.partial ? " (so far)" : "");
+      if (cell.state === "NONE") return { t, n: cell.text };
+      if (cell.state === "NO_FIGURE") return { t, r: [["Fund income per unit (agE)", unit4(cell.ageEur)]].concat(cell.reports > 1 ? [["Reports in the year", String(cell.reports)]] : []), n: cell.text };
+      const r = [
+        ["Share of the price taxed", pct(cell.sharePct, 2)],
+        ["Fund income per unit (agE)", unit4(cell.ageEur)],
+        ["Average price", eur2(cell.avgEur) + " (" + plural(cell.closes, "close") + ")"],
+        ["Price change of the year", cell.changePct === null ? "–" : signed(cell.changePct, 1), cell.changePct === null ? undefined : cell.changePct < 0 ? "neg" : cell.changePct > 0 ? "pos" : undefined],
+      ];
+      if (cell.reports > 1) r.splice(2, 0, ["Reports in the year", String(cell.reports)]);
+      return { t, r: r.map((x) => (x[2] ? x : x.slice(0, 2))), n: (cell.partial ? "The year so far: prices up to " + fd(cell.to) + ". " : "") + (cell.changePct === null ? cell.changeWhy : "") };
+    };
+    out.rows = funds.map((f) => ({
+      isin: f.isin,
+      name: nameOf(f.isin),
+      label: labelOf(f.isin),
+      symbol: f.symbol,
+      cells: data.years.map((y) => {
+        const cell = f.cells[y];
+        const ok = cell.state === "OK";
+        return { year: y, state: cell.state, text: ok ? cellText(cell.sharePct) : "–", cls: ok ? classOf(cell.sharePct, scale) : "ft-none", partial: cell.partial, tip: cellTip(f, cell) };
+      }),
+    }));
+    const rate = c.rateText ? " At the KESt rate of " + c.rateText + " a share of 1 % costs " + (Number.parseFloat(c.rateText) * 0.01).toFixed(3).replace(/0+$/, "").replace(/\.$/, "") + " % of the price." : "";
+    out.note = "The share is the fund income (agE) that the OeKB reported per unit, divided by the average price of the same calendar year in euro: 10 euro of agE on an average price of 100 euro is 10 %. That part of the price was taxed as income, whether or not the price rose." + rate + " The year is the year of the report, which is the year the tax falls in; the OeKB data does not say which business year the income belongs to. It is a ratio for orientation, not a tax figure.";
+
+    out.twin = (isin) => {
+      const f = funds.find((x) => x.isin === isin);
+      if (!f) return null;
+      const cells = data.years.map((y) => f.cells[y]);
+      const shown = (cell) => cell.state === "OK";
+      return {
+        isin,
+        name: nameOf(isin),
+        label: labelOf(isin),
+        categories: data.years,
+        tickLabels: cells.map((cell) => (cell.partial ? cell.year + "\nso far" : cell.year)),
+        share: { values: cells.map((cell) => (shown(cell) ? cell.sharePct : 0)), texts: cells.map((cell) => (shown(cell) ? pct(cell.sharePct, 2) : cell.state === "NONE" ? "no report counted" : "no figure")) },
+        change: { values: cells.map((cell) => (shown(cell) && cell.changePct !== null ? cell.changePct : 0)), texts: cells.map((cell) => (shown(cell) && cell.changePct !== null ? signed(cell.changePct, 1) : "no figure")), shownCount: cells.filter((cell) => shown(cell) && cell.changePct !== null).length },
+        details: cells.map((cell) =>
+          cell.state === "OK"
+            ? [["Fund income per unit (agE)", unit4(cell.ageEur)], ["Average price", eur2(cell.avgEur)]].concat(cell.reports > 1 ? [["Reports in the year", String(cell.reports)]] : [])
+            : cell.text
+              ? [["Why no figure", cell.text.length > 70 ? cell.text.slice(0, 69) + "…" : cell.text]]
+              : []
+        ),
+        table: {
+          cols: ["Year", "Fund income per unit", "Average price", "Share of the price taxed", "Price change"],
+          main: 3,
+          rows: cells.map((cell) => ({
+            key: cell.year,
+            cells: [cell.year + (cell.partial ? " (so far)" : ""), cell.state === "NONE" ? "–" : unit4(cell.ageEur), shown(cell) ? eur2(cell.avgEur) : "–", shown(cell) ? pct(cell.sharePct, 2) : "–", shown(cell) && cell.changePct !== null ? signed(cell.changePct, 1) : "–"],
+          })),
+        },
+        why: cells.filter((cell) => cell.state === "NO_FIGURE").map((cell) => cell.year + ": " + cell.text),
+      };
+    };
+    return out;
+  }
+
+  return { VERSION, MIN_CLOSES, MIN_CLOSES_PARTIAL, START_BY, END_WITHIN, MAX_GAP, MAX_RATE_LAG, CHANGE_LAG, SCALE_STEPS, symbolsFor, series, yearFigures, compute, scaleOf, classOf, view };
 });
 
 /* ---- src/app/persist.js ---- */
@@ -18565,6 +19278,168 @@ const HoldCharts = (function () {
   return { create };
 })();
 
+/* ---- src/app/ui-fund-tax.js ---- */
+/*
+ * "Fund income against the price" on the Holdings tab (browser only; architecture section 28.3).
+ *
+ * One card: a grid of colour cells, a row for each fund and a column for each year, each cell the share of the price that was taxed as fund income
+ * (agE per unit over the average price of the year), and under it, for the fund that is chosen, two small charts (the share, and the price change of the
+ * year) with their table. A cell, or the name of a row, chooses the fund. The figures come from FundTax (fund-tax.js); this file only draws, and puts text in
+ * with textContent. The fund chosen is kept while the page is open; it is not saved.
+ *
+ * On the demo the card is a note: the demo has no price history (the Performance tab says the same).
+ */
+const FundTaxUI = (function () {
+  "use strict";
+
+  const { el, listItem } = Dom;
+  const C = Charts;
+  const plural = (n, one, many) => n + " " + (n === 1 ? one : many || one + "s");
+  const axisPct = (v) => (v < -0.005 ? "−" : "") + +Math.abs(v).toFixed(2) + " %";
+
+  /** The table of one fund and, for a phone, the same rows as a list (the pair the Performance tab uses). t: { cols, main, rows: [{ key, cells }] }. */
+  function twin(t, caption) {
+    const table = C.tableOf(t.cols, t.rows.map((r) => ({ cells: r.cells })), caption);
+    const line = (r) =>
+      el("li", { "data-k": "ft-li:" + r.key },
+        el("div", { class: "sec-top" }, el("strong", { class: "sec-name", text: r.cells[0] }), el("span", { class: "num sec-value", text: r.cells[t.main] })),
+        el("div", { class: "sec-sub" }, t.cols.map((name, i) => (i === 0 || i === t.main || r.cells[i] === "–" ? null : el("span", { text: name + " " + r.cells[i] })))));
+    return [el("div", { class: "sec-table" }, table), el("ul", { class: "sec-list", "aria-label": caption }, t.rows.map(line))];
+  }
+
+  /**
+   * host: {
+   *   mode()          "mine" | "demo"
+   *   base()          the engine input (its events carry the OeKB reports the tax engine counted)
+   *   conv(), doc()   the conversion (the tickers and their ISINs) and the document (the ECB files)
+   *   book()          the price book, or null while the saved prices are being read
+   *   perfModel()     the performance model of the whole portfolio, or null
+   *   today()         today as YYYY-MM-DD
+   *   secName(isin), secLabel(isin)
+   *   refresh()
+   * }
+   */
+  function create(host) {
+    const st = { isin: "" };
+    let memo = { base: null, model: null, book: null, today: "", out: null, names: "", view: null };
+
+    /** { data, view } for what is on screen, null while there is nothing to draw yet, { error } when it stopped. Kept until the data change: the page is drawn on every keystroke. */
+    function result() {
+      const base = host.base();
+      if (!base || !Array.isArray(base.events)) return null;
+      const book = host.book();
+      const model = host.perfModel();
+      if (!book || !model) return null;
+      const today = host.today();
+      try {
+        if (!(memo.out && memo.base === base && memo.model === model && memo.book === book && memo.today === today)) {
+          const conv = host.conv();
+          const data = FundTax.compute({
+            events: base.events,
+            tickers: conv && conv.tables ? conv.tables.tickers : [],
+            model,
+            prices: (s) => book.store.symbols[s] || null,
+            rateOn: PerfInput.makeRateOn(host.doc()),
+            today,
+          });
+          memo = { base, model, book, today, out: data, names: "", view: null };
+        }
+        const data = memo.out;
+        const names = data.funds.map((f) => host.secName(f.isin) + "~" + host.secLabel(f.isin)).join("|");
+        if (!memo.view || memo.names !== names) {
+          const rate = base.settings && base.settings.kestRate ? Model.rateText(base.settings.kestRate) : "";
+          memo.view = FundTax.view(data, { nameOf: host.secName, labelOf: host.secLabel, rateText: rate });
+          memo.names = names;
+        }
+        return { data, view: memo.view };
+      } catch (e) {
+        return { error: "The figures could not be worked out (" + (e && e.message ? e.message : String(e)) + "). Your data is not changed." };
+      }
+    }
+
+    function choose(isin) {
+      return () => {
+        st.isin = isin;
+        host.refresh();
+      };
+    }
+
+    function grid(v, chosen) {
+      const head = el("tr", {}, [el("th", { scope: "col", text: "Fund" })].concat(v.years.map((y) => el("th", { scope: "col", text: y }))));
+      const body = v.rows.map((row) => {
+        const on = row.isin === chosen;
+        const name = el("th", { scope: "row" }, el("button", { type: "button", class: "ft-name" + (on ? " on" : ""), "aria-pressed": String(on), "data-key": "ft-name:" + row.isin, title: row.name, onclick: choose(row.isin), text: row.label }));
+        const cells = row.cells.map((cell) => {
+          const tip = Tip.attr(cell.tip);
+          const say = row.label + ", " + cell.year + (cell.partial ? " so far" : "") + ": " + (cell.state === "OK" ? cell.text + " %" : cell.state === "NONE" ? "no report counted" : "no figure");
+          if (cell.state === "OK") {
+            return el("td", {}, el("button", { type: "button", class: "hc " + cell.cls + (cell.partial ? " part" : "") + (on ? " sel" : ""), "data-key": "ft:" + row.isin + ":" + cell.year, "data-tip": tip || false, "aria-label": say, onclick: choose(row.isin), text: cell.text }));
+          }
+          if (cell.state === "NONE") return el("td", {}, el("span", { class: "hc hm-void", "data-tip": tip || false, "aria-label": say }));
+          return el("td", {}, el("span", { class: "hc hm-none", tabindex: "0", "data-tip": tip || false, "aria-label": say, text: "–" }));
+        });
+        return el("tr", { class: on ? "sel" : false, "data-k": "ft-row:" + row.isin }, [name].concat(cells));
+      });
+      const legend = el("div", { class: "hlegend", "aria-hidden": "true" }, [el("span", { text: "0 %" })]
+        .concat(v.legend.map((l) => el("span", { class: "hsw " + l.cls, title: l.text })))
+        .concat([el("span", { text: v.legend[v.legend.length - 1].text.split(" to ")[1] })]));
+      return el("div", { class: "heat-box" },
+        el("div", { class: "heat-wrap" }, el("table", { class: "heat ft", "aria-label": "Share of the price taxed as fund income, by fund and year" }, el("thead", {}, head), el("tbody", {}, body))),
+        el("div", { class: "hfoot" }, legend, el("span", { class: "note", text: "Percent of the average price of the year; “–” is a year without a figure. Click a cell or a name to choose the fund below. Dashed outline: the year so far." })));
+    }
+
+    function fundBlock(t) {
+      const kids = [el("h3", { class: "ft-title", text: t.name })];
+      kids.push(C.bars({ categories: t.categories, tickLabels: t.tickLabels, series: [{ id: "share", name: "Share of the price taxed", color: "var(--c-austria)", values: t.share.values, texts: t.share.texts }], mode: "grouped", legend: true, format: axisPct, details: t.details, height: 190, ariaLabel: "Share of the price of " + t.name + " that was taxed as fund income, by year" }));
+      if (t.change.shownCount > 0) {
+        kids.push(el("h3", { class: "ft-title", text: "Price change of the year" }));
+        kids.push(C.bars({ categories: t.categories, tickLabels: t.tickLabels, series: [{ id: "change", name: "Price change", values: t.change.values, texts: t.change.texts }], mode: "split", colorPos: "var(--c-gain)", colorNeg: "var(--c-more)", splitLegend: [{ name: "Price up", color: "var(--c-gain)" }, { name: "Price down", color: "var(--c-more)" }], format: axisPct, height: 170, ariaLabel: "Price change of " + t.name + " in each year, in euro" }));
+      }
+      kids.push(twin(t.table, "Fund income against the price, " + t.name));
+      if (t.why.length) kids.push(el("ul", { class: "list", "data-k": "ft-why" }, t.why.map((w) => listItem("info", w))));
+      return el("div", { class: "stack", "data-k": "ft-fund:" + t.isin }, kids);
+    }
+
+    /** The card, or nothing while the figures are being worked out or when no OeKB report was counted. */
+    function render(root) {
+      if (host.mode() === "demo") {
+        root.appendChild(el("section", { class: "card", "data-k": "fundtax" },
+          el("div", { class: "card-head" }, el("h2", { text: "Fund income against the price" })),
+          el("p", { class: "note", text: "On “My data” this card sets the fund income (agE) that the OeKB reported for each of your funds against its daily prices, year by year: 10 euro of agE on an average price of 100 euro means that 10 % of the price was taxed as income. The demo has no price history." })));
+        return;
+      }
+      const x = result();
+      if (!x) return;
+      if (x.error) {
+        root.appendChild(el("section", { class: "card", "data-k": "fundtax" }, el("div", { class: "card-head" }, el("h2", { text: "Fund income against the price" })), el("p", { class: "note", text: x.error })));
+        return;
+      }
+      const { data, view } = x;
+      if (!data.ok || !data.funds.length) return;
+      const kids = [el("div", { class: "card-head" }, el("h2", { text: "Fund income against the price" }), el("span", { class: "sub", text: "agE per unit ÷ average price" }))];
+      if (!view.rows.length) {
+        kids.push(el("p", { class: "note", text: "No fund has prices that cover a whole year yet, so there is no share to show. The prices come from the Performance tab." }));
+      } else {
+        const chosen = view.rows.some((r) => r.isin === st.isin) ? st.isin : view.rows[0].isin;
+        kids.push(grid(view, chosen));
+        kids.push(fundBlock(view.twin(chosen)));
+        kids.push(el("p", { class: "note", "data-k": "ft-note", text: view.note }));
+      }
+      if (view.left.length) {
+        const names = view.left.map((l) => l.name + " (" + l.text + ")");
+        kids.push(el("div", { class: "stack", "data-k": "ft-left" },
+          el("p", { class: "note", text: plural(view.left.length, "fund") + " without a figure in any year:" }),
+          el("ul", { class: "list" }, names.map((t) => listItem("info", t)))));
+      }
+      root.appendChild(el("section", { class: "card", "data-k": "fundtax" }, kids));
+    }
+
+    return { render, result, state: st };
+  }
+
+  return { create };
+})();
+
 /* ---- src/app/ui-regular.js ---- */
 /*
  * "Normal tax scale instead?" on the Tax tab (browser only).
@@ -19503,20 +20378,30 @@ const RegularUI = (function () {
     const paidV = M.taxPaid(v.summary, cats, inputsFor);
     const paidF = sel ? M.taxPaid(f.summary, cats, inputsFor) : paidV;
     const paidYr = paidV.byYear[yr];
+    // the tax on fund income that was paid in advance (28.2), for this view and, under a selection, for as filed
+    const prepaidV = Prepaid.compute(v.engine, cats);
+    const prepaidF = sel ? Prepaid.compute(f.engine, cats) : prepaidV;
+    const prepaidShown = prepaidV.ok && !M.prepaidEmpty(prepaidV);
     root.appendChild(
-      el("div", { class: "kpis" },
+      el("div", { class: "kpis five" },
         kpi("Tax paid, all years", fm(paidV.totals.totalEur), M.paidTotalLines(paidV.totals), sel ? M.subMoney(paidV.totals.totalEur, paidF.totals.totalEur) : null),
         kpi("Tax paid " + yr + " so far", row && paidYr ? fm(paidYr.totalEur) : "–", row && paidYr ? M.paidYearLines(paidYr) : null, sel && row && paidYr ? M.subMoney(paidYr.totalEur, paidF.byYear[yr].totalEur) : null),
         kpi("Realized result " + yr, row ? fm(row.realizedNetEur) : "–", "gains minus losses from sales", sel && row ? v.delta.byYear[yr].realizedNetEur : null),
-        kpi("Tax cost of holdings", fm(M.sumMoney(held)), "what the average cost adds up to", sel ? v.delta.endingTaxCostEur : null)
+        kpi("Tax cost of holdings", fm(M.sumMoney(held)), "what the average cost adds up to", sel ? v.delta.endingTaxCostEur : null),
+        kpi("Prepaid in your funds", prepaidShown ? fm(prepaidV.totals.stillKestEur) : "–", M.prepaidLines(prepaidV), sel && prepaidShown && prepaidF.ok ? M.subMoney(prepaidV.totals.stillKestEur, prepaidF.totals.stillKestEur) : null)
       )
     );
     if (sel) {
       root.appendChild(el("div", { class: "banner info" }, el("strong", { text: "Your selection is on" }), el("span", {}, "The figures above and the charts show: " + v.label + ". ", explainSpan(v)), el("div", {}, btn("Clear selection", () => setState((s) => Object.assign(s, M.defaultState(meta)))))));
     }
 
-    // Tax paid by year: the foreign tax withheld at the source at the baseline, the Austrian tax on top, KESt as a tick that can be switched on
+    // Tax paid by year (28.1): the foreign tax withheld at the source at the baseline, the Austrian tax on top as the return was filed. Each part has a
+    // button that shows or hides it, and "With special rates" puts a hatched stack beside each year: what the year would have cost on the special rates.
     const paidRows = cats.map((y) => paidV.byYear[y]);
+    const paidSp = M.taxPaid(v.summary, cats, inputsFor, "SPECIAL");
+    const spRows = cats.map((y) => paidSp.byYear[y]);
+    const paidCmp = M.paidCompare(paidV, paidSp);
+    const cmpWords = paidCmp.rows.map((c, i) => M.paidCompareYear(c, spRows[i]));
     const paidSeries = [
       { id: "abroad", name: "Withheld abroad", color: "var(--c-abroad)", values: paidRows.map((r) => M.num(r.abroadEur)), texts: paidRows.map((r) => fm(r.abroadEur)) },
       { id: "austria", name: "Austria", color: "var(--c-austria)", values: paidRows.map((r) => M.num(r.austriaEur)), texts: paidRows.map(M.austriaText) },
@@ -19525,15 +20410,54 @@ const RegularUI = (function () {
       categories: cats,
       series: paidSeries,
       mode: "stacked",
+      toggle: true,
+      key: "overview-paid",
       totalTexts: paidRows.map(M.paidTotalText),
       labelTexts: paidRows.map((r) => fm(r.totalEur)),
-      markers: { name: "KESt", color: "var(--c-put)", values: paidRows.map((r) => M.num(r.kestEur)), texts: paidRows.map((r) => fm(r.kestEur)), key: "overview-kest-tick", defaultOn: false },
+      pair: {
+        name: "With special rates",
+        key: "overview-paid-pair",
+        defaultOn: false,
+        series: [
+          { values: spRows.map((r) => M.num(r.abroadEur)), texts: spRows.map((r) => fm(r.abroadEur)) },
+          { values: spRows.map((r) => M.num(r.austriaEur)), texts: spRows.map(M.austriaText) },
+        ],
+        totalTexts: spRows.map(M.paidTotalText),
+        labelTexts: spRows.map((r) => fm(r.totalEur)),
+        note: M.paidCompareText(paidCmp),
+        rows: (i) =>
+          cmpWords[i].same
+            ? [{ name: "With special rates", value: "the same", plain: true, head: true }]
+            : [
+                { name: "With special rates", value: "", plain: true, head: true },
+                { name: "Austria", value: cmpWords[i].austria, color: "var(--c-austria)", kind: "hatch", of: "austria" },
+                { name: "Total", value: cmpWords[i].total, plain: true, of: ["abroad", "austria"] },
+                { name: "Difference", value: cmpWords[i].difference, plain: true },
+              ],
+      },
       details: paidRows.map((r) => (r.way ? [["Filed with", M.wayText(r)]] : [])),
       ariaLabel: "Tax paid per year: withheld abroad and Austrian tax" + (sel ? ", for your selection" : ""),
       height: 230,
     });
-    const paidTable = C.tableOf(["Year", "Filed with", "Withheld abroad", "Austria", "Total", "KESt before credit"], paidRows.map((r) => [r.year, M.wayText(r), fm(r.abroadEur), M.austriaText(r), M.paidTotalText(r), fm(r.kestEur)]), "Tax paid per year");
+    const paidTable = C.tableOf(
+      ["Year", "Filed with", "Withheld abroad", "Austria", "Total", "Total with special rates", "Special rates vs filed", "KESt before credit"],
+      paidRows.map((r, i) => [r.year, M.wayText(r), fm(r.abroadEur), M.austriaText(r), M.paidTotalText(r), M.paidTotalText(spRows[i]), cmpWords[i].difference, fm(r.kestEur)]),
+      "Tax paid per year"
+    );
     const paidNotes = paidNotesFor(paidV.totals);
+
+    // Tax prepaid on fund income (28.2): the KESt on each year's fund income, and how much of the prepaid tax is still in the units held at the year end
+    const prepYears = prepaidV.years;
+    const prepSeries = [
+      { id: "paid", name: "Tax on the year’s fund income", color: "var(--c-austria)", values: prepYears.map((y) => M.num(y.kestEur)), texts: prepYears.map((y) => fm(y.kestEur)) },
+      { id: "held", name: "Prepaid tax still in your units", color: "var(--c-gain)", values: prepYears.map((y) => M.num(y.stillKestEur)), texts: prepYears.map((y) => fm(y.stillKestEur)) },
+    ];
+    const prepChart = prepaidShown
+      ? C.bars({ categories: cats, series: prepSeries, mode: "grouped", toggle: true, key: "overview-prepaid", details: prepYears.map(M.prepaidYearRows), ariaLabel: "Tax prepaid on fund income per year, and what is still in your units" + (sel ? ", for your selection" : ""), height: 230 })
+      : null;
+    const prepTable = prepaidShown
+      ? C.tableOf(["Year", "Fund income (agE)", "Tax on it", "Already-taxed gains in your units", "Prepaid tax in your units"], prepYears.map((y) => [y.year, fm(y.ageEur), fm(y.kestEur), fm(y.stillInCostEur), fm(y.stillKestEur)]), "Prepaid tax by year")
+      : null;
 
     const comp = cats.map((y) => {
       const yy = v.summary.years[y];
@@ -19554,7 +20478,8 @@ const RegularUI = (function () {
     const holdTable = C.tableOf(["Security", "Tax cost"], hold.map((g) => [secName(g.isin), fm(g.taxCostText)]), "Tax cost by security");
 
     root.appendChild(el("div", { class: "grid2" },
-      chartCard("paid", "Tax paid by year", "The tax withheld abroad at the source (amber) and the Austrian tax as your return was filed (blue). The KESt button adds a tick: the 27.5 % KESt on the same income, before foreign-tax credit. Hover or tab to a year for the exact amounts.", paidChart, paidTable, paidNotes),
+      chartCard("paid", "Tax paid by year", "What you paid in tax on your investment income each year: the tax withheld abroad at the source (amber) and the Austrian tax as your return was filed (blue). The buttons show or hide a part. “With special rates” puts a hatched bar beside each year: what that year would have cost with the special rates (27.5 % and 25 %). Hover or tab to a year for the exact amounts.", paidChart, paidTable, paidNotes),
+      prepChart ? chartCard("prepaid", "Tax prepaid on fund income", "Every year the OeKB reports the income of your accumulating funds (agE), and you pay KESt on it before you sell. That tax raises the cost of the units, so you do not pay it again when you sell. Blue: the KESt on each year’s fund income. Green: how much of that prepaid tax is still in the units you hold at the end of the year. Figures are at the KESt rate (" + M.rateText(prepaidV.rate) + "), not at what your return was assessed at.", prepChart, prepTable) : null,
       chartCard("comp", "What the taxable income is made of", "Positive items before losses are set off (see the Tax tab for the loss offset).", compChart, compTable),
       chartCard("hold", "Tax cost of what you hold", "The cost the tax uses (average cost, step-up and fund corrections), not today’s value.", holdChart, holdTable)
     ));
@@ -19879,6 +20804,7 @@ const RegularUI = (function () {
       holdUI.render(root);
     }
     else root.appendChild(el("p", { class: "note", "data-k": "sell-selection", text: "“If you sold everything today” is worked out for the position as filed. Choose “As filed” above to see it." }));
+    fundUI.render(root); // the share of each fund's price that was taxed as fund income (architecture 28.3); the same for a selection, it uses reports and prices only
     for (const g of groups) {
       const inner = el("div", { class: "rows" });
       for (const r of g.rows) {
@@ -20184,6 +21110,20 @@ const RegularUI = (function () {
 
   // "Your holdings in pictures" under that card (architecture section 27.6): drawn from the result of the card above. Read-only.
   const holdUI = HoldCharts.create({ result: () => sellUI.result(), secName, secLabel: secShort, refresh: () => render() });
+
+  // "Fund income against the price" (architecture section 28.3): the OeKB reports the tax engine counted, set against the daily prices. Read-only.
+  const fundUI = FundTaxUI.create({
+    mode: () => ui.mode,
+    base: () => base,
+    conv: () => conv,
+    doc: () => doc,
+    book: () => perfUI.book(),
+    perfModel: () => perfUI.model(),
+    today: todayIso,
+    secName,
+    secLabel: secShort,
+    refresh: () => render(),
+  });
 
   async function init() {
     loadPrefs();
