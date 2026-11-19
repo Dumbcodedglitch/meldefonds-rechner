@@ -7096,14 +7096,14 @@ span.hc { cursor: default; }
  *   files       the files the owner loaded, as text, exactly as they were: the PortfolioSlicer export, one ECB rate file
  *               per currency, the OeKB data and correction files. Nothing is parsed here. An OeKB file that was fetched from an
  *               address also remembers where and when (origin), which only informs the owner and never changes a figure.
- *   securities  by ticker: ISIN, type (fund with reports, share, fund without reports), country and treaty rate, and the Yahoo
+ *   securities  by ticker: ISIN, type (fund with reports, share, fund without reports, bond), country and treaty rate, and the Yahoo
  *               symbol its prices are fetched under (only for the performance figures, never for the tax)
  *   accounts    by PortfolioSlicer account: depot name, currency, kind, and the closure of a TBSZ (date, receiving depot,
  *               closure-day prices)
  *   stepUp      market value per ISIN on the arrival date (and an optional second set: the day before)
  *   decisions   what the owner decided: "I looked at the flagged rows", "no report is due for this fund and year",
  *               which source wins a disagreement between OeKB files
- *   manual      transactions the owner typed in by hand (a purchase, a sale or a dividend), kept as typed. The converter
+ *   manual      transactions the owner typed in by hand (a purchase, a sale, a dividend or a coupon, interest from a bank), kept as typed. The converter
  *               reads them like the rows of the transaction file (see ledger.js). A document without any is unchanged.
  *   plans       planned sales and planned moves to another broker the owner is thinking about (day, depot, security, units,
  *               expected price; a move also the name of the receiving broker). Never part of the filed position: they only
@@ -7132,13 +7132,14 @@ span.hc { cursor: default; }
   const KIND = "austria-tax-tracker-data";
   const BACKUP_KIND = "austria-tax-tracker-backup";
   const SCHEMA = 1;
-  const SEC_TYPES = ["REPORTING_FUND", "SHARE", "NON_REPORTING_FUND"];
+  const SEC_TYPES = ["REPORTING_FUND", "SHARE", "NON_REPORTING_FUND", "BOND"];
   const ACCOUNT_KINDS = ["TBSZ", "REGULAR"];
   const OEKB_KINDS = ["OEKB_DATA", "KORREKTUR_FILE"];
   const PLAN_KINDS = ["SALE", "MOVE"];
   const PLAN_ID = /^[A-Za-z0-9_-]{1,30}$/;
   const MAX_PLANS = 50;
-  const ENTRY_KINDS = ["BUY", "SELL", "DIVIDEND"];
+  const ENTRY_KINDS = ["BUY", "SELL", "DIVIDEND", "INTEREST"];
+  const INTEREST_CLASSES = ["BANK", "OTHER"];
   const ENTRY_ID = /^m\d{1,6}$/;
   const MAX_MANUAL = 5000;
   const MAX_REGULAR = 40;
@@ -7429,7 +7430,16 @@ span.hc { cursor: default; }
           return;
         }
         seen.add(id);
-        doc.manual.push({ id, kind: e.kind, date: isIso(e.date) ? e.date : "", account: str(e.account, 80), ticker: str(e.ticker, 60), qty: str(e.qty, 40), price: str(e.price, 40), fee: str(e.fee, 40), amount: str(e.amount, 40), withheld: str(e.withheld, 40), note: str(e.note, 200) });
+        const entry = { id, kind: e.kind, date: isIso(e.date) ? e.date : "", account: str(e.account, 80), ticker: str(e.ticker, 60), qty: str(e.qty, 40), price: str(e.price, 40), fee: str(e.fee, 40), amount: str(e.amount, 40), withheld: str(e.withheld, 40), note: str(e.note, 200) };
+        // Kept only when there is something, so that a document that never used them is unchanged: the total amount of a purchase or a
+        // sale (instead of the price per unit), and for interest from a bank the rate class (BANK = 25 %, OTHER = 27.5 %) and the
+        // treaty rate (a fraction) that goes with the tax withheld abroad.
+        const total = str(e.total, 40);
+        if (total !== "") entry.total = total;
+        if (INTEREST_CLASSES.includes(e.cls)) entry.cls = e.cls;
+        const cap = str(e.cap, 40);
+        if (cap !== "") entry.cap = cap;
+        doc.manual.push(entry);
       });
       if (tooMany) problems.push("Only the first " + MAX_MANUAL + " transactions you typed in are kept; " + tooMany + " more were dropped.");
     }
@@ -7577,15 +7587,15 @@ span.hc { cursor: default; }
     return { ok: true, doc: n.doc, savedAt: typeof p.savedAt === "string" ? p.savedAt : "", problems: n.problems };
   }
 
-  return { VERSION, KIND, BACKUP_KIND, SCHEMA, SEC_TYPES, ACCOUNT_KINDS, OEKB_KINDS, PLAN_KINDS, ENTRY_KINDS, MAX_MANUAL, DEFAULT_RELOCATION, DEFAULT_OEKB_ADDRESS, DEFAULT_ECB_ADDRESS, emptyDoc, fileEntry, oekbSettings, ecbSettings, normalizeDoc, fingerprint, hasTransactions, toBackup, parseBackup, isIso };
+  return { VERSION, KIND, BACKUP_KIND, SCHEMA, SEC_TYPES, ACCOUNT_KINDS, OEKB_KINDS, PLAN_KINDS, ENTRY_KINDS, INTEREST_CLASSES, MAX_MANUAL, DEFAULT_RELOCATION, DEFAULT_OEKB_ADDRESS, DEFAULT_ECB_ADDRESS, emptyDoc, fileEntry, oekbSettings, ecbSettings, normalizeDoc, fingerprint, hasTransactions, toBackup, parseBackup, isIso };
 });
 
 /* ---- src/app/ledger.js ---- */
 /*
  * Ledger: the transactions the owner types in by hand, and what they become.
  *
- * An entry is one thing that happened: a purchase, a sale, or a dividend (with the tax withheld at the source). Entries are
- * kept in the document (doc.manual) as typed text. This module checks them and turns each one into rows in the format of the
+ * An entry is one thing that happened: a purchase, a sale, a dividend (with the tax withheld at the source; also the coupon of a
+ * bond) or interest from a bank (architecture 30). Entries are kept in the document (doc.manual) as typed text. This module checks them and turns each one into rows in the format of the
  * PortfolioSlicer file, so that the very same reader, classification and conversion handle them as the rows of the file. It
  * decides nothing about tax.
  *
@@ -7598,10 +7608,14 @@ span.hc { cursor: default; }
  *  - Nothing in this file contains real data.
  *
  * What an entry becomes (PortfolioSlicer vocabulary, see import/core.js):
- *   purchase    one "Buy" row:   quantity, price per unit, fee
- *   sale        one "Sell" row:  quantity, price per unit, fee
+ *   purchase    one "Buy" row:   quantity, price per unit, fee; with the total amount instead of a price one "BuyTA" row (the price
+ *               column is the whole amount, so a bond of 1,000,000 units for 1,012,345 needs no division)
+ *   sale        one "Sell" row:  quantity, price per unit, fee; with the total amount one "SellTA" row
  *   dividend    one "DivTA" row: the price column is the whole gross amount; and, when tax was withheld, one "WHTX" row
  *               with the withheld amount in the price column
+ *   interest    one "INT" row on the cash line of the account ("* Cash"): the price column is the whole gross amount. What the
+ *               owner chose for it (the rate class, the tax withheld abroad and the treaty rate) is put on the row as `interest`;
+ *               it is not part of the file format. Only a row typed in here is turned into income by the converter.
  * Amounts are in the currency of the account, exactly as the rows of the file are.
  */
 (function (root, factory) {
@@ -7610,9 +7624,14 @@ span.hc { cursor: default; }
 })(typeof self !== "undefined" ? self : this, function (Dec, PS) {
   "use strict";
 
-  const VERSION = "ledger-0.1.0";
-  const KINDS = ["BUY", "SELL", "DIVIDEND"];
-  const LABEL = { BUY: "Purchase", SELL: "Sale", DIVIDEND: "Dividend" };
+  const VERSION = "ledger-0.2.0";
+  const KINDS = ["BUY", "SELL", "DIVIDEND", "INTEREST"];
+  const LABEL = { BUY: "Purchase", SELL: "Sale", DIVIDEND: "Dividend", INTEREST: "Interest from a bank" };
+  /** The two tax rates of interest from a bank (architecture 30.3): 25 % for a deposit at a credit institution, 27.5 % for any other interest. */
+  const CLASSES = ["BANK", "OTHER"];
+  const CLASS_LABEL = { BANK: "25 %: interest on a bank account or deposit", OTHER: "27.5 %: any other interest (for example income of a money-market fund)" };
+  /** The line that cash rows of the file have as their security (the converter knows it as CASH_TICKER). */
+  const CASH_SYMBOL = "* Cash";
   const MAX_ENTRIES = 5000;
   const EARLIEST = "1990-01-01";
   const MAX_INT_DIGITS = 15;
@@ -7684,7 +7703,8 @@ span.hc { cursor: default; }
   /** An empty entry of a kind, as the form starts out. */
   function blank(kind, day, defaults) {
     const d = defaults || {};
-    return { id: "", kind: KINDS.includes(kind) ? kind : "BUY", date: isIso(day) ? day : "", account: d.account || "", ticker: d.ticker || "", qty: "", price: "", fee: "", amount: "", withheld: "", note: "" };
+    const k = KINDS.includes(kind) ? kind : "BUY";
+    return { id: "", kind: k, date: isIso(day) ? day : "", account: d.account || "", ticker: k === "INTEREST" ? "" : d.ticker || "", qty: "", price: "", total: "", fee: "", amount: "", withheld: "", cls: k === "INTEREST" ? "BANK" : "", cap: "", note: "" };
   }
 
   /**
@@ -7702,8 +7722,8 @@ span.hc { cursor: default; }
     const err = (field, text) => errors.push({ field, text });
     const warn = (field, text) => warnings.push({ field, text });
     const kind = KINDS.includes(e.kind) ? e.kind : "";
-    const values = { kind, date: "", account: "", ticker: "", qty: "", price: "", fee: "", amount: "", withheld: "", note: clean(e.note, MAX_NOTE) };
-    if (!kind) err("kind", "Choose what happened: a purchase, a sale or a dividend.");
+    const values = { kind, date: "", account: "", ticker: "", qty: "", price: "", total: "", fee: "", amount: "", withheld: "", cls: "", cap: "", note: clean(e.note, MAX_NOTE) };
+    if (!kind) err("kind", "Choose what happened: a purchase, a sale, a dividend (or the coupon of a bond) or interest from a bank.");
 
     // the day
     const rawDate = typeof e.date === "string" ? e.date.trim() : "";
@@ -7727,7 +7747,9 @@ span.hc { cursor: default; }
       }
     }
     const ticker = clean(e.ticker, MAX_TICKER + 1);
-    if (ticker === "") err("ticker", "Choose the security, or type its name as your file spells it.");
+    if (kind === "INTEREST") {
+      if (ticker !== "") warn("ticker", "Interest from a bank has no security. What is entered here is not used.");
+    } else if (ticker === "") err("ticker", "Choose the security, or type its name as your file spells it.");
     else if (ticker.length > MAX_TICKER) err("ticker", "The security name is longer than " + MAX_TICKER + " characters.");
     else {
       values.ticker = ticker;
@@ -7759,7 +7781,12 @@ span.hc { cursor: default; }
     };
     if (kind === "BUY" || kind === "SELL") {
       values.qty = num("qty", { required: true, positive: true, missing: "Enter how many units.", zero: "The number of units must be above zero." });
-      values.price = num("price", { required: true, positive: true, missing: "Enter the price per unit.", zero: kind === "SELL" ? "A sale at price zero would book the whole cost as a loss. Enter the price you got." : "The price must be above zero." });
+      // the price per unit, or the whole amount (a bond of 1,000,000 units that cost 1,012,345: the total is exact, a price per unit is not)
+      const typed = (f) => (typeof e[f] === "string" ? e[f] : typeof e[f] === "number" ? String(e[f]) : "").trim() !== "";
+      if (!typed("price") && !typed("total")) err("price", "Enter the price per unit, or the total amount.");
+      else if (typed("price") && typed("total")) err("total", "Fill in the price per unit or the total amount, not both.");
+      else if (typed("total")) values.total = num("total", { required: true, positive: true, missing: "Enter the total amount.", zero: kind === "SELL" ? "A sale for a total of zero would book the whole cost as a loss. Enter the amount you got." : "The total amount must be above zero." });
+      else values.price = num("price", { required: true, positive: true, missing: "Enter the price per unit.", zero: kind === "SELL" ? "A sale at price zero would book the whole cost as a loss. Enter the price you got." : "The price must be above zero." });
       values.fee = num("fee", { required: false, positive: false });
     } else if (kind === "DIVIDEND") {
       values.amount = num("amount", { required: true, positive: true, missing: "Enter the dividend before tax.", zero: "The dividend must be above zero." });
@@ -7769,6 +7796,26 @@ span.hc { cursor: default; }
         err("withheld", "The tax withheld cannot be more than the dividend itself.");
         values.withheld = "";
       }
+    } else if (kind === "INTEREST") {
+      values.amount = num("amount", { required: true, positive: true, missing: "Enter the interest before any tax.", zero: "The interest must be above zero." });
+      values.withheld = num("withheld", { required: false, positive: false });
+      if (values.amount !== "" && values.withheld !== "" && Dec.cmp(Dec.parse(values.withheld), Dec.parse(values.amount)) > 0) {
+        err("withheld", "The tax withheld cannot be more than the interest itself.");
+        values.withheld = "";
+      }
+      // the rate: no default is assumed here (the form starts with the bank rate, and what is saved is what was chosen)
+      if (!CLASSES.includes(e.cls)) err("cls", "Choose the tax rate of this interest: 25 % for a bank account or deposit, 27.5 % for any other interest.");
+      else values.cls = e.cls;
+      // the highest rate the treaty lets the country of the bank tax: a fraction between 0 and 1 (0.1 is 10 %), as on the Data tab
+      const capRaw = typeof e.cap === "string" ? e.cap : typeof e.cap === "number" ? String(e.cap) : "";
+      const capP = parseNumber(capRaw);
+      if (!capP.empty) {
+        if (!capP.ok || Dec.cmp(Dec.parse(capP.canon), Dec.parse("1")) > 0) err("cap", "The treaty rate is a fraction between 0 and 1 (0.1 is 10 %). " + NUMBER_HELP);
+        else values.cap = capP.canon;
+      }
+      const hasTax = values.withheld !== "" && !Dec.isZero(Dec.parse(values.withheld));
+      if (hasTax && values.cap === "" && !errors.some((x) => x.field === "cap")) warn("cap", "Without the treaty rate no credit is counted for the tax withheld abroad, and the year is shown as not complete until it is entered.");
+      else if (!hasTax && values.cap !== "") warn("cap", "The treaty rate is only used when tax was withheld abroad.");
     }
     if (typeof e.note === "string" && e.note.trim().length > MAX_NOTE) warn("note", "The note is cut to " + MAX_NOTE + " characters.");
     return { ok: errors.length === 0, errors, warnings, values };
@@ -7777,7 +7824,8 @@ span.hc { cursor: default; }
   /** The gross amount of an entry in the currency of its account, exact: units × price, or the dividend. Null when it cannot be told. */
   function gross(values) {
     if (!values) return null;
-    if (values.kind === "DIVIDEND") return values.amount !== "" ? Dec.parse(values.amount) : null;
+    if (values.kind === "DIVIDEND" || values.kind === "INTEREST") return values.amount !== "" ? Dec.parse(values.amount) : null;
+    if (values.total !== undefined && values.total !== "") return Dec.parse(values.total);
     if (values.qty === "" || values.price === "") return null;
     const q = Dec.parse(values.qty);
     const p = Dec.parse(values.price);
@@ -7798,8 +7846,11 @@ span.hc { cursor: default; }
 
   /** What one checked entry becomes: a list of rows { part, type, qty, price, fee }. */
   function rowsOf(v) {
-    if (v.kind === "BUY") return [{ part: "MAIN", type: "Buy", qty: v.qty, price: v.price, fee: v.fee === "" ? "0" : v.fee }];
-    if (v.kind === "SELL") return [{ part: "MAIN", type: "Sell", qty: v.qty, price: v.price, fee: v.fee === "" ? "0" : v.fee }];
+    // with a total amount the price column holds the whole amount (the TA types of the file format)
+    const total = typeof v.total === "string" && v.total !== "";
+    if (v.kind === "BUY") return [{ part: "MAIN", type: total ? "BuyTA" : "Buy", qty: v.qty, price: total ? v.total : v.price, fee: v.fee === "" ? "0" : v.fee }];
+    if (v.kind === "SELL") return [{ part: "MAIN", type: total ? "SellTA" : "Sell", qty: v.qty, price: total ? v.total : v.price, fee: v.fee === "" ? "0" : v.fee }];
+    if (v.kind === "INTEREST") return [{ part: "INTEREST", type: "INT", qty: "", price: v.amount, fee: "" }];
     const out = [{ part: "DIVIDEND", type: "DivTA", qty: v.qty, price: v.amount, fee: "" }];
     if (v.withheld !== "" && !Dec.isZero(Dec.parse(v.withheld))) out.push({ part: "TAX", type: "WHTX", qty: "", price: v.withheld, fee: "" });
     return out;
@@ -7833,7 +7884,7 @@ span.hc { cursor: default; }
         return;
       }
       const x = v.values;
-      const same = [x.kind, x.date, x.account, x.ticker, x.qty, x.price, x.fee, x.amount, x.withheld].join("\u0001");
+      const same = [x.kind, x.date, x.account, x.ticker, x.qty, x.price, x.total, x.fee, x.amount, x.withheld, x.cls, x.cap].join("\u0001");
       if (seenSame.has(same)) repeats.push({ id, sameAs: seenSame.get(same) });
       else seenSame.set(same, id);
       items.push({ id, n: idNumber(id), seq: i, v: v.values });
@@ -7849,8 +7900,9 @@ span.hc { cursor: default; }
       for (const r of rowsOf(it.v)) {
         tid++;
         const comment = "manual:" + it.id + (it.v.note === "" ? "" : " " + it.v.note);
-        lines.push([it.v.account, it.v.date, r.type, it.v.ticker, r.qty, r.price, r.fee, comment, String(tid)].map(csvCell).join(","));
-        meta.push({ entryId: it.id, part: r.part });
+        const symbol = it.v.kind === "INTEREST" ? CASH_SYMBOL : it.v.ticker;
+        lines.push([it.v.account, it.v.date, r.type, symbol, r.qty, r.price, r.fee, comment, String(tid)].map(csvCell).join(","));
+        meta.push({ entryId: it.id, part: r.part, interest: it.v.kind === "INTEREST" ? { cls: it.v.cls, cap: it.v.cap, withheld: it.v.withheld } : null });
       }
     }
     result.text = lines.join("\n") + "\n";
@@ -7865,6 +7917,7 @@ span.hc { cursor: default; }
       r.manual = true;
       r.entryId = m.entryId;
       r.part = m.part;
+      if (m.interest) r.interest = m.interest;
       r.id = null;
     }
     result.rows = a.rows;
@@ -7917,11 +7970,26 @@ span.hc { cursor: default; }
 
   // ---------------------------------------------------------------- looking through the list (the Transactions screen)
 
-  const KIND_GROUPS = ["ALL", "BUY", "SELL", "DIVIDEND", "OTHER"];
+  /** A fraction as typed text ("0.155") to percent text ("15.5"); "" when it is not a number. */
+  function percentOfFraction(frac) {
+    const d = Dec.parse(String(frac === undefined || frac === null ? "" : frac).trim());
+    return d ? Dec.str(Dec.normalize(Dec.mul(d, Dec.mk(100n, 0)))) : "";
+  }
+
+  /** Percent typed by the owner ("15", "15,5", "15 %") to a fraction text ("0.15"); null when it is not a number from 0 to 100. */
+  function fractionOfPercent(text) {
+    const t = String(text === undefined || text === null ? "" : text).trim().replace(",", ".").replace(/\s*%$/, "");
+    if (!/^\d+(\.\d+)?$/.test(t) || t.length > 12) return null;
+    const d = Dec.mul(Dec.parse(t), Dec.mk(1n, 2));
+    if (Dec.cmp(d, Dec.mk(1n, 0)) > 0) return null;
+    return Dec.str(Dec.normalize(d));
+  }
+
+  const KIND_GROUPS = ["ALL", "BUY", "SELL", "DIVIDEND", "INTEREST", "OTHER"];
 
   /**
    * The lines of the ledger table (Convert's tables.ledger) that match a filter, in the order they were given.
-   * filter: { text, kind: ALL|BUY|SELL|DIVIDEND|OTHER (OTHER: tax rows, cash and anything else), account, year, source: ALL|FILE|TYPED,
+   * filter: { text, kind: ALL|BUY|SELL|DIVIDEND|INTEREST|OTHER (OTHER: tax rows, cash and anything else), account, year, source: ALL|FILE|TYPED,
    *           attention: true to keep only lines that need a look (not counted, or typed in and possibly doubled) }
    * extra: { overlaps: { entryId: text }, repeats: { entryId: entryId } } from Convert's tables.manual.
    */
@@ -7933,7 +8001,7 @@ span.hc { cursor: default; }
     const kind = KIND_GROUPS.includes(f.kind) ? f.kind : "ALL";
     const doubled = (l) => l.entry !== "" && ((x.overlaps && x.overlaps[l.entry] !== undefined) || (x.repeats && x.repeats[l.entry] !== undefined));
     return (Array.isArray(lines) ? lines : []).filter((l) => {
-      if (kind !== "ALL" && (kind === "OTHER" ? l.kind === "BUY" || l.kind === "SELL" || l.kind === "DIVIDEND" : l.kind !== kind)) return false;
+      if (kind !== "ALL" && (kind === "OTHER" ? l.kind === "BUY" || l.kind === "SELL" || l.kind === "DIVIDEND" || l.kind === "INTEREST" : l.kind !== kind)) return false;
       if (f.account && l.account !== f.account) return false;
       if (f.year && l.date.slice(0, 4) !== f.year) return false;
       if (f.source === "FILE" && l.src !== "FILE") return false;
@@ -7963,6 +8031,7 @@ span.hc { cursor: default; }
     let buys = Dec.mk(0n, 0);
     let sells = Dec.mk(0n, 0);
     let divs = Dec.mk(0n, 0);
+    let interest = Dec.mk(0n, 0);
     let wht = Dec.mk(0n, 0);
     let fees = Dec.mk(0n, 0);
     let counted = 0;
@@ -7984,13 +8053,16 @@ span.hc { cursor: default; }
       } else if (l.kind === "DIVIDEND") {
         divs = Dec.add(divs, take(l.grossEur));
         wht = Dec.add(wht, take(l.whtEur));
+      } else if (l.kind === "INTEREST") {
+        interest = Dec.add(interest, take(l.grossEur));
+        wht = Dec.add(wht, take(l.whtEur));
       }
     }
     const two = (d) => Dec.str(Dec.round(d, 2), 2);
-    return { count: total, counted, notCounted: total - counted, buysEur: two(buys), sellsEur: two(sells), dividendsEur: two(divs), withheldEur: two(wht), feesEur: two(fees) };
+    return { count: total, counted, notCounted: total - counted, buysEur: two(buys), sellsEur: two(sells), dividendsEur: two(divs), interestEur: two(interest), withheldEur: two(wht), feesEur: two(fees) };
   }
 
-  return { VERSION, KINDS, KIND_GROUPS, LABEL, MAX_ENTRIES, EARLIEST, HEADER, isIso, parseNumber, nextId, blank, validate, gross, read, overlaps, filterLines, yearsOf, summarize };
+  return { VERSION, KINDS, CLASSES, CLASS_LABEL, CASH_SYMBOL, percentOfFraction, fractionOfPercent, KIND_GROUPS, LABEL, MAX_ENTRIES, EARLIEST, HEADER, isIso, parseNumber, nextId, blank, validate, gross, read, overlaps, filterLines, yearsOf, summarize };
 });
 
 /* ---- src/app/oekb-update.js ---- */
@@ -8498,6 +8570,10 @@ span.hc { cursor: default; }
  *    his accounts is a sale plus a purchase (nothing was moved between brokers), the EUR and USD account of a broker are
  *    two depots (the One-depot switch on the What-if screen merges them), a TBSZ closure carries the cost over (the
  *    Closure switch counts it as a sale).
+ *  - Bonds and interest from banks (architecture 30): a security of type BOND pays interest, not dividends (a dividend entry on it becomes
+ *    INTEREST_OTHER, 27.5 %), and a typed-in "interest from a bank" row (an INT row on the cash line, carrying what the owner chose in
+ *    row.interest) becomes one INCOME line with no depot and no security: INTEREST_BANK (25 %) or INTEREST_OTHER (27.5 %). A file's own INT row
+ *    is still refused, as before: only what the owner typed in, with its rate class, is taken.
  *  - Nothing in this file contains real data. The ISINs, tickers, prices and accounts all come from the document.
  */
 (function (root, factory) {
@@ -8512,6 +8588,9 @@ span.hc { cursor: default; }
   // Treaty rates the Austrian credit allows for dividends to a private person (Auslands-KESt-VO § 1 Abs 2 caps the credit at 15 %;
   // the DBA with the US and Switzerland set 15 %). Other countries have no default: the owner enters the rate, or the foreign tax gets no credit.
   const TREATY_CAP_DEFAULT = { US: "0.15", CH: "0.15" };
+  // A bond pays interest, and the treaty rate for interest is not the one for dividends. Hungary: interest is taxable only in the state of residence
+  // (DBA Austria-Hungary, BGBl 52/1976, Art 11 Abs 1), so the rate is 0: Hungarian tax on a coupon is shown, never credited. Any other country: no default.
+  const BOND_CAP_DEFAULT = { HU: "0" };
   const MAX_ITEMS = 12;
   const FX_MAX_LAG_DAYS = 7;
   // Lots bought before 1 Jan 2011 (shares, fund units) or 1 Oct 2011 (other assets) stay outside the tax on a later sale and are not stepped up
@@ -8544,7 +8623,7 @@ span.hc { cursor: default; }
     return d && !Dec.isNeg(d) && !Dec.isZero(d) ? d : null;
   };
   // A row typed in by hand is named in plain words; a row of the file by its type in the file.
-  const TYPED_WORD = { Buy: "purchase", Sell: "sale", DivTA: "dividend", WHTX: "tax withheld" };
+  const TYPED_WORD = { Buy: "purchase", BuyTA: "purchase", Sell: "sale", SellTA: "sale", DivTA: "dividend", WHTX: "tax withheld", INT: "interest" };
   const rowRef = (r) => r.date + " " + r.account + " " + r.symbol + " (" + (r.manual ? "typed in: " + (TYPED_WORD[r.type] || r.type) : r.type) + ")";
   const rowId = (r) => (r.manual ? "manual:" + r.entryId + (r.part === "TAX" ? ":tax" : "") : r.id !== null && r.id !== undefined ? "ps:" + r.id : "ps-line:" + r.line);
   const srcOf = (r) => (r.manual ? "typed in " : "PS ") + rowRef(r);
@@ -8693,6 +8772,8 @@ span.hc { cursor: default; }
     // left out and no ISIN or type is asked for it. Whatever is unclear makes a security count: a row without a date, a quantity that is
     // unreadable or below zero, a split, an adjustment or a row of unknown type, or an account in which the quantities do not net to zero.
     const isSecRow = (r) => !!r.symbol && r.symbol !== CASH_TICKER && !!r.tinfo && r.tinfo.fam !== "cash";
+    /** Interest from a bank that the owner typed in: the only kind of cash row that is converted (the rate class is on the row). */
+    const isInterestRow = (r) => r.manual === true && r.type === "INT" && !!r.interest;
     const symNeeded = new Map(); // ticker -> true when it matters for the tax
     {
       const net = new Map(); // ticker -> Map(account -> quantity bought minus sold before the arrival date)
@@ -8739,11 +8820,12 @@ span.hc { cursor: default; }
       if (!r.account) continue;
       let a = accounts.get(r.account);
       if (!a) {
-        a = { name: r.account, rows: 0, first: null, last: null, needed: 0, neededFirst: null };
+        a = { name: r.account, rows: 0, first: null, last: null, needed: 0, neededFirst: null, interestRows: 0 };
         accounts.set(r.account, a);
       }
       a.rows++;
-      if (isSecRow(r) && rowNeeded(r)) {
+      if (isInterestRow(r)) a.interestRows++;
+      if ((isSecRow(r) && rowNeeded(r)) || isInterestRow(r)) {
         a.needed++;
         if (r.date && (a.neededFirst === null || r.date < a.neededFirst)) a.neededFirst = r.date;
       }
@@ -8848,7 +8930,7 @@ span.hc { cursor: default; }
       t.type = t.typeSet || (t.typeAuto ? "REPORTING_FUND" : "");
       t.country = s.country || (t.isin ? t.isin.slice(0, 2) : "");
       t.capRate = s.capRate || "";
-      t.capDefault = TREATY_CAP_DEFAULT[t.country] || "";
+      t.capDefault = (t.type === "BOND" ? BOND_CAP_DEFAULT[t.country] : TREATY_CAP_DEFAULT[t.country]) || "";
       t.capUsed = t.capRate || t.capDefault;
       t.accounts = Array.from(t.accounts).sort();
       t.currencies = Array.from(t.currencies).sort();
@@ -9013,10 +9095,44 @@ span.hc { cursor: default; }
         P.group("warn", "rows", "WHT_SHARED", "Several dividend rows share one withholding row on the same day; it is counted on the first only", rowRef(r));
       }
       if (Dec.cmp(wht, gross) > 0) return rowFlag(r, "ROW_WHT_TOO_BIG", "Withholding larger than the dividend itself is not converted"), stats.skipped++;
-      const ev = { id: rowId(r), type: "INCOME", date: r.date, depot: c.depot, isin: c.sec.isin, kind: "DIVIDEND", grossEur: toEur(gross, c.rate), whtEur: toEur(wht, c.rate), seq, native: nativeIncome(r, c.acc, c.rate, gross, wht), src: srcOf(r) };
+      // The coupon of a bond is interest (§ 27 Abs 2 Z 2 EStG), not a dividend: the same 27.5 % and the same loss pool, its own name on the screens.
+      const ev = { id: rowId(r), type: "INCOME", date: r.date, depot: c.depot, isin: c.sec.isin, kind: c.sec.type === "BOND" ? "INTEREST_OTHER" : "DIVIDEND", grossEur: toEur(gross, c.rate), whtEur: toEur(wht, c.rate), seq, native: nativeIncome(r, c.acc, c.rate, gross, wht), src: srcOf(r) };
       if (c.sec.country) ev.country = c.sec.country;
       if (c.sec.capUsed) ev.treatyCapRate = c.sec.capUsed;
       if (!Dec.isZero(wht) && !c.sec.capUsed) P.group("warn", "securities", "NO_TREATY_CAP", "Foreign tax was withheld on these securities but no treaty rate is known, so no credit is counted for it until you enter the rate (country " + (c.sec.country || "?") + ")", c.sec.ticker);
+      events.push(ev);
+      stats.events.INCOME++;
+      stats.converted++;
+    }
+
+    /**
+     * Interest from a bank, typed in (architecture 30): one income line with no depot and no security. The amount is in the currency of the
+     * account and is converted at the ECB rate of its day, like every other amount. The rate class (25 % or 27.5 %) is what the owner chose for
+     * this entry; the tax withheld abroad and the treaty rate are optional, and without the rate no credit is counted (the year says so).
+     */
+    function interest(r, seq) {
+      const acc = accounts.get(r.account);
+      if (!acc || !acc.currency) {
+        stats.skipped++; // reported once for the account (NO_CURRENCY)
+        return;
+      }
+      if (r.numProblems.length) return rowFlag(r, "ROW_NUMBER", "Rows with a number that cannot be read are not converted"), stats.skipped++;
+      if (r.problems.length) return rowFlag(r, "ROW_SHAPE", "Rows with a damaged layout are not converted"), stats.skipped++;
+      const rate = fx.rate(acc.currency, r.date);
+      if (!rate.ok) {
+        if (rate.why === "NO_RATE") P.group("error", "fx", "NO_RATE", "No usable " + acc.currency + " rate on or before these dates (rates may start too late; download the full history)", r.date);
+        stats.skipped++; // a missing file is reported once per currency above
+        return;
+      }
+      if (today && r.date > today) P.group("warn", "rows", "ROW_FUTURE", "Rows dated after today are included as they are", rowRef(r));
+      const it = r.interest;
+      const gross = r.price;
+      if (gross === null || Dec.isNeg(gross) || Dec.isZero(gross)) return rowFlag(r, "ROW_INTEREST_AMOUNT", "Interest rows without an amount above zero are not converted"), stats.skipped++;
+      const wht = it.withheld === "" ? ZERO : Dec.parse(it.withheld);
+      if (!wht || Dec.isNeg(wht) || Dec.cmp(wht, gross) > 0) return rowFlag(r, "ROW_WHT_TOO_BIG", "Withholding larger than the interest itself is not converted"), stats.skipped++;
+      const ev = { id: rowId(r), type: "INCOME", date: r.date, kind: it.cls === "OTHER" ? "INTEREST_OTHER" : "INTEREST_BANK", grossEur: toEur(gross, rate), whtEur: toEur(wht, rate), seq, native: nativeIncome(r, acc, rate, gross, wht), src: srcOf(r) };
+      if (it.cap !== "") ev.treatyCapRate = it.cap;
+      if (!Dec.isZero(wht) && it.cap === "") P.group("warn", "rows", "NO_TREATY_CAP_INTEREST", "Foreign tax was withheld on this interest but no treaty rate is entered, so no credit is counted for it until you enter the rate", rowRef(r));
       events.push(ev);
       stats.events.INCOME++;
       stats.converted++;
@@ -9041,7 +9157,8 @@ span.hc { cursor: default; }
         case "withholding":
           return;
         case "cash":
-          if (r.type === "INT") return P.group("error", "rows", "ROW_INTEREST", "Interest rows (INT) are not converted yet; tell me how your interest rows look", rowRef(r)), stats.skipped++;
+          if (isInterestRow(r)) return interest(r, seq);
+          if (r.type === "INT") return P.group("error", "rows", "ROW_INTEREST", "Interest rows (INT) of the file are not converted: the tax rate of interest depends on who paid it. Type the interest in on the Transactions tab (Interest from a bank), with its rate", rowRef(r)), stats.skipped++;
           stats.ignoredCash++;
           return;
         case "split":
@@ -9205,7 +9322,7 @@ span.hc { cursor: default; }
       else if (!doc.stepUp.prices[h.isin] || doc.stepUp.prices[h.isin].price === "") P.group("error", "stepup", "NO_STEP_UP", "No market value of " + reloc + " is entered for these securities held on that day; a sale from their depots gets no tax figure until it is", (tickersOfIsin.get(h.isin) || [h.isin]).join("/"));
       if (prev) suPrev[h.isin] = { price: prev.price, fxUnitsPerEur: prev.fxUnitsPerEur, priceDate: prev.priceDate, source: prev.source };
       const tk = tickersOfIsin.get(h.isin) || [];
-      stepUpTable.push({ isin: h.isin, tickers: tk, qty: q(h.qty), depots: h.depots.sort((x, y) => cmpStr(x.depot, y.depot)), currencies: ccyOfIsin(h.isin), entry: doc.stepUp.prices[h.isin] || null, entryPrev: doc.stepUp.prevClose[h.isin] || null, ok: !!main, okPrev: !!prev });
+      stepUpTable.push({ isin: h.isin, tickers: tk, bond: liveTickers.some((t) => t.isin === h.isin && t.type === "BOND"), qty: q(h.qty), depots: h.depots.sort((x, y) => cmpStr(x.depot, y.depot)), currencies: ccyOfIsin(h.isin), entry: doc.stepUp.prices[h.isin] || null, entryPrev: doc.stepUp.prevClose[h.isin] || null, ok: !!main, okPrev: !!prev });
     }
     const priceSets = {};
     if (Object.keys(doc.stepUp.prevClose).some((i) => doc.stepUp.prevClose[i].price !== "")) {
@@ -9220,7 +9337,7 @@ span.hc { cursor: default; }
     const typeOfIsin = new Map(); // isin -> effective type
     for (const t of liveTickers) if (t.isinStatus === "OK") typeOfIsin.set(t.isin, t.type || typeOfIsin.get(t.isin) || "");
     for (const t of liveTickers) {
-      if (t.isinStatus === "OK" && t.type === "") P.group("error", "securities", "NO_TYPE", "Choose what these securities are (fund with OeKB reports, share, or fund without reports); it decides whether reports are due", t.ticker);
+      if (t.isinStatus === "OK" && t.type === "") P.group("error", "securities", "NO_TYPE", "Choose what these securities are (fund with OeKB reports, share, fund without reports, or bond); it decides whether reports are due and which tax rules apply", t.ticker);
     }
     const fundIsins = Array.from(typeOfIsin.entries()).filter(([, t]) => t === "REPORTING_FUND").map(([i]) => i);
     const noReportIsins = Array.from(typeOfIsin.entries()).filter(([, t]) => t === "NON_REPORTING_FUND").map(([i]) => i);
@@ -9347,10 +9464,11 @@ span.hc { cursor: default; }
     const metaSecurities = {};
     for (const [isin, s] of Object.entries(securities)) {
       const short = s.tickers.join(" / ");
-      metaSecurities[isin] = { name: s.names[0] || short, short, tickers: s.tickers.slice(), fundName: fundNames[isin] || "", note: typeOfIsin.get(isin) === "REPORTING_FUND" ? "fund with OeKB reports" : typeOfIsin.get(isin) === "SHARE" ? "share" : typeOfIsin.get(isin) === "NON_REPORTING_FUND" ? "fund without reports" : "" };
+      metaSecurities[isin] = { name: s.names[0] || short, short, tickers: s.tickers.slice(), fundName: fundNames[isin] || "", note: typeOfIsin.get(isin) === "REPORTING_FUND" ? "fund with OeKB reports" : typeOfIsin.get(isin) === "SHARE" ? "share" : typeOfIsin.get(isin) === "NON_REPORTING_FUND" ? "fund without reports" : typeOfIsin.get(isin) === "BOND" ? "bond" : "" };
     }
     const depots = {};
     for (const a of accountList) {
+      if (a.interestRows === a.rows) continue; // only interest from a bank was typed in for this account: it holds nothing, so it is no depot
       depots[a.depot] = depots[a.depot] || { label: depotLabel(a.broker, a.kind, a.year, a.currency), broker: a.broker, kind: a.kind, year: a.year, currency: a.currency };
       if (a.closure && a.closure.state === "OK") {
         depots[a.closure.to] = depots[a.closure.to] || { label: depotLabel(a.broker, "REGULAR", "", a.currency), broker: a.broker, kind: "REGULAR", year: "", currency: a.currency };
@@ -9504,6 +9622,7 @@ span.hc { cursor: default; }
     const LEDGER_KIND = { purchase: "BUY", move_in: "BUY", sale: "SELL", move_out: "SELL", dividend: "DIVIDEND", withholding: "TAX", cash: "CASH" };
     const grossOf = (r) => {
       if (!r.tinfo) return null;
+      if (isInterestRow(r)) return r.price;
       if (r.tinfo.fam === "wht") return r.price;
       if (r.tinfo.totalPrice) return r.price;
       return r.price !== null && r.qty !== null ? Dec.mul(r.price, r.qty) : null;
@@ -9531,7 +9650,7 @@ span.hc { cursor: default; }
       if (ev) {
         status = "COUNTED";
         why = "";
-      } else if (r.role === "cash") {
+      } else if (r.role === "cash" && !isInterestRow(r)) {
         status = "IGNORED";
         why = "Cash is not tracked, and a cash movement changes no holding or taxable income.";
       } else if (isSecRow(r) && !rowNeeded(r)) {
@@ -9545,11 +9664,17 @@ span.hc { cursor: default; }
         entry: r.manual ? r.entryId : "",
         date: r.date || "",
         account: r.account,
-        ticker: r.symbol || "",
+        ticker: isInterestRow(r) ? "" : r.symbol || "",
         name: sec && sec.name ? sec.name : "",
         isin: sec && sec.isinStatus === "OK" ? sec.isin : "",
-        kind: LEDGER_KIND[r.role] || "OTHER",
+        // a bond: its "dividend" lines are coupons
+        bond: !!(sec && sec.type === "BOND"),
+        kind: isInterestRow(r) ? "INTEREST" : LEDGER_KIND[r.role] || "OTHER",
         type: r.type,
+        // true when the price column is the whole amount (BuyTA, SellTA, DivTA) and not the price of one unit; then `gross` is the amount
+        totalPrice: !!(r.tinfo && r.tinfo.totalPrice),
+        // interest from a bank: the rate class the owner chose (BANK 25 %, OTHER 27.5 %)
+        rateClass: isInterestRow(r) ? r.interest.cls : "",
         move: r.role === "move_in" || r.role === "move_out",
         // for a move: the account on the other side and the day the units left (the performance views by account use them)
         moveWith: (r.role === "move_in" || r.role === "move_out") && r.moveWith ? r.moveWith : "",
@@ -9559,7 +9684,7 @@ span.hc { cursor: default; }
         fee: r.fee === null ? "" : Dec.str(r.fee),
         ccy: acc ? acc.currency : "",
         gross: g === null ? "" : Dec.str(g),
-        withheld: r.role === "dividend" && divOwner.get(dayKey(r)) === r && withheldOf.has(dayKey(r)) && !withheldOf.get(dayKey(r)).bad ? Dec.str(withheldOf.get(dayKey(r)).sum) : "",
+        withheld: isInterestRow(r) ? r.interest.withheld : r.role === "dividend" && divOwner.get(dayKey(r)) === r && withheldOf.has(dayKey(r)) && !withheldOf.get(dayKey(r)).bad ? Dec.str(withheldOf.get(dayKey(r)).sum) : "",
         grossEur: ev ? (ev.type === "ACQUIRE" ? ev.grossEur : ev.type === "DISPOSE" ? ev.proceedsEur : ev.grossEur) : "",
         feeEur: ev && ev.type !== "INCOME" ? ev.feeEur : "",
         whtEur: ev && ev.type === "INCOME" ? ev.whtEur : "",
@@ -11241,6 +11366,8 @@ span.hc { cursor: default; }
    *   prices    (symbol) => the price entry { currency, closes: [[day, "price"], ...], splits: [{ date, num, den }], status, error } or null,
    *   fx        (currency, day) => { ok, rate (units of the currency per euro), lagDays } (never asked for EUR),
    *   options   { maxPriceLagDays: 10, maxFxLagDays: 7, applySplits: true, unpriced: "exclude" | "trade" }
+   *   bonds     the tickers of bonds (architecture 30.5): a bond has no market price, so it is always valued at the prices of the owner's own
+   *             transactions, in the currency of its account, and converted to euro at the rate of every day (the exchange rate shows day by day)
    *   end       (a view only) "YYYY-MM-DD": the last day of the axis (never before the last row), so that every view ends on the day of the whole
    *   decided   (a view only) decisions(whole model): which tickers the whole portfolio could value; the view follows it
    * }
@@ -11254,6 +11381,7 @@ span.hc { cursor: default; }
     const failed = (reason, text, tickers) => ({ ok: false, reason, text, version: VERSION, tickers: tickers || [], problems: P.list() });
     if (todayDn === null) return failed("NO_TODAY", "The page did not pass today's date.");
     const mapping = input.mapping || {};
+    const bonds = new Set(Array.isArray(input.bonds) ? input.bonds.filter((t) => typeof t === "string") : []);
     const lines = Array.isArray(input.lines) ? input.lines : [];
 
     // ---- 1. the lines, grouped by ticker
@@ -11293,7 +11421,9 @@ span.hc { cursor: default; }
         g.divs.push({ dn, gross, withheld: wh, net: gross - wh, ccy: str(l.ccy) });
       } else {
         const q = num(l.qty);
-        const price = num(l.price);
+        // A row typed with the total amount (BuyTA, SellTA) has the whole amount in its price column: the price of one unit is that amount over the units.
+        const total = l.totalPrice === true ? num(l.gross) : null;
+        const price = l.totalPrice === true ? (total !== null && q !== null && q > 0 ? total / q : null) : num(l.price);
         if (q === null || q <= 0 || (price !== null && price < 0)) {
           P.add("warn", "BAD_ROW", "A " + (l.kind === "BUY" ? "purchase" : "sale") + " of " + l.ticker + " on " + l.date + " has no usable quantity or price and is not part of the figures.", l.ticker);
           continue;
@@ -11338,7 +11468,7 @@ span.hc { cursor: default; }
     const live = [];
     for (const g of Array.from(groups.values()).sort((a, b) => (a.ticker < b.ticker ? -1 : a.ticker > b.ticker ? 1 : 0))) {
       const all = g.trades.map((t) => t.dn).concat(g.divs.map((d) => d.dn));
-      const info = { ticker: g.ticker, name: g.name, symbol: "", currency: "", rows: g.rows, first: all.length ? isoOf(Math.min(...all)) : "", last: all.length ? isoOf(Math.max(...all)) : "", state: "EXCLUDED", reason: "", text: "", valuedBy: "" };
+      const info = { ticker: g.ticker, name: g.name, symbol: "", currency: "", rows: g.rows, first: all.length ? isoOf(Math.min(...all)) : "", last: all.length ? isoOf(Math.max(...all)) : "", state: "EXCLUDED", reason: "", text: "", valuedBy: "", bond: false };
       infos.push(info);
       if (!all.length) {
         info.reason = "NO_ROWS";
@@ -11355,8 +11485,10 @@ span.hc { cursor: default; }
         continue;
       }
       const firstDn = Math.min(...all);
-      const symbol = typeof mapping[g.ticker] === "string" ? mapping[g.ticker] : "";
+      const isBond = bonds.has(g.ticker);
+      const symbol = !isBond && typeof mapping[g.ticker] === "string" ? mapping[g.ticker] : "";
       info.symbol = symbol;
+      if (isBond) info.bond = true;
       const entry = symbol && typeof input.prices === "function" ? input.prices(symbol) : null;
       const closes = entry && Array.isArray(entry.closes) ? entry.closes : [];
       let ser = null;
@@ -11387,7 +11519,41 @@ span.hc { cursor: default; }
         info.reason = "NO_PRICES";
         info.text = entry && entry.status === "error" ? "The last update for " + symbol + " failed" + (entry.error ? ": " + entry.error : ".") : "No prices for " + symbol + " have been loaded yet.";
       }
-      if (!ser && o.unpriced === "trade") {
+      if (!ser && isBond) {
+        // A bond has no market price (the Treasury redeems it at a fixed price). It is valued at the prices of the owner's own transactions, in the
+        // currency of the account, flat from one transaction to the next; the daily ECB rate turns it into euro, so the moves of the exchange
+        // rate show day by day, as they do in the real result. (Trades in more than one currency: the euro prices of the days they were made.)
+        const byDay = new Map();
+        const ccies = new Set();
+        for (const t of g.trades) if (t.price !== null) ccies.add(t.ccy || "EUR");
+        const native = ccies.size === 1 ? Array.from(ccies)[0] : "";
+        let missing = "";
+        for (const t of g.trades) {
+          if (t.price === null) continue;
+          if (native !== "") byDay.set(t.dn, t.price);
+          else {
+            const f = fx(t.ccy || "EUR", t.dn);
+            if (f) byDay.set(t.dn, t.price / f.rate);
+            else missing = t.ccy || "EUR";
+          }
+        }
+        if (missing) {
+          info.reason = "NO_FX_RATES";
+          info.text = "There are no ECB rates for " + missing + " (load the ECB rate file, step 4 of the Data tab).";
+        } else if (byDay.size) {
+          const ds = Array.from(byDay.keys()).sort((a, b) => a - b);
+          ser = { dns: ds, px: ds.map((d) => byDay.get(d)), ccy: native !== "" ? native : "EUR", splits: [], real: false };
+          info.currency = ser.ccy;
+          info.reason = "";
+          info.text = "";
+          info.valuedBy = "TRADES";
+          P.add("info", "BOND_VALUED", g.ticker + " is a bond. It is valued at the prices of your own transactions (in its own currency, converted to euro at the rate of each day), so its value changes when you trade and with the exchange rate, and the interest shows on the days it was paid.", g.ticker);
+        } else {
+          info.reason = "NO_PRICES";
+          info.text = "No purchase or sale of this bond has a price, so it cannot be valued.";
+        }
+      }
+      if (!ser && !isBond && o.unpriced === "trade") {
         // no market data: value at the transaction prices (in euro)
         const byDay = new Map();
         let okAll = true;
@@ -11478,7 +11644,7 @@ span.hc { cursor: default; }
     // ---- 5. every security, day by day
     const per = [];
     for (const { g, ser, info } of live) {
-      const A = { ticker: g.ticker, symbol: info.symbol, name: info.name, currency: ser.ccy, valuedBy: info.valuedBy, value: zeros(), units: zeros(), inflow: zeros(), outflow: zeros(), dividends: zeros(), index: zeros(), fees: zeros(), divGross: zeros(), withheld: zeros(), trades: [] };
+      const A = { ticker: g.ticker, symbol: info.symbol, name: info.name, currency: ser.ccy, valuedBy: info.valuedBy, bond: info.bond === true, value: zeros(), units: zeros(), inflow: zeros(), outflow: zeros(), dividends: zeros(), index: zeros(), fees: zeros(), divGross: zeros(), withheld: zeros(), trades: [] };
       const tr = g.trades;
       const dv = g.divs;
       let qty = 0;
@@ -11880,6 +12046,7 @@ span.hc { cursor: default; }
         name: A.name,
         currency: A.currency,
         valuedBy: A.valuedBy,
+        bond: A.bond === true,
         units: A.units[e],
         valueStart: A.value[s],
         valueEnd: A.value[e],
@@ -12411,7 +12578,7 @@ span.hc { cursor: default; }
 })(typeof self !== "undefined" ? self : this, function (Ecb, PriceBook, Perf) {
   "use strict";
 
-  const VERSION = "perfinput-0.3.0";
+  const VERSION = "perfinput-0.4.0";
   const MAX_LAG_DAYS = 3650; // a rate is always used, however old; the engine reports the ones that are far from their day
 
   const readers = new Map(); // "hash|ccy" -> ledger or null (the ECB file is large: read it once per currency)
@@ -12482,6 +12649,12 @@ span.hc { cursor: default; }
     return out;
   }
 
+  /** The tickers of the securities the owner chose the type Bond for (and that count for the tax): valued by their own transactions (architecture 30.5). */
+  function bondsOf(conv) {
+    const list = conv && conv.tables && Array.isArray(conv.tables.tickers) ? conv.tables.tickers : [];
+    return list.filter((t) => t && t.type === "BOND" && t.needed !== false && typeof t.ticker === "string").map((t) => t.ticker).sort();
+  }
+
   /** The input of Perf.compute. args: { doc, conv, book, today, options }. */
   function build(args) {
     const conv = args.conv;
@@ -12490,6 +12663,7 @@ span.hc { cursor: default; }
       lines: conv && conv.tables && Array.isArray(conv.tables.ledger) ? conv.tables.ledger : [],
       today: args.today,
       mapping: mappingOf(args.doc),
+      bonds: bondsOf(conv),
       prices: (symbol) => (book && book.store && book.store.symbols[symbol]) || null,
       fx: makeFx(args.doc),
       options: args.options || {},
@@ -12594,7 +12768,7 @@ span.hc { cursor: default; }
     return { loaded: names.length > 0, currencies: names };
   }
 
-  return { VERSION, makeFx, makeRateOn, mappingOf, build, run, ecbInfo, isWhole, viewKey, placesOf, tickersAt, scopeOf, runView };
+  return { VERSION, makeFx, makeRateOn, mappingOf, bondsOf, build, run, ecbInfo, isWhole, viewKey, placesOf, tickersAt, scopeOf, runView };
 });
 
 /* ---- src/app/liquidate-input.js ---- */
@@ -13657,7 +13831,7 @@ span.hc { cursor: default; }
       return {
         t: name,
         r: [row("Units held", r.held ? F.units(r.units) : "sold"), money("Value at the end", r.valueEnd), row("Share of the value", r.held ? (r.weight * 100).toFixed(1) + " %" : "–"), money("Value at the start", r.valueStart), money("Paid in", r.inflow), money("Received", r.outflow), money("Dividends", r.dividends), money("Gain", r.gain, true), pct("Return", r.twr, true), row("Prices in", r.currency || "–")].concat(Array.isArray(ids) ? ids : []),
-        n: r.valuedBy === "TRADES" ? "No market prices: its value changes only on the days you traded." : "The return is the security's own time-weighted return over the time-frame, from the day you bought it if that was later.",
+        n: r.bond === true ? "A bond: valued at the prices of your own transactions, in its currency, and converted to euro at the rate of each day. Its value changes when you trade and with the exchange rate; the interest comes on the days it was paid." : r.valuedBy === "TRADES" ? "No market prices: its value changes only on the days you traded." : "The return is the security's own time-weighted return over the time-frame, from the day you bought it if that was later.",
       };
     }
 
@@ -16549,7 +16723,7 @@ const DataUI = (function () {
   const POS_DEC = /^\d+(\.\d+)?$/;
   const ECB_ZIP = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.zip";
   const ECB_PORTAL = "https://data.ecb.europa.eu/data/datasets/EXR/EXR.D.USD.EUR.SP00.A";
-  const TYPE_TEXT = { REPORTING_FUND: "Fund with OeKB reports", SHARE: "Share", NON_REPORTING_FUND: "Fund without OeKB reports" };
+  const TYPE_TEXT = { REPORTING_FUND: "Fund with OeKB reports", SHARE: "Share", NON_REPORTING_FUND: "Fund without OeKB reports", BOND: "Bond" };
   const STEP_ORDER = ["file", "securities", "accounts", "rates", "stepup", "oekb", "rows", "messages", "backup"];
   const STEP_TITLE = { file: "Your transaction file", securities: "Securities (ISINs)", accounts: "Accounts and TBSZ closures", rates: "Exchange rates (ECB)", stepup: "Prices of 28 Jan 2020", oekb: "OeKB fund reports", rows: "Rows to look at", messages: "All messages", backup: "Backup and restore" };
   const STEP_CONV = { file: ["ps"], securities: ["securities"], accounts: ["accounts", "closures"], rates: ["fx"], stepup: ["stepup"], oekb: ["oekb"], rows: ["rows"] };
@@ -16862,16 +17036,16 @@ const DataUI = (function () {
       const set = (patch) => host.commit((x) => { x.securities[t.ticker] = Object.assign({ isin: "", name: "", type: "", country: "", capRate: "" }, x.securities[t.ticker] || {}, patch); });
       const ek = "sec:" + t.ticker;
       const isinChip = t.isinStatus === "OK" ? chip("ISIN ok", "ok") : t.isinStatus === "MISSING" ? chip("ISIN needed", "bad") : t.isinStatus === "SHAPE" ? chip("not an ISIN", "bad") : chip("check digit wrong", "bad");
-      const typeOptions = [["", t.typeAuto ? "Automatic: fund with OeKB reports (found in your OeKB data)" : "Choose …"], ["REPORTING_FUND", "Fund with OeKB reports"], ["SHARE", "Share"], ["NON_REPORTING_FUND", "Fund without OeKB reports"]];
+      const typeOptions = [["", t.typeAuto ? "Automatic: fund with OeKB reports (found in your OeKB data)" : "Choose …"], ["REPORTING_FUND", "Fund with OeKB reports"], ["SHARE", "Share"], ["NON_REPORTING_FUND", "Fund without OeKB reports"], ["BOND", "Bond (its coupons are interest at 27.5 %; no fund reports)"]];
       const fields = [
         textField({ key: ek + ":isin", label: "ISIN", value: cur.isin, upper: true, maxlength: 12, placeholder: "12 characters", onCommit: (v) => set({ isin: v }), error: t.isinStatus === "SHAPE" || t.isinStatus === "CHECK" ? (t.isinStatus === "SHAPE" ? "An ISIN has 2 letters, 9 letters or digits and 1 digit." : "The last digit does not fit the others: probably a typing mistake.") : null }),
         selectField({ key: ek + ":type", label: "What is it?", value: cur.type, options: typeOptions, invalid: t.isinStatus === "OK" && t.type === "", onCommit: (v) => set({ type: v }) }),
       ];
       const more = [textField({ key: ek + ":name", label: "Name (optional)", value: cur.name, mono: false, maxlength: 120, onCommit: (v) => set({ name: v }), wide: true })];
       if (t.dividends > 0) {
-        more.push(textField({ key: ek + ":country", label: "Country of the company (2 letters)", value: cur.country, upper: true, maxlength: 2, placeholder: t.isin ? t.isin.slice(0, 2) : "US", onCommit: (v) => set({ country: v }), hint: "Where foreign tax was withheld. Empty means the first two letters of the ISIN." }));
+        more.push(textField({ key: ek + ":country", label: cur.type === "BOND" ? "Country of the issuer (2 letters)" : "Country of the company (2 letters)", value: cur.country, upper: true, maxlength: 2, placeholder: t.isin ? t.isin.slice(0, 2) : "US", onCommit: (v) => set({ country: v }), hint: "Where foreign tax was withheld. Empty means the first two letters of the ISIN." }));
         const capErr = st.errs[ek + ":cap"];
-        more.push(textField({ key: ek + ":cap", label: "Treaty rate in % (only if not 15)", value: cur.capRate ? percentOfFraction(cur.capRate) : "", placeholder: t.capDefault ? percentOfFraction(t.capDefault) : "none known", inputmode: "decimal", error: capErr || null, hint: t.capDefault ? "The treaty with " + t.country + " allows " + percentOfFraction(t.capDefault) + " %. Foreign tax above the treaty rate cannot be credited." : "No treaty rate is known for " + (t.country || "this country") + ", so no foreign tax is credited until you enter one.", onCommit: (v) => {
+        more.push(textField({ key: ek + ":cap", label: cur.type === "BOND" ? "Treaty rate in % (only if not the one shown)" : "Treaty rate in % (only if not 15)", value: cur.capRate ? percentOfFraction(cur.capRate) : "", placeholder: t.capDefault ? percentOfFraction(t.capDefault) : "none known", inputmode: "decimal", error: capErr || null, hint: t.capDefault ? "The treaty with " + t.country + " allows " + percentOfFraction(t.capDefault) + " %. Foreign tax above the treaty rate cannot be credited." : "No treaty rate is known for " + (t.country || "this country") + ", so no foreign tax is credited until you enter one.", onCommit: (v) => {
           if (v.trim() === "") {
             st.errs[ek + ":cap"] = null;
             set({ capRate: "" });
@@ -17119,7 +17293,7 @@ const DataUI = (function () {
         const bad = cur.price !== "" && !POS_DEC.test(cur.price);
         const needCcy = x.currencies.length !== 1;
         return [
-          textField({ key: k + ":price", label, value: cur.price, inputmode: "decimal", placeholder: "for example 83.45", error: bad ? "Digits and a dot, like 83.45" : null, onCommit: (v) => set({ price: v.trim().replace(",", ".") }) }),
+          textField({ key: k + ":price", label, value: cur.price, inputmode: "decimal", placeholder: x.bond ? "for example 1.0035" : "for example 83.45", error: bad ? "Digits and a dot, like " + (x.bond ? "1.0035" : "83.45") : null, hint: x.bond ? "A bond: the value of one unit of nominal (1 Ft). 100.35 % of the nominal is 1.0035. The day's accrued interest is counted in the market value here; if you and your tax adviser read it otherwise, enter what you decide." : "", onCommit: (v) => set({ price: v.trim().replace(",", ".") }) }),
           selectField({ key: k + ":ccy", label: "Currency of the price", value: cur.ccy, invalid: needCcy && cur.price !== "" && cur.ccy === "", options: [["", x.currencies.length === 1 ? "Automatic: " + x.currencies[0] : "Choose …"]].concat(CURRENCIES.map((cc) => [cc, cc])), onCommit: (v) => set({ ccy: v }) }),
           textField({ key: k + ":src", label: "Where is the price from? (optional)", value: cur.source, mono: false, maxlength: 200, placeholder: "for example the broker statement", wide: true, onCommit: (v) => set({ source: v }) }),
         ];
@@ -17130,7 +17304,7 @@ const DataUI = (function () {
       return el("div", { class: "sec", "data-k": "su:" + isin },
         el("div", { class: "sec-head" }, el("span", { class: "rc-title mono", text: name }), x.ok ? chip("price entered", "ok") : chip("price needed", "bad")),
         el("div", { class: "rc-sub", text: M.fmtQty(x.qty) + " units held · " + x.depots.map((p) => p.depot + " " + M.fmtQty(p.qty)).join(", ") }),
-        el("div", { class: "fields" }, mk("prices", "Closing price on " + fd(d.settings.relocationDate), k1)),
+        el("div", { class: "fields" }, mk("prices", (x.bond ? "Market value per unit on " : "Closing price on ") + fd(d.settings.relocationDate), k1)),
         fold({ class: "mini", "data-k": "sup:" + isin }, st.open["sup:" + isin] !== undefined ? !!st.open["sup:" + isin] : !!x.entryPrev, (v) => setOpen("sup:" + isin, v), "Also the closing price of the day before (to compare)",
           el("div", { class: "body" }, note("The law names the market value of the day itself, but not whether that is the opening or the closing price. Enter the closing price of the day before to see on the What-if tab how much that choice matters."), el("div", { class: "fields" }, mk("prevClose", "Closing price of the day before", k2)))));
     }
@@ -18712,10 +18886,16 @@ const LedgerUI = (function () {
 
   const PAGE = 50;
   const NEW = "__new__";
-  const KIND_TEXT = { BUY: "Purchase", SELL: "Sale", DIVIDEND: "Dividend", TAX: "Tax withheld", CASH: "Cash", OTHER: "Other" };
-  const KIND_FILTERS = [["ALL", "All"], ["BUY", "Purchases"], ["SELL", "Sales"], ["DIVIDEND", "Dividends"], ["OTHER", "Other"]];
+  const KIND_TEXT = { BUY: "Purchase", SELL: "Sale", DIVIDEND: "Dividend", INTEREST: "Interest", TAX: "Tax withheld", CASH: "Cash", OTHER: "Other" };
+  const KIND_FILTERS = [["ALL", "All"], ["BUY", "Purchases"], ["SELL", "Sales"], ["DIVIDEND", "Dividends"], ["INTEREST", "Interest"], ["OTHER", "Other"]];
   const SOURCE_FILTERS = [["ALL", "All"], ["FILE", "From your file"], ["TYPED", "Typed in by you"]];
-  const ENTRY_KINDS = [["BUY", "Purchase"], ["SELL", "Sale"], ["DIVIDEND", "Dividend"]];
+  const ENTRY_KINDS = [["BUY", "Purchase"], ["SELL", "Sale"], ["DIVIDEND", "Dividend or coupon"], ["INTEREST", "Interest from a bank"]];
+  // The two tax rates of interest from a bank (architecture 30.3), as the owner chooses them for each entry.
+  const CLASS_OPTIONS = [["BANK", "25 %"], ["OTHER", "27.5 %"]];
+  const CLASS_HINT = {
+    BANK: "25 %: interest on a bank account or a deposit, for example a savings account.",
+    OTHER: "27.5 %: any other interest, for example the income of a money-market fund that an app pays out as \"interest\" (it is not a bank deposit).",
+  };
 
   const defaultFilter = () => ({ text: "", kind: "ALL", account: "", year: "", source: "ALL", attention: false });
   const fid = (key) => "f-" + String(key).replace(/[^A-Za-z0-9_-]/g, "-");
@@ -18817,6 +18997,8 @@ const LedgerUI = (function () {
 
     function setKind(kind) {
       st.form.values.kind = kind;
+      // interest has to say which rate it belongs to; the form starts with the one for a bank account (the owner can change it)
+      if (kind === "INTEREST" && !Ledger.CLASSES.includes(st.form.values.cls)) st.form.values.cls = "BANK";
       host.refresh();
     }
 
@@ -18875,6 +19057,7 @@ const LedgerUI = (function () {
       const show = (field) => f.attempted || nonEmpty(v[field]);
       const errs = {};
       for (const e of res.errors) if (errs[e.field] === undefined && show(e.field)) errs[e.field] = e.text;
+      if (errs.cap !== undefined) errs.cap = "Use a percentage from 0 to 100, like 15 or 7.5.";
       const accounts = knownAccounts();
       const tickers = knownTickers();
       const kind = v.kind;
@@ -18890,7 +19073,7 @@ const LedgerUI = (function () {
 
       // account: pick one the data knows, or type a new one
       fields.push(selectField({
-        key: "tx-account", label: "Account", error: f.newAccount ? null : errs.account,
+        key: "tx-account", label: kind === "INTEREST" ? "Account that was paid the interest" : "Account", error: f.newAccount ? null : errs.account,
         children: [el("option", { value: "", selected: !f.newAccount && v.account === "", text: "Choose …" })].concat(accounts.map((a) => el("option", { value: a, selected: !f.newAccount && v.account === a, text: a })), [el("option", { value: NEW, selected: f.newAccount, text: "Another account …" })]),
         onCommit: (val) => {
           if (val === NEW) {
@@ -18907,44 +19090,68 @@ const LedgerUI = (function () {
         fields.push(textField({ key: "tx-account-new", label: "Name of the new account", value: v.account, mono: false, maxlength: 80, placeholder: "for example BROKER-EUR", error: errs.account, hint: "As your file spells account names. The currency is read from the end (EUR, USD, …).", onCommit: (t) => setValue("account", sameSpelling(t, accounts)) }));
       }
 
-      // security
-      fields.push(selectField({
-        key: "tx-ticker", label: "Security", error: f.newTicker ? null : errs.ticker,
-        children: [el("option", { value: "", selected: !f.newTicker && v.ticker === "", text: "Choose …" })].concat(tickers.map((t) => el("option", { value: t, selected: !f.newTicker && v.ticker === t, text: t })), [el("option", { value: NEW, selected: f.newTicker, text: "Another security …" })]),
-        hint: !f.newTicker && sec && (sec.name || sec.isin) ? [sec.name, sec.isin].filter(Boolean).join(" · ") : "",
-        onCommit: (val) => {
-          if (val === NEW) {
-            f.newTicker = true;
-            v.ticker = "";
-          } else {
-            f.newTicker = false;
-            v.ticker = val;
-          }
-          host.refresh();
-        },
-      }));
-      if (f.newTicker) {
-        fields.push(textField({ key: "tx-ticker-new", label: "Name of the new security", value: v.ticker, mono: false, maxlength: 60, placeholder: "as your file spells it, like VWCE.DE", error: errs.ticker, hint: "It needs its ISIN on the Data tab before it is counted.", onCommit: (t) => setValue("ticker", sameSpelling(t, tickers)) }));
+      // security (interest from a bank has none)
+      if (kind !== "INTEREST") {
+        fields.push(selectField({
+          key: "tx-ticker", label: "Security", error: f.newTicker ? null : errs.ticker,
+          children: [el("option", { value: "", selected: !f.newTicker && v.ticker === "", text: "Choose …" })].concat(tickers.map((t) => el("option", { value: t, selected: !f.newTicker && v.ticker === t, text: t })), [el("option", { value: NEW, selected: f.newTicker, text: "Another security …" })]),
+          hint: !f.newTicker && sec && (sec.name || sec.isin) ? [sec.name, sec.isin].filter(Boolean).join(" · ") : "",
+          onCommit: (val) => {
+            if (val === NEW) {
+              f.newTicker = true;
+              v.ticker = "";
+            } else {
+              f.newTicker = false;
+              v.ticker = val;
+            }
+            host.refresh();
+          },
+        }));
+        if (f.newTicker) {
+          fields.push(textField({ key: "tx-ticker-new", label: "Name of the new security", value: v.ticker, mono: false, maxlength: 60, placeholder: "as your file spells it, like VWCE.DE", error: errs.ticker, hint: "It needs its ISIN on the Data tab before it is counted.", onCommit: (t) => setValue("ticker", sameSpelling(t, tickers)) }));
+        }
+
       }
 
       const inCcy = ccy ? " in " + ccy : "";
       if (kind === "BUY" || kind === "SELL") {
-        fields.push(textField({ key: "tx-qty", label: "Units", value: v.qty, inputmode: "decimal", placeholder: "for example 10 or 2.5", error: errs.qty, onCommit: (t) => setValue("qty", t) }));
+        fields.push(textField({ key: "tx-qty", label: "Units", value: v.qty, inputmode: "decimal", placeholder: "for example 10 or 2.5", error: errs.qty, hint: sec && sec.type === "BOND" ? "For a bond: the nominal value in its currency (1 Ft each), as your statement shows it." : "", onCommit: (t) => setValue("qty", t) }));
         fields.push(textField({ key: "tx-price", label: "Price per unit" + inCcy, value: v.price, inputmode: "decimal", placeholder: "for example 104.30", error: errs.price, onCommit: (t) => setValue("price", t) }));
+        fields.push(textField({ key: "tx-total", label: "or the total amount" + inCcy, value: v.total, inputmode: "decimal", placeholder: "for example 1012345", error: errs.total, hint: "Fill in the price per unit or the total, not both. The total is exact, with nothing to round; for a bond, the whole amount on your statement.", onCommit: (t) => setValue("total", t) }));
         fields.push(textField({ key: "tx-fee", label: "Fee" + inCcy + " (optional)", value: v.fee, inputmode: "decimal", placeholder: "0", error: errs.fee, hint: "It does not reduce the taxable gain (§ 27a Abs 4 Z 2 EStG).", onCommit: (t) => setValue("fee", t) }));
-      } else {
-        fields.push(textField({ key: "tx-amount", label: "Dividend before tax" + inCcy, value: v.amount, inputmode: "decimal", placeholder: "for example 35.20", error: errs.amount, hint: "The whole amount, before any tax was taken off.", onCommit: (t) => setValue("amount", t) }));
+      } else if (kind === "DIVIDEND") {
+        const bondHint = sec && sec.type === "BOND" ? "The coupon of a bond: counted as interest at 27.5 %." : "The whole amount, before any tax was taken off.";
+        fields.push(textField({ key: "tx-amount", label: (sec && sec.type === "BOND" ? "Coupon before tax" : "Dividend before tax") + inCcy, value: v.amount, inputmode: "decimal", placeholder: "for example 35.20", error: errs.amount, hint: bondHint, onCommit: (t) => setValue("amount", t) }));
         fields.push(textField({ key: "tx-withheld", label: "Tax withheld at the source" + inCcy + " (optional)", value: v.withheld, inputmode: "decimal", placeholder: "0", error: errs.withheld, hint: "For example the 15 % a US fund pays out less. Leave empty if none.", onCommit: (t) => setValue("withheld", t) }));
         fields.push(textField({ key: "tx-qty", label: "Units held (optional)", value: v.qty, inputmode: "decimal", placeholder: "", error: errs.qty, onCommit: (t) => setValue("qty", t) }));
+      } else {
+        // interest from a bank: no security; the rate, and optionally the tax withheld abroad with the treaty rate
+        fields.push(textField({ key: "tx-amount", label: "Interest before any tax" + inCcy, value: v.amount, inputmode: "decimal", placeholder: "for example 41.37", error: errs.amount, hint: "The whole amount credited to the account, before any tax was taken off.", onCommit: (t) => setValue("amount", t) }));
+        fields.push(el("div", { class: "field wide" }, el("label", { text: "Which tax rate does this interest have?" }), seg("Tax rate of this interest", CLASS_OPTIONS, v.cls, (c) => setValue("cls", c), "tx-cls"),
+          el("span", { class: "hint", "data-k": "tx-cls-hint", text: CLASS_HINT[v.cls] || "Choose one." }),
+          errs.cls ? el("span", { class: "err", text: errs.cls }) : null));
+        fields.push(textField({ key: "tx-withheld", label: "Tax withheld abroad" + inCcy + " (optional)", value: v.withheld, inputmode: "decimal", placeholder: "0", error: errs.withheld, hint: "Only if the bank took tax off at the source. Leave empty if none.", onCommit: (t) => setValue("withheld", t) }));
+        const capShown = f.capText !== undefined ? f.capText : Ledger.percentOfFraction(v.cap);
+        fields.push(textField({ key: "tx-cap", label: "Treaty rate in % (optional)", value: capShown, inputmode: "decimal", placeholder: "for example 15", error: errs.cap, hint: "The most the double-tax treaty lets that country take, in %. Without it no credit is counted for tax withheld abroad.", onCommit: (t) => {
+          f.capText = t;
+          const frac = Ledger.fractionOfPercent(t);
+          // what cannot be read as a percentage is handed on as typed, so that the checks refuse it next to the field
+          setValue("cap", t.trim() === "" ? "" : frac === null ? "?" : frac);
+        } }));
       }
       fields.push(textField({ key: "tx-note", label: "Note (optional)", value: v.note, mono: false, maxlength: 200, wide: true, placeholder: "for example: bought via savings plan", onCommit: (t) => setValue("note", t) }));
 
       const body = [el("div", { class: "fields" }, fields)];
-      const gross = res.ok || (kind !== "DIVIDEND" ? res.values.qty !== "" && res.values.price !== "" : res.values.amount !== "") ? Ledger.gross(res.values) : null;
+      const isIncome = kind === "DIVIDEND" || kind === "INTEREST";
+      const gross = res.ok || (isIncome ? res.values.amount !== "" : res.values.qty !== "" && (res.values.price !== "" || res.values.total !== "")) ? Ledger.gross(res.values) : null;
       if (gross) {
-        const label = kind === "DIVIDEND" ? "Dividend" : (kind === "BUY" ? "Cost" : "Proceeds") + " of " + fq(res.values.qty) + " × " + fa(res.values.price);
-        body.push(el("p", { class: "note", "data-k": "tx-preview", text: label + ": " + fa(Dec.str(gross)) + (ccy ? " " + ccy : "") + (kind === "DIVIDEND" && res.values.withheld !== "" ? " · tax withheld " + fa(res.values.withheld) + (ccy ? " " + ccy : "") : "") + "." + (ccy && ccy !== "EUR" ? " It is converted to euro at the ECB rate of the day." : "") }));
+        const byTotal = !isIncome && res.values.total !== "";
+        const label = kind === "INTEREST" ? "Interest" : kind === "DIVIDEND" ? (sec && sec.type === "BOND" ? "Coupon" : "Dividend") : (kind === "BUY" ? "Cost" : "Proceeds") + " of " + fq(res.values.qty) + (byTotal ? " units" : " × " + fa(res.values.price));
+        const taxText = isIncome && res.values.withheld !== "" && !M.isZeroText(res.values.withheld) ? " · tax withheld " + fa(res.values.withheld) + (ccy ? " " + ccy : "") : "";
+        const rateText = kind === "INTEREST" && Ledger.CLASSES.includes(res.values.cls) ? " · taxed at " + (res.values.cls === "BANK" ? "25 %" : "27.5 %") : "";
+        body.push(el("p", { class: "note", "data-k": "tx-preview", text: label + ": " + fa(Dec.str(gross)) + (ccy ? " " + ccy : "") + taxText + rateText + "." + (ccy && ccy !== "EUR" ? " It is converted to euro at the ECB rate of the day." : "") }));
       }
+      if (kind === "INTEREST") body.push(el("p", { class: "note", "data-k": "tx-interest-note", text: "Interest from a bank abroad is not taxed in Austria at the source: it goes into your tax return, and the tracker adds it to the year. It is not part of the performance figures (cash is not tracked)." }));
       if (!ccy && (f.newAccount ? v.account !== "" : v.account !== "")) body.push(el("p", { class: "note", text: "The currency of this account is not known. Name it with the currency at the end (like BROKER-EUR) or set it on the Data tab; without it the transaction is not converted." }));
       const warns = res.warnings.filter((w) => w.field !== "note" || show("note"));
       if (warns.length) body.push(el("ul", { class: "list", "data-k": "tx-warnings" }, warns.map((w) => listItem("warn", w.text))));
@@ -18971,7 +19178,7 @@ const LedgerUI = (function () {
       if (typed) parts.push(plural(typed, "transaction") + " typed in by you");
       const kids = [
         el("div", { class: "card-head" }, el("h2", { text: "Transactions" }), parts.length ? el("span", { class: "sub", text: parts.join(" · ") }) : null),
-        el("p", { class: "note", text: "Every purchase, sale and dividend in one list. The rows of your PortfolioSlicer file are shown as they are; to change one, change it in PortfolioSlicer and load the file again. What you add here by hand is saved with your data and counted in the tax exactly like a row of the file." }),
+        el("p", { class: "note", text: "Every purchase, sale, dividend, coupon and bank interest in one list. The rows of your PortfolioSlicer file are shown as they are; to change one, change it in PortfolioSlicer and load the file again. What you add here by hand is saved with your data and counted in the tax exactly like a row of the file." }),
       ];
       if (st.notice) kids.push(el("p", { class: "note", role: "status" }, el("strong", { text: st.notice })));
       if (full) kids.push(el("p", { class: "note", text: "You have " + Store.MAX_MANUAL + " typed-in transactions, the most that are kept." }));
@@ -19061,7 +19268,8 @@ const LedgerUI = (function () {
       const nz = (t) => !M.isZeroText(t);
       if (nz(s.buysEur)) pairs.push(["Purchases", fm(s.buysEur)]);
       if (nz(s.sellsEur)) pairs.push(["Sales", fm(s.sellsEur)]);
-      if (nz(s.dividendsEur)) pairs.push(["Dividends before tax", fm(s.dividendsEur)]);
+      if (nz(s.dividendsEur)) pairs.push(["Dividends and coupons before tax", fm(s.dividendsEur)]);
+      if (nz(s.interestEur)) pairs.push(["Interest on accounts before tax", fm(s.interestEur)]);
       if (nz(s.withheldEur)) pairs.push(["Tax withheld at the source", fm(s.withheldEur)]);
       if (nz(s.feesEur)) pairs.push(["Fees (purchases and sales)", fm(s.feesEur)]);
       const kv = el("dl", { class: "kv", "data-k": "tx-sum" });
@@ -19080,12 +19288,17 @@ const LedgerUI = (function () {
       const ccy = l.ccy ? " " + l.ccy : "";
       const out = [];
       if (l.kind === "BUY" || l.kind === "SELL") {
-        if (l.qty !== "" && l.price !== "") out.push(fq(l.qty) + " × " + fa(l.price) + ccy);
+        if (l.totalPrice === true && l.qty !== "" && l.gross !== "") out.push(fq(l.qty) + " units for " + fa(l.gross) + ccy);
+        else if (l.qty !== "" && l.price !== "") out.push(fq(l.qty) + " × " + fa(l.price) + ccy);
         else if (l.gross !== "") out.push(fa(l.gross) + ccy);
         if (l.fee !== "" && !M.isZeroText(l.fee)) out.push("fee " + fa(l.fee) + ccy);
       } else if (l.kind === "DIVIDEND") {
         if (l.gross !== "") out.push(fa(l.gross) + ccy + " before tax");
         if (l.withheld !== "" && !M.isZeroText(l.withheld)) out.push(fa(l.withheld) + ccy + " withheld at the source");
+      } else if (l.kind === "INTEREST") {
+        if (l.gross !== "") out.push(fa(l.gross) + ccy + " interest before tax");
+        out.push("taxed at " + (l.rateClass === "OTHER" ? "27.5 %" : "25 %"));
+        if (l.withheld !== "" && !M.isZeroText(l.withheld)) out.push(fa(l.withheld) + ccy + " withheld abroad");
       } else if (l.kind === "TAX") {
         if (l.price !== "") out.push(fa(l.price) + ccy + " withheld");
       } else {
@@ -19105,7 +19318,7 @@ const LedgerUI = (function () {
       const e = typed ? entryOf(l.entry) : null;
       const overlap = typed ? info().overlaps[l.entry] : undefined;
       const repeat = typed ? info().repeats[l.entry] : undefined;
-      const title = l.kind === "CASH" ? "Cash" : (l.ticker || "–") + (l.name ? " · " + l.name : "");
+      const title = l.kind === "CASH" ? "Cash" : l.kind === "INTEREST" ? "Interest on an account" : (l.ticker || "–") + (l.name ? " · " + l.name : "");
       // a security with a known name shows the name (its ISIN and Yahoo ticker on hover) and the ticker of the file next to the date
       const nm = host.names && l.kind !== "CASH" && l.ticker ? host.names() : null;
       const ni = nm ? nm.ofTicker(l.ticker) : null;
@@ -19133,7 +19346,7 @@ const LedgerUI = (function () {
         : null;
       return el("div", { class: "row-card flat tx" + (st.flash === l.entry && typed ? " flash" : ""), "data-k": "tx:" + l.key },
         el("div", { class: "rc-main" },
-          el("div", { class: "rc-title" }, chip(KIND_TEXT[l.kind] || "Other", "neutral"), " ", titleNode),
+          el("div", { class: "rc-title" }, chip(l.kind === "DIVIDEND" && l.bond === true ? "Coupon" : KIND_TEXT[l.kind] || "Other", "neutral"), " ", titleNode),
           el("div", { class: "rc-sub", text: [l.date ? fd(l.date) : "no day", l.account, named ? l.ticker : ""].filter(Boolean).join(" · ") })),
         el("div", { class: "rc-val", text: valueText(l) }),
         el("div", { class: "extra" }, detailLine(l) !== "" ? el("div", { text: detailLine(l) }) : null, chips.length ? el("div", {}, chips) : null, notes.length ? el("div", { text: notes.join(" ") }) : null),
@@ -19318,7 +19531,8 @@ const PerfUI = (function () {
     const doc = () => host.doc();
     const cv = () => host.conv();
     const lines = () => (cv() && cv().tables && Array.isArray(cv().tables.ledger) ? cv().tables.ledger : []);
-    const tickerRows = () => (cv() && cv().tables && Array.isArray(cv().tables.tickers) ? cv().tables.tickers.filter((t) => t.rows > 0) : []);
+    // the securities that have market prices to fetch: a bond is valued at the prices of its own transactions (architecture 30.5), has no Yahoo symbol and never goes into the public symbol list
+    const tickerRows = () => (cv() && cv().tables && Array.isArray(cv().tables.tickers) ? cv().tables.tickers.filter((t) => t.rows > 0 && t.type !== "BOND") : []);
 
     // ------------------------------------------------------------ the price book: loading, saving, updating
 
@@ -19960,7 +20174,7 @@ const PerfUI = (function () {
       const table = C.tableOf(
         ["Security", "Value", "Share", "Gain", "Return", "Dividends"],
         rows.map((r) => ({
-          cells: [{ node: rowLink("pf-sec-go:" + r.ticker, info(r).label + (r.held ? "" : " (sold)") + (r.valuedBy === "TRADES" ? " · own prices" : ""), "", "Look at " + info(r).full + " alone", look(r)), tip: Tip.attr(nameSpec(r)) }, money(r.valueEnd), r.held ? (r.weight * 100).toFixed(1) + " %" : "–", money(r.gain, true), pct(r.twr, true), money(r.dividends)],
+          cells: [{ node: rowLink("pf-sec-go:" + r.ticker, info(r).label + (r.held ? "" : " (sold)") + (r.bond === true ? " · bond" : r.valuedBy === "TRADES" ? " · own prices" : ""), "", "Look at " + info(r).full + " alone", look(r)), tip: Tip.attr(nameSpec(r)) }, money(r.valueEnd), r.held ? (r.weight * 100).toFixed(1) + " %" : "–", money(r.gain, true), pct(r.twr, true), money(r.dividends)],
           tip: Tip.attr(rowSpec(r)),
         })),
         "Securities over the time-frame"
@@ -20113,9 +20327,10 @@ const PerfUI = (function () {
 
     function checksCard(m) {
       const excluded = m.tickers.filter((t) => t.state === "EXCLUDED");
-      const own = m.tickers.filter((t) => t.valuedBy === "TRADES");
-      const probs = m.problems;
-      if (!excluded.length && !own.length && !probs.length) return null;
+      const own = m.tickers.filter((t) => t.valuedBy === "TRADES" && t.bond !== true);
+      const bonds = m.tickers.filter((t) => t.bond === true && t.state === "INCLUDED");
+      const probs = m.problems.filter((p) => p.code !== "BOND_VALUED"); // the bonds have their own entry below
+      if (!excluded.length && !own.length && !bonds.length && !probs.length) return null;
       const n = excluded.length + probs.filter((p) => p.level !== "info").length;
       // The switch is there as long as something is left out or valued at its own prices, so it can always be turned back.
       const body = el("div", { class: "stack" },
@@ -20123,6 +20338,7 @@ const PerfUI = (function () {
           excluded.length ? el("div", {}, el("strong", { text: "Left out of every figure" }), el("ul", { class: "list" }, excluded.map((t) => listItem("bad", inText(t.ticker, t.name) + ": " + (t.text || REASON_TEXT[t.reason] || t.reason))))) : null,
           own.length ? el("div", {}, el("strong", { text: "Valued at your own transaction prices" }), el("ul", { class: "list" }, own.map((t) => listItem("warn", inText(t.ticker, t.name) + ": no market prices, so its value changes only on the days you traded")))) : null,
           el("div", { class: "btn-row" }, button(st.unpriced ? "Leave them out again" : "Include them at my own transaction prices", () => { st.unpriced = !st.unpriced; host.refresh(); }, "small", "pf-unpriced"))) : null,
+        bonds.length ? el("div", { "data-k": "pf-bonds" }, el("strong", { text: "Bonds" }), el("ul", { class: "list" }, bonds.map((t) => listItem("info", inText(t.ticker, t.name) + ": valued at the prices of your own transactions, in its own currency and converted to euro every day. Its value changes when you trade and with the exchange rate, and its interest shows on the days it was paid.")))) : null,
         probs.length ? el("ul", { class: "list" }, probs.map((p) => listItem(p.level === "bad" ? "bad" : p.level === "warn" ? "warn" : "info", p.text + (p.count > 1 && !/\d+ (rows?|withholding)/.test(p.text) ? " (" + p.count + " times)" : "")))) : null);
       return stepFold("pf-checks", n ? "warn" : "ok", n ? "!" : "✓", "Checks", "what is left out, and what to look at", chip(n ? plural(n, "thing") + " to look at" : "all fine", n ? "warn" : "ok"), st.open.checks || excluded.length > 0 || own.length > 0, (o) => { st.open.checks = o; host.refresh(); }, body);
     }
@@ -22179,10 +22395,15 @@ const RegularUI = (function () {
     };
     row("Realized gains so far", fm(s.realizedGainsEur));
     row("Realized losses so far", fm(s.realizedLossesEur));
-    row("Fund income and dividends", fm(M.sumMoney([s.ageEur, s.dividendsEur, s.interestOtherEur, s.otherSpecialEur])));
+    row("Fund income, dividends and interest", fm(M.sumMoney([s.ageEur, s.dividendsEur, s.interestOtherEur, s.otherSpecialEur])));
     kv.appendChild(el("div", { class: "sep" }));
     row("Taxable base", fm(s.netBaseEur));
     row("KESt on it", fm(s.kestBeforeCreditEur));
+    if (yr.bankInterest && !M.isZeroText(yr.bankInterest.grossEur)) {
+      // interest from banks has its own rate and its own pool: losses of the year never reduce it
+      row("Bank interest so far (" + yr.bankInterest.ratePercent + " %)", fm(yr.bankInterest.grossEur));
+      row("KESt on the bank interest", fm(yr.bankInterest.kestBeforeCreditEur));
+    }
     const forf = s.lossForfeitedEur;
     const hint = M.isZeroText(forf)
       ? (M.isZeroText(s.realizedLossesEur) ? "No losses so far this year." : "All losses this year are used up against income. Capital losses cannot be carried forward.")
