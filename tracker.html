@@ -263,6 +263,16 @@ details .body { padding-top: 8px; display: grid; gap: 10px; }
 .swatch.ln { width: 16px; height: 4px; border-radius: 2px; }
 .swatch.bd { width: 16px; height: 11px; border-radius: 2px; }
 .swatch.hatch { background-image: repeating-linear-gradient(135deg, var(--sw) 0 2px, transparent 2px 4px) !important; background-color: transparent !important; box-shadow: inset 0 0 0 1px var(--sw); }
+/* the key of a series that is told apart by a texture (Charts TEXTURES): the marks of its colour on a hollow square, the same marks as in the bars */
+.swatch.tx { background-color: transparent !important; box-shadow: inset 0 0 0 1px var(--sw); }
+.swatch.tx-hatch { background-image: repeating-linear-gradient(45deg, var(--sw) 0 1.6px, transparent 1.6px 3.6px) !important; }
+.swatch.tx-backhatch { background-image: repeating-linear-gradient(135deg, var(--sw) 0 1.6px, transparent 1.6px 3.6px) !important; }
+.swatch.tx-cross { background-image: repeating-linear-gradient(45deg, var(--sw) 0 1px, transparent 1px 3.6px), repeating-linear-gradient(135deg, var(--sw) 0 1px, transparent 1px 3.6px) !important; }
+.swatch.tx-dots { background-image: radial-gradient(var(--sw) 1.1px, transparent 1.5px) !important; background-size: 4px 4px !important; }
+.swatch.tx-hlines { background-image: repeating-linear-gradient(0deg, var(--sw) 0 1.6px, transparent 1.6px 3.4px) !important; }
+.swatch.tx-vlines { background-image: repeating-linear-gradient(90deg, var(--sw) 0 1.6px, transparent 1.6px 3.4px) !important; }
+.swatch.tx-checker { background-image: conic-gradient(var(--sw) 25%, transparent 0 50%, var(--sw) 0 75%, transparent 0) !important; background-size: 6px 6px !important; }
+.swatch.tx-grid { background-image: linear-gradient(var(--sw) 1.3px, transparent 1.3px), linear-gradient(90deg, var(--sw) 1.3px, transparent 1.3px) !important; background-size: 4px 4px !important; }
 .swatch.dash { background-image: repeating-linear-gradient(90deg, transparent 0 3px, var(--bg) 3px 5px) !important; }
 /* a piece that is not there but shown (27.6: the loss below the cost): a dashed outline, in the legend and on the bar */
 .swatch.gh { box-sizing: border-box; width: 14px; height: 10px; background: transparent !important; border: 1.5px dashed var(--sw, var(--muted)); }
@@ -9786,6 +9796,12 @@ span.hc { cursor: default; }
  *                                           the closure in step: see below)
  *   sentence(row, fmtDate)                  one plain sentence that says what became of the closure
  *   noteOf(name, result)                    what a change did besides itself (prices removed, a choice removed), for the page
+ *   setPrice(draft, owner, isin, patch)     writes one closing-day price (and its currency) by hand
+ *   suggestPrices(args)                     the closing-day prices that the price file holds for what a closure moved (nothing is written)
+ *   fillPrices(draft, owner, found)         writes the prices suggestPrices found, where none is stored yet (a price typed by hand is never replaced)
+ *
+ * The closing-day prices are only needed for the reading in which a closure counts as a sale (What-if tab). The tax of the position as filed never
+ * uses them, and the price file never enters the tax by itself: a price is stored only when the owner presses the button, and he sees the day it is from.
  *
  * Two things follow the day, because both belong to it:
  *   - the closing-day prices (they are the prices of that day: a different day makes them wrong, and the tax engine would use them with the
@@ -9801,8 +9817,11 @@ span.hc { cursor: default; }
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  const VERSION = "closure-edit-0.1.0";
+  const VERSION = "closure-edit-0.2.0";
   const MAX_NAME = 60;
+  const MAX_PRICE_LAG_DAYS = 4; // a closing day is a day of trading, or at most a weekend and a holiday after the last close
+  const ISIN_RE = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/;
+  const POS_DEC = /^\d+(\.\d+)?$/;
   const isObj = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
   const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
   const plural = (n, one, many) => n + " " + (n === 1 ? one : many || one + "s");
@@ -9846,13 +9865,16 @@ span.hc { cursor: default; }
   /**
    * The TBSZ accounts of the converter's tables, for a list on a screen.
    *   accounts   conv.tables.accounts        closures   conv.tables.closures        stored   doc.accounts
-   * Each row: { name, broker, year, currency, depot, rows, first, last, needed, day, to, defaultTo, state, items, targets, sharing, prices }
+   * Each row: { name, broker, year, currency, depot, rows, first, last, needed, day, to, defaultTo, state, items, targets, sharing, prices, owner, unpriced }
    *   day        the closing day entered ("" while the account is open)
    *   to         the receiving depot shown: the one entered, or else the default
    *   state      "OPEN" (no day), "OK", "FUTURE" (the day has not come), "SAME" (into itself), "CONFLICT" (another account of its depot differs)
-   *   items      what moved on that day: [{ isin, qty, valued }], only when the state is OK
+   *   items      what moved on that day: [{ isin, qty, valued }], only when the state is OK (valued: the converter has a closing-day value for it)
    *   sharing    the other accounts that are the same securities account (they must close alike)
    *   prices     how many closing-day prices are stored for it
+   *   owner      the account that keeps the closing-day prices of the closure: the first of the accounts that are the same securities account
+   *              (the converter reads them from there); the account itself when it is alone, or while the state is not OK
+   *   unpriced   how many of the items have no closing-day value yet
    * Sorted by broker, then by the year in the name, currency and name, as the file's accounts are listed.
    */
   function rows(accounts, closures, stored) {
@@ -9881,6 +9903,8 @@ span.hc { cursor: default; }
         targets: targets(accounts, a, s.to),
         sharing: (accounts || []).filter((x) => x !== a && x.depot === a.depot).map((x) => x.name),
         prices: Object.keys(s.prices).length,
+        owner: cl && cl.accounts.length ? cl.accounts[0] : a.name,
+        unpriced: cl ? cl.items.filter((i) => !i.valued).length : 0,
       };
     });
     out.sort((x, y) => cmpStr(x.broker, y.broker) || cmpStr(x.year, y.year) || cmpStr(x.currency, y.currency) || cmpStr(x.name, y.name));
@@ -9948,7 +9972,7 @@ span.hc { cursor: default; }
   function noteOf(name, res) {
     if (!res || !res.ok) return "That is not a day the tracker can use. Enter a real date from the year 2000 on.";
     const parts = [];
-    if (res.droppedPrices) parts.push("The closing-day prices of " + name + " were removed because they belong to the old day. Enter them again on the Data tab (step 3) if you want to count this closure as a sale.");
+    if (res.droppedPrices) parts.push("The closing-day prices of " + name + " were removed because they belong to the old day. If you want to count this closure as a sale, fill them in again for the new day (What-if tab, or Data tab step 3).");
     if (res.lostChoice) parts.push("Your choice \u201ccounted as a sale\u201d for the old closing day of " + name + " was removed with the day.");
     return parts.join(" ");
   }
@@ -9965,7 +9989,182 @@ span.hc { cursor: default; }
     return "Closed on " + when + ". " + plural(row.items.length, "security", "securities") + " moved into " + row.to + ".";
   }
 
-  return { VERSION, isDay, targets, rows, change, noteOf, sentence };
+  // ---------------------------------------------------------------- the closing-day prices
+
+  /** Whole days since 1970-01-01 of a real day, else null. */
+  const dayNo = (t) => (isDay(t) ? Date.UTC(+t.slice(0, 4), +t.slice(5, 7) - 1, +t.slice(8, 10)) / 86400000 : null);
+  const positive = (t) => typeof t === "string" && POS_DEC.test(t) && /[1-9]/.test(t);
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const dayText = (t) => (/^\d{4}-\d{2}-\d{2}$/.test(t) ? +t.slice(8, 10) + " " + MONTHS[+t.slice(5, 7) - 1] + " " + t.slice(0, 4) : String(t));
+
+  /**
+   * The latest close of a list [[day, "price"], ...] on or before the day number dn: { date, dn, price } or null. A row that cannot be read
+   * (no day, no positive price) is skipped, never repaired.
+   */
+  function lastCloseOn(closes, dn) {
+    let best = null;
+    for (const c of Array.isArray(closes) ? closes : []) {
+      if (!Array.isArray(c) || typeof c[1] !== "string" || !positive(c[1])) continue;
+      const d = dayNo(c[0]);
+      if (d === null || d > dn || (best !== null && d <= best.dn)) continue;
+      best = { date: c[0], dn: d, price: c[1] };
+    }
+    return best;
+  }
+
+  /**
+   * The closing-day prices that the price file holds for the securities a closure moved. Nothing is written.
+   *   args: {
+   *     day        the closing day
+   *     isins      the securities that moved
+   *     tickers    conv.tables.tickers: { ticker, isin, isinStatus }
+   *     symbolOf   (ticker) => the Yahoo symbol the owner chose for it, or ""
+   *     entryOf    (symbol) => { currency, closes: [[day, "price"], ...] } of the price file, or null
+   *     fmtDate    (optional) a day as the page writes it
+   *     maxLagDays (optional) how many days before the closing day the last close may be (default 4)
+   *   }
+   * Returns { found: { isin: { price, ccy, date, symbol, lag } }, missing: { isin: reason } }.
+   * The rule: the close of the closing day itself, or else the last close before it when that is at most maxLagDays earlier (a weekend, a holiday),
+   * and the day it is from is returned, to be shown. Of several tickers (symbols) of one ISIN the one with the most recent close wins, then the one
+   * that sorts first. Anything else is a missing price with its reason: never an older price, never an estimate, never a price in another currency
+   * than the one the file says.
+   */
+  function suggestPrices(args) {
+    const out = { found: {}, missing: {} };
+    const a = isObj(args) ? args : {};
+    const dn = dayNo(a.day);
+    const fd = typeof a.fmtDate === "function" ? a.fmtDate : dayText;
+    const maxLag = Number.isInteger(a.maxLagDays) && a.maxLagDays >= 0 ? a.maxLagDays : MAX_PRICE_LAG_DAYS;
+    const tickers = Array.isArray(a.tickers) ? a.tickers.filter((t) => isObj(t) && typeof t.ticker === "string") : [];
+    const symbolOf = typeof a.symbolOf === "function" ? a.symbolOf : () => "";
+    const entryOf = typeof a.entryOf === "function" ? a.entryOf : () => null;
+    for (const isin of Array.isArray(a.isins) ? a.isins : []) {
+      if (dn === null) {
+        out.missing[isin] = "The closing day is not a real date.";
+        continue;
+      }
+      const mine = tickers.filter((t) => t.isin === isin && t.isinStatus === "OK").map((t) => t.ticker).sort();
+      if (!mine.length) {
+        out.missing[isin] = "No security of your data has this ISIN.";
+        continue;
+      }
+      const symbols = Array.from(new Set(mine.map((t) => symbolOf(t)).filter((s) => typeof s === "string" && s !== ""))).sort();
+      if (!symbols.length) {
+        out.missing[isin] = "No Yahoo symbol is chosen for " + mine.join(", ") + ". Choose it on the Performance tab, or enter the price by hand.";
+        continue;
+      }
+      const cands = [];
+      const why = [];
+      for (const sym of symbols) {
+        const entry = entryOf(sym);
+        const closes = isObj(entry) && Array.isArray(entry.closes) ? entry.closes : [];
+        if (!closes.length) {
+          why.push("The price file has no prices of " + sym + ".");
+          continue;
+        }
+        const c = lastCloseOn(closes, dn);
+        if (!c) {
+          why.push("The price file of " + sym + " has no close on or before " + fd(a.day) + ".");
+          continue;
+        }
+        const lag = dn - c.dn;
+        if (lag > maxLag) {
+          why.push("The last close of " + sym + " before " + fd(a.day) + " is from " + fd(c.date) + ", " + plural(lag, "day") + " earlier (at most " + maxLag + " are accepted).");
+          continue;
+        }
+        const ccy = typeof entry.currency === "string" ? entry.currency.trim().toUpperCase() : "";
+        if (!/^[A-Z]{3}$/.test(ccy)) {
+          why.push("The price file does not say which currency " + sym + " is quoted in.");
+          continue;
+        }
+        cands.push({ symbol: sym, date: c.date, dn: c.dn, price: c.price, ccy, lag });
+      }
+      if (!cands.length) {
+        out.missing[isin] = why.join(" ") + " Update the prices on the Performance tab, or enter the price by hand.";
+        continue;
+      }
+      cands.sort((x, y) => y.dn - x.dn || cmpStr(x.symbol, y.symbol));
+      const c = cands[0];
+      out.found[isin] = { price: c.price, ccy: c.ccy, date: c.date, symbol: c.symbol, lag: c.lag };
+    }
+    return out;
+  }
+
+  /** The closure of account `owner` in a draft (created when it is not there), or null when the owner is not an account of the draft. */
+  function closureOf(draft, owner) {
+    if (!isObj(draft) || typeof owner !== "string" || owner === "") return null;
+    if (!isObj(draft.accounts)) draft.accounts = {};
+    const acc = isObj(draft.accounts[owner]) ? draft.accounts[owner] : { depot: "", currency: "", kind: "", closure: null };
+    const cl = isObj(acc.closure) ? acc.closure : { date: "", to: "", prices: {} };
+    cl.prices = isObj(cl.prices) ? Object.assign({}, cl.prices) : {};
+    acc.closure = cl;
+    draft.accounts[owner] = acc;
+    return cl;
+  }
+
+  /**
+   * Writes one closing-day price by hand into a draft. owner: the account that keeps the prices of the closure (row.owner). patch: { price, ccy }
+   * (either one; ccy "" means the currency of the account). Returns true when it was written: false, and nothing changes, for an ISIN that is not
+   * one, a patch with something else in it, or a closure that has no day yet (the prices belong to a day).
+   */
+  function setPrice(draft, owner, isin, patch) {
+    if (typeof isin !== "string" || !ISIN_RE.test(isin) || !isObj(patch)) return false;
+    const keys = Object.keys(patch);
+    if (!keys.length || keys.some((k) => k !== "price" && k !== "ccy") || keys.some((k) => typeof patch[k] !== "string")) return false;
+    if (!isObj(draft) || !isObj(draft.accounts) || !isObj(draft.accounts[owner]) || !isObj(draft.accounts[owner].closure) || !isDay(draft.accounts[owner].closure.date)) return false;
+    const cl = closureOf(draft, owner);
+    cl.prices[isin] = Object.assign({ price: "", ccy: "" }, cl.prices[isin] || {}, patch);
+    return true;
+  }
+
+  /**
+   * Writes what suggestPrices found into the closure of `owner`, only where no price is stored yet: a price typed by hand (from the statement of the
+   * broker, say) is never replaced. Returns { filled, kept } (how many were written, how many already had a price).
+   */
+  function fillPrices(draft, owner, found) {
+    const res = { filled: 0, kept: 0, written: [] };
+    if (!isObj(found)) return res;
+    for (const isin of Object.keys(found).sort()) {
+      const f = found[isin];
+      if (!isObj(f) || !positive(f.price) || !/^[A-Z]{3}$/.test(String(f.ccy))) continue;
+      const have = isObj(draft) && isObj(draft.accounts) && isObj(draft.accounts[owner]) && isObj(draft.accounts[owner].closure) && isObj(draft.accounts[owner].closure.prices) ? draft.accounts[owner].closure.prices[isin] : null;
+      if (isObj(have) && typeof have.price === "string" && have.price !== "") {
+        res.kept++;
+        continue;
+      }
+      if (setPrice(draft, owner, isin, { price: f.price, ccy: f.ccy })) {
+        res.filled++;
+        res.written.push(isin);
+      }
+    }
+    return res;
+  }
+
+  /**
+   * What pressing "fill from the price file" did, as sentences for the page.
+   *   o: { day, found, missing (as suggestPrices), res (as fillPrices), nameOf (isin) => a name, fmtDate }
+   * It says which day the closes are from, so that a close of an earlier day (a weekend) is never taken for the price of the closing day.
+   */
+  function fillText(o) {
+    const x = isObj(o) ? o : {};
+    const fd = typeof x.fmtDate === "function" ? x.fmtDate : dayText;
+    const nm = typeof x.nameOf === "function" ? x.nameOf : (i) => i;
+    const found = isObj(x.found) ? x.found : {};
+    const res = isObj(x.res) ? x.res : { filled: 0, kept: 0, written: [] };
+    const missing = isObj(x.missing) ? x.missing : {};
+    const parts = [];
+    if (res.filled) {
+      const days = Array.from(new Set(res.written.map((i) => (found[i] || {}).date).filter(Boolean))).sort();
+      const exact = days.length === 1 && days[0] === x.day;
+      parts.push("Filled in " + plural(res.filled, "price") + " from the price file" + (exact ? " (the closes of " + fd(x.day) + ")." : " (the closes of " + days.map(fd).join(" and ") + "; where the closing day itself has no close, the last close before it is used)."));
+    }
+    const names = Object.keys(missing).sort();
+    for (const i of names) parts.push(nm(i) + ": " + missing[i]);
+    if (!res.filled && !names.length) parts.push("Every security already has a closing-day price.");
+    return parts.join(" ");
+  }
+
+  return { VERSION, MAX_PRICE_LAG_DAYS, isDay, targets, rows, change, noteOf, sentence, setPrice, suggestPrices, fillPrices, fillText, lastCloseOn };
 });
 
 /* ---- src/app/demo.js ---- */
@@ -13884,6 +14083,9 @@ span.hc { cursor: default; }
   const MAX_BAR = 24; // px
   const RADIUS = 4; // px, data end only
   const GAP = 2; // px between neighbouring bars and stacked segments
+  // The textures that tell apart securities of one colour (architecture 29.3): a colour cannot tell more than a handful of series apart, so the others share
+  // the grey and differ by a pattern. The same names are drawn in the bars (defs.texture), in the key of the legend and the tip (the .swatch.tx-* rules of the style).
+  const TEXTURES = ["hatch", "backhatch", "cross", "dots", "hlines", "vlines", "checker", "grid"];
   const PIE_HUES = 5; // the coloured slices of a pie (--c-pie-1 to --c-pie-5 in the style); every place beyond that is grey (architecture 27.3)
 
   // ---------------------------------------------------------------- pure helpers
@@ -14100,6 +14302,38 @@ span.hc { cursor: default; }
         s("rect", { x: 0, y: 0, width: 2.4, height: 6 }, p).style.fill = color;
         return "url(#" + pid + ")";
       },
+      /**
+       * A texture (one of TEXTURES) in one colour: marks of the colour over a faint tint of it, in a tile of 6 pixels. Returns url(#id), or the colour itself for a name
+       * that is not a texture.
+       */
+      texture(color, kind) {
+        if (TEXTURES.indexOf(kind) < 0) return color;
+        const pid = id + "-t" + ++n;
+        const p = s("pattern", { id: pid, patternUnits: "userSpaceOnUse", width: 6, height: 6 }, defs);
+        s("rect", { x: 0, y: 0, width: 6, height: 6 }, p).style.cssText = "fill:" + color + ";fill-opacity:0.22";
+        const mark = (tag, attrs) => {
+          const m = s(tag, attrs, p);
+          if (tag === "path") {
+            m.style.stroke = color;
+            m.style.fill = "none";
+            m.style.strokeWidth = "1.5";
+          } else m.style.fill = color;
+        };
+        if (kind === "hatch") mark("path", { d: "M-1 7L7 -1M-1 1L1 -1M5 7L7 5" });
+        else if (kind === "backhatch") mark("path", { d: "M-1 -1L7 7M5 -1L7 1M-1 5L1 7" });
+        else if (kind === "cross") mark("path", { d: "M-1 7L7 -1M-1 1L1 -1M5 7L7 5M-1 -1L7 7M5 -1L7 1M-1 5L1 7" });
+        else if (kind === "dots") mark("circle", { cx: 3, cy: 3, r: 1.5 });
+        else if (kind === "hlines") mark("rect", { x: 0, y: 0, width: 6, height: 2 });
+        else if (kind === "vlines") mark("rect", { x: 0, y: 0, width: 2, height: 6 });
+        else if (kind === "checker") {
+          mark("rect", { x: 0, y: 0, width: 3, height: 3 });
+          mark("rect", { x: 3, y: 3, width: 3, height: 3 });
+        } else {
+          mark("rect", { x: 0, y: 0, width: 6, height: 1.6 });
+          mark("rect", { x: 0, y: 0, width: 1.6, height: 6 });
+        }
+        return "url(#" + pid + ")";
+      },
     };
   }
 
@@ -14109,7 +14343,7 @@ span.hc { cursor: default; }
    * (kind "ghost": a loss below the cost, architecture 27.6), a square otherwise. The colour is also kept as --sw, so that the key of a switched-off line can be drawn hollow.
    */
   function keyOf(x) {
-    const sw = h("span", { class: "swatch" + (x.kind === "line" ? " ln" : x.kind === "band" ? " bd" : x.kind === "hatch" ? " hatch" : x.kind === "ghost" ? " gh" : "") + (x.dash ? " dash" : "") });
+    const sw = h("span", { class: "swatch" + (x.kind === "line" ? " ln" : x.kind === "band" ? " bd" : x.kind === "hatch" ? " hatch" : x.kind === "ghost" ? " gh" : "") + (x.dash ? " dash" : "") + (TEXTURES.indexOf(x.pattern) >= 0 ? " tx tx-" + x.pattern : "") });
     sw.style.setProperty("--sw", x.color);
     sw.style.background = x.kind === "band" ? "linear-gradient(180deg, " + x.color + " 0 3px, color-mix(in srgb, " + x.color + " 40%, transparent) 3px, transparent 100%)" : x.color;
     return sw;
@@ -14311,7 +14545,7 @@ span.hc { cursor: default; }
         tip.appendChild(h("div", { class: "tip-title", text: title }));
         for (const r of rows) {
           const line = h("div", { class: "tip-row" + (r.plain ? " plain" : "") + (r.head ? " head" : "") });
-          if (r.color) line.appendChild(keyOf({ color: r.color, kind: r.kind }));
+          if (r.color) line.appendChild(keyOf({ color: r.color, kind: r.kind, pattern: r.pattern }));
           line.appendChild(h("span", { class: "tip-name", text: r.name }));
           line.appendChild(h("span", { class: "tip-val" + (r.tone ? " " + r.tone : ""), text: r.value }));
           tip.appendChild(line);
@@ -14364,9 +14598,10 @@ span.hc { cursor: default; }
   /**
    * opts: {
    *   categories: ["2020", ...],
-   *   series: [{ id, name, color, values: [number...], texts: ["€1.00", ...] }],
+   *   series: [{ id, name, color, pattern?, values: [number...], texts: ["€1.00", ...] }]  (pattern: one of constants.TEXTURES, for a stacked series that shares its colour with others),
    *   mode: "grouped" | "stacked" | "split"   (split: one series, colour by sign: colorPos / colorNeg)
    *   legend: true shows the legend of a single series too (the title does not name it)
+   *   skipZero: true (stacked) leaves a series out of the tip of a category where it has nothing
    *   colorPos, colorNeg, height, ariaLabel, totalTexts (stacked: text of each total), labelMax: true,
    *   tickLabels: ["Jan\n2024", "Feb", "", ...] (text under the bars when it should be shorter than the category, which stays the title of
    *   the tip; "\n" starts a second line; an empty one is left out),
@@ -14473,11 +14708,17 @@ span.hc { cursor: default; }
       const glowLayer = lit ? s("g", { class: "barglow", filter: defs.glow }, svg) : null;
       const grads = {};
       const hatches = {};
-      const bar = (g, d, color, up, hatched) => {
+      const bar = (g, d, color, up, hatched, pattern) => {
         const p = s("path", { d, class: "bar" }, g);
         if (hatched) {
           // the hatched side of a pair: stripes of the colour over a faint tint of it, and a fine outline
           p.style.fill = hatches[color] || (hatches[color] = defs.hatch(color));
+          p.style.stroke = color;
+          p.style.strokeWidth = "1";
+        } else if (TEXTURES.indexOf(pattern) >= 0) {
+          // a series told apart by a texture: its marks over a faint tint of the colour, and a fine outline
+          const tk = color + "|" + pattern;
+          p.style.fill = hatches[tk] || (hatches[tk] = defs.texture(color, pattern));
           p.style.stroke = color;
           p.style.strokeWidth = "1";
         } else if (lit) {
@@ -14491,14 +14732,22 @@ span.hc { cursor: default; }
       // one stack of the shown series at x; the pair's stack is hatched
       const stack = (g, x, list, i, hatched) => {
         let acc = 0;
+        let drawn = false;
         const lastNonZero = list.reduce((m, x2, si) => ((x2.values[i] || 0) > 0 ? si : m), -1);
         list.forEach((x2, si) => {
           const v = Math.max(0, x2.values[i] || 0);
           if (v === 0) return;
           const y0 = y(acc), y1 = y(acc + v);
-          const gap = acc === 0 ? 0 : GAP;
+          // A part less than a pixel high cannot be seen: it is not drawn (its value is in the tip and the table) but it still lifts the parts above it.
+          // A thin part keeps at least a pixel of its height: the gap to the part below shrinks with it, so it is never drawn upside down above the stack.
+          if (y0 - y1 < 1) {
+            acc += v;
+            return;
+          }
+          const gap = drawn ? Math.min(GAP, y0 - y1 - 1) : 0;
           const d = si === lastNonZero ? barPath(x, bw, y0 - gap, y1) : "M" + x + " " + (y0 - gap) + "V" + (y1 + 0) + "H" + (x + bw) + "V" + (y0 - gap) + "Z";
-          bar(g, d, x2.color, true, hatched);
+          bar(g, d, x2.color, true, hatched, x2.pattern);
+          drawn = true;
           acc += v;
         });
       };
@@ -14558,7 +14807,8 @@ span.hc { cursor: default; }
           }
         }
         // hit area: the whole band, keyboard focusable
-        const rows = shown.map((x) => ({ name: x.name, color: mode === "split" ? (x.values[i] < 0 ? opts.colorNeg : opts.colorPos) : x.color, value: (x.texts && x.texts[i]) || String(x.values[i]) }));
+        // skipZero (stacked): a series that has nothing in this category is not a row of its tip (a stack of a dozen series would be a tall box of dashes)
+        const rows = shown.filter((x) => !(opts.skipZero && mode === "stacked" && !(x.values[i] > 0))).map((x) => ({ name: x.name, color: mode === "split" ? (x.values[i] < 0 ? opts.colorNeg : opts.colorPos) : x.color, pattern: x.pattern, value: (x.texts && x.texts[i]) || String(x.values[i]) }));
         if (mode === "stacked" && opts.totalTexts && allShown) rows.push({ name: "Total", value: opts.totalTexts[i] });
         const more = plainRows(opts.details && opts.details[i]);
         // a row of the pair that is about series that are hidden goes away with them
@@ -15547,7 +15797,7 @@ span.hc { cursor: default; }
     return h("div", { class: "tbl-wrap" }, [t]);
   }
 
-  return { niceScale, niceScaleFree, timeTicks, nearestIndex, barPath, hBarPath, compactEuro, bandPaths, splitLinePaths, fadeShapes, nonZeroRuns, pieSlices, donutPath, pieFold, pieChosen, pieToggle, lineSamples, roomAround, tipSpot, tipPlaces, tipSpotRing, bars, line, timeLines, hbars, stackRuns, sbars, pie, tableOf, legend, constants: { MAX_BAR, RADIUS, GAP, PIE_HUES } };
+  return { niceScale, niceScaleFree, timeTicks, nearestIndex, barPath, hBarPath, compactEuro, bandPaths, splitLinePaths, fadeShapes, nonZeroRuns, pieSlices, donutPath, pieFold, pieChosen, pieToggle, lineSamples, roomAround, tipSpot, tipPlaces, tipSpotRing, bars, line, timeLines, hbars, stackRuns, sbars, pie, tableOf, legend, constants: { MAX_BAR, RADIUS, GAP, PIE_HUES, TEXTURES } };
 });
 
 /* ---- src/app/hold-view.js ---- */
@@ -15557,7 +15807,7 @@ span.hc { cursor: default; }
  * It takes the result of Liquidate.compute (the card "If you sold everything today", section 26) and decides what each picture shows:
  *   value  "What you hold": a ring, one slice for each security by its value today.
  *   after  "After tax": one bar for each security, split into the tax cost, the gain that is left after tax and the tax on selling.
- *   fund   "Fund income tax": the KESt on the fund income (agE) of each year: a bar for each year (the total) and a grid with a row for each security (architecture 29.3).
+ *   fund   "Fund income tax": the KESt on the fund income (agE) of each year: a stacked bar for each year with a part for each security, and a grid with a row for each security (architecture 29.3).
  * and, for each, the table that carries the same figures (the table twin).
  *
  * Securities chosen in the ring (architecture 28.5): build(res, { all }) takes the result for the chosen securities as `res` (it has `only`) and the result
@@ -15724,8 +15974,7 @@ span.hc { cursor: default; }
     // ---- fund income tax: the KESt on the fund income (agE) of each year, for every security one by one (architecture 29.3)
     // One row for each security that has a history of fund income (also one that is not held any more or has no price: it is in the history of fund income only),
     // the biggest total first, one column for each year from the first to the last and a total; a cell is tinted by its amount in five steps of the biggest cell.
-    // There is no "Other": a colour cannot tell more than a handful of securities apart, so the security is told by its name in its row, and the grid never gets wider
-    // than the years it has. Above it one bar for each year with the total of that year.
+    // The grid never gets wider than the years it has. Above it one stacked bar for each year, a part for every security (stack, below).
     const hist = res.prepaid && res.prepaid.byIsin ? res.prepaid.byIsin : {};
     const years = new Set();
     for (const isin of Object.keys(hist)) for (const y of hist[isin].years) if (/^\d{4}$/.test(String(y.year))) years.add(Number(y.year));
@@ -15757,7 +16006,27 @@ span.hc { cursor: default; }
       const cents = (d) => Math.round(num(text(d)) * 100);
       const big = rows.reduce((m, r) => r.kest.reduce((n, d) => Math.max(n, cents(d)), m), 0);
       const step = (d) => (cents(d) > 0 && big > 0 ? Math.min(5, Math.max(1, Math.ceil((5 * cents(d)) / big))) : 0);
+      // The stacked bars: one series for each security, in the colour it has in the ring (a place among the five largest holdings). A colour cannot tell more than a handful
+      // of series apart, so a security without such a place (not among the five largest, or not held any more) is grey and told apart from the other greys by a texture,
+      // given over every security with fund income, so that choosing some securities never repaints the others. Beyond the textures there is one plain grey "Other".
+      // The order is that of the ring's colours (by name), then the textured ones by name.
+      const everything = all.prepaid && all.prepaid.byIsin ? all.prepaid.byIsin : hist;
+      const byLabel = (a, b) => byText(short(a).toLowerCase(), short(b).toLowerCase()) || byText(a, b);
+      const greyIsins = Object.keys(everything)
+        .filter((isin) => (everything[isin].years || []).some((q) => /^\d{4}$/.test(String(q.year))) && !slotOf.has(isin))
+        .sort(byLabel);
+      const textures = Charts.constants.TEXTURES;
+      const patternOf = new Map(greyIsins.slice(0, textures.length).map((isin, k) => [isin, textures[k]]));
+      const part = (r) => ({ id: r.isin, name: short(r.isin), color: colorOf(r.isin), pattern: patternOf.get(r.isin) || "", values: r.kest.map((d) => num(text(d))), texts: r.kest.map((d) => dash(d)) });
+      const stackSeries = rows.filter((r) => slotOf.has(r.isin)).sort((p, q) => slotOf.get(p.isin) - slotOf.get(q.isin)).map(part)
+        .concat(rows.filter((r) => patternOf.has(r.isin)).sort((p, q) => byLabel(p.isin, q.isin)).map(part));
+      const rest = rows.filter((r) => !slotOf.has(r.isin) && !patternOf.has(r.isin));
+      if (rest.length) {
+        const sumsOf = cats.map((y, i) => rest.reduce((t, r) => Dec.add(t, r.kest[i]), Z));
+        stackSeries.push({ id: "other", name: "Other (" + rest.length + ")", color: hue(-1), pattern: "", values: sumsOf.map((d) => num(text(d))), texts: sumsOf.map((d) => dash(d)) });
+      }
       v.fund = {
+        stack: { series: stackSeries },
         categories: cats,
         total: { values: sums.map((d) => num(text(d))), texts: sums.map((d) => dash(d)), grandText: dash(grand) },
         details: cats.map((y, i) => [["Fund income (agE)", dash(incomes[i])], ["Securities with fund income", String(rows.filter((r) => !Dec.isZero(r.kest[i])).length)]]),
@@ -15784,7 +16053,7 @@ span.hc { cursor: default; }
           rows: rows.map((r) => ({ key: r.isin, cells: [short(r.isin)].concat(cats.map((y, i) => dash(r.kest[i])), [dash(r.total)]) })),
           total: ["All securities"].concat(sums.map((d) => dash(d)), [dash(grand)]),
         },
-        note: "KESt" + rate + " on the fund income (agE) that the OeKB reported for each year, before the foreign-tax credit and before the loss offset of that year. It is what the fund income cost in tax, not what was paid: the Overview has what was paid. In the grid the darker a cell, the more tax: five steps up to the biggest cell." + (negative ? " A year with a negative figure is in the table and is not tinted." : ""),
+        note: "KESt" + rate + " on the fund income (agE) that the OeKB reported for each year, before the foreign-tax credit and before the loss offset of that year. It is what the fund income cost in tax, not what was paid: the Overview has what was paid. In the grid the darker a cell, the more tax: five steps up to the biggest cell." + (negative ? " A year with a negative figure is in the table and is not tinted; the bars show the positive parts only." : ""),
       };
     }
 
@@ -17571,17 +17840,22 @@ const DataUI = (function () {
     return { render, state: st };
   }
 
-  return { create, parts: { textField, selectField, button, note, banner, kvRow, plural } };
+  return { create, parts: { textField, selectField, button, note, banner, kvRow, plural, CURRENCIES } };
 })();
 
 /* ---- src/app/ui-closures.js ---- */
 /*
  * "When your TBSZ accounts were closed" on the What-if tab (browser only; architecture section 28.4).
  *
- * One card with a block for every TBSZ account of the file: the day it was closed and the depot its holdings went into. It writes the same two
- * fields as the card "Closing this TBSZ" on the Data tab (step 3), through the same module (ClosureEdit), so the two screens cannot disagree.
- * What a closure means for the tax is not decided here: the converter reads the fields, the tax engine does the rest, and the card below it
- * ("Count TBSZ closures as sales") shows what the other reading would change. Text is always put in with textContent.
+ * One card with a block for every TBSZ account of the file: the day it was closed, the depot its holdings went into, and the price of each
+ * security on the closing day. It writes the same fields as the card "Closing this TBSZ" on the Data tab (step 3), through the same module
+ * (ClosureEdit), so the two screens cannot disagree. What a closure means for the tax is not decided here: the converter reads the fields, the
+ * tax engine does the rest, and the card below it ("Count TBSZ closures as sales") shows what the other reading would change.
+ *
+ * The closing-day prices are needed for that other reading only (a closure counted as a sale is worked out at the market value of the day).
+ * They can be typed (the broker's own valuation on the statement is the best source) or filled from the price file with one button. The price
+ * file never enters the tax by itself: the button writes a price only where none is stored, and says which day each close is from.
+ * Text is always put in with textContent.
  *
  * Shown for the owner's own data only; the demo has no files to change.
  */
@@ -17591,25 +17865,97 @@ const ClosureUI = (function () {
   const { el, chip } = Dom;
   const fid = (key) => "f-" + String(key).replace(/[^A-Za-z0-9_-]/g, "-");
   const plural = (n, one, many) => n + " " + (n === 1 ? one : many || one + "s");
+  const POS_DEC = /^\d+(\.\d+)?$/;
   const STATE_CHIP = { OPEN: ["open", "neutral"], OK: ["closed", "ok"], FUTURE: ["in the future", "info"], SAME: ["not accepted", "bad"], CONFLICT: ["not accepted", "bad"] };
 
   /**
    * host: {
    *   mode()      "mine" | "demo"
-   *   conv(), doc()   the conversion (tables.accounts, tables.closures) and the document (accounts)
+   *   conv(), doc()   the conversion (tables.accounts, tables.closures, tables.tickers, meta.securities) and the document (accounts, securities)
    *   commit(fn)  changes a copy of the document, then everything is converted, calculated, drawn and saved
    *   fd(iso)     a day as the page shows it
+   *   book()      the price book (PriceBook), or null while it is not loaded
    * }
    */
   function create(host) {
-    const st = { note: "" };
-    const { selectField, banner } = DataUI.parts;
+    const st = { note: "", fill: null };
+    const { selectField, textField, banner, CURRENCIES } = DataUI.parts;
+    const nameOf = (isin) => {
+      const c = host.conv();
+      return (((c && c.meta) || {}).securities || {})[isin] ? c.meta.securities[isin].short || isin : isin;
+    };
+    const listOf = () => {
+      const conv = host.conv();
+      if (host.mode() !== "mine" || !conv || !conv.tables || !conv.usable) return [];
+      return ClosureEdit.rows(conv.tables.accounts, conv.tables.closures, host.doc().accounts);
+    };
+
+    /** Fills the missing closing-day prices of the closures named (owner accounts) from the price file, and tells what happened. */
+    function fill(owners) {
+      const conv = host.conv();
+      const book = host.book();
+      if (!book) {
+        st.fill = { kind: "warn", text: "The price file is not loaded yet. Open the Performance tab, load or update the prices there, then come back." };
+        host.commit(() => {});
+        return;
+      }
+      host.commit((d) => {
+        const texts = [];
+        let warn = false;
+        const rows = ClosureEdit.rows(conv.tables.accounts, conv.tables.closures, d.accounts).filter((r) => r.state === "OK" && r.owner === r.name && owners.indexOf(r.name) >= 0);
+        for (const r of rows) {
+          const stored = ((d.accounts[r.owner] || {}).closure || {}).prices || {};
+          const isins = r.items.filter((i) => !(stored[i.isin] && stored[i.isin].price)).map((i) => i.isin);
+          if (!isins.length) continue;
+          const found = ClosureEdit.suggestPrices({
+            day: r.day,
+            isins,
+            tickers: conv.tables.tickers,
+            symbolOf: (t) => PriceBook.symbolOf(d, t),
+            entryOf: (s) => book.store.symbols[s] || null,
+            fmtDate: host.fd,
+          });
+          const res = ClosureEdit.fillPrices(d, r.owner, found.found);
+          if (Object.keys(found.missing).length) warn = true;
+          texts.push((owners.length > 1 ? r.name + ": " : "") + ClosureEdit.fillText({ day: r.day, found: found.found, missing: found.missing, res, nameOf, fmtDate: host.fd }));
+        }
+        if (!texts.length) texts.push("Every security already has a closing-day price.");
+        st.fill = { kind: warn ? "warn" : "ok", text: texts.join(" ") };
+      });
+    }
+
+    /** The result of the last fill, or null. */
+    const fillNote = () => (st.fill && st.fill.text ? (st.fill.kind === "warn" ? banner("warn", "", st.fill.text) : el("p", { class: "note", role: "status", "data-k": "ce-fill-note", text: st.fill.text })) : null);
+
+    function priceBlock(r) {
+      if (r.state !== "OK" || !r.items.length) return null;
+      if (r.owner !== r.name) return el("p", { class: "note", text: "The closing-day prices of this closure are kept with " + r.owner + ", which is the same securities account." });
+      const stored = ((host.doc().accounts[r.owner] || {}).closure || {}).prices || {};
+      const ccyList = CURRENCIES.concat(Object.keys(stored).map((i) => stored[i].ccy).filter((c, i, arr) => c && CURRENCIES.indexOf(c) < 0 && arr.indexOf(c) === i));
+      const setPrice = (isin, patch) => host.commit((d) => { ClosureEdit.setPrice(d, r.owner, isin, patch); });
+      return el("div", { class: "closure", "data-k": "ce-prices:" + r.name },
+        el("h3", { text: "Prices on " + host.fd(r.day) }),
+        el("div", { class: "rows" }, r.items.map((it) => {
+          const p = stored[it.isin] || { price: "", ccy: "" };
+          const k = "ce-price:" + r.name + ":" + it.isin;
+          const bad = p.price !== "" && !POS_DEC.test(p.price);
+          return el("div", { class: "sub-row", "data-k": k },
+            el("span", { class: "what" }, el("strong", { class: "mono", text: nameOf(it.isin) }), el("br"), el("span", { class: "muted", text: Model.fmtQty(it.qty) + " units" + (it.valued ? "" : " · no price yet") })),
+            el("div", { class: "fields tight" },
+              textField({ key: k, label: "Price per unit", value: p.price, inputmode: "decimal", placeholder: "for example 83.45", error: bad ? "Digits and a dot, like 83.45" : null, onCommit: (v) => setPrice(it.isin, { price: v.trim().replace(",", ".") }) }),
+              selectField({ key: k + ":ccy", label: "Currency", value: p.ccy, options: [["", "Same as the account (" + (r.currency || "?") + ")"]].concat(ccyList.map((x) => [x, x])), onCommit: (v) => setPrice(it.isin, { ccy: v }) })));
+        })),
+        el("div", { class: "btn-row" },
+          el("button", { type: "button", class: "btn small", "data-key": "ce-fill:" + r.name, disabled: r.unpriced === 0, onclick: () => fill([r.name]), text: "Fill the missing prices from the price file" }),
+          r.unpriced === 0 ? el("span", { class: "muted small", text: "Every security has a price." }) : null));
+    }
 
     function block(r, tables) {
       const key = (k) => "ce-" + k + ":" + r.name;
       const edit = (e) =>
         host.commit((d) => {
           st.note = ClosureEdit.noteOf(r.name, ClosureEdit.change(d, tables.accounts, r.name, e));
+          if (Object.prototype.hasOwnProperty.call(e, "day")) st.fill = null;
         });
       const sc = STATE_CHIP[r.state] || STATE_CHIP.OPEN;
       const text = ClosureEdit.sentence(r, host.fd);
@@ -17623,31 +17969,37 @@ const ClosureUI = (function () {
             el("input", { type: "date", "data-key": key("day"), value: r.day || false, min: "2000-01-01", onchange: (e) => edit({ day: e.target.value }) })),
           selectField({ key: key("to"), label: "The holdings went into", value: r.to, options: r.targets, wide: true, hint: r.day ? "Check that this is where the holdings went." : "", onCommit: (v) => edit({ to: v }) })),
         bad ? banner("warn", "", text) : el("p", { class: "note", "data-k": "ce-text:" + r.name, text }),
+        priceBlock(r),
         r.day ? el("div", { class: "btn-row" }, el("button", { type: "button", class: "btn small", "data-key": key("clear"), onclick: () => edit({ day: "" }), text: "Not closed" })) : null);
     }
 
     /** The card, or null when there is nothing to show (the demo, no usable data, no TBSZ account in the file). */
     function card() {
-      if (host.mode() !== "mine") return null;
-      const conv = host.conv();
-      if (!conv || !conv.tables || !conv.usable) return null;
-      const rows = ClosureEdit.rows(conv.tables.accounts, conv.tables.closures, host.doc().accounts);
+      const rows = listOf();
       if (!rows.length) return null;
       return el("section", { class: "card", "data-k": "closure-editor" },
         el("div", { class: "card-head" }, el("h2", { text: "When your TBSZ accounts were closed" })),
         el("p", { class: "note", text: "Choose the day each TBSZ account was closed and the account its holdings went into. The cost is carried over into that account, as filed. Leave the day empty while an account is still open. These are the same fields as on the Data tab, step 3." }),
         st.note ? el("p", { class: "note", role: "status", "data-k": "ce-note", text: st.note }) : null,
-        el("div", { class: "secs" }, rows.map((r) => block(r, conv.tables))),
-        el("p", { class: "note", text: "The prices of the closing day are only needed to count a closure as a sale (below). They are entered on the Data tab, step 3." }));
+        rows.some((r) => r.state === "OK" && r.items.length) ? el("p", { class: "note", "data-k": "ce-prices-help", text: "The price of each security on its closing day is needed only to count a closure as a sale (the card “Count TBSZ closures as sales” further down works it out at the market value of the day). The best source is the broker’s own valuation on the closing day: the new cost per unit on its statement. Otherwise use the price file." }) : null,
+        fillNote(),
+        el("div", { class: "secs" }, rows.map((r) => block(r, host.conv().tables))));
     }
 
     /** How many TBSZ accounts the card lists (0 while there is no card). */
-    const count = () => {
-      const conv = host.conv();
-      return host.mode() === "mine" && conv && conv.tables && conv.usable ? ClosureEdit.rows(conv.tables.accounts, conv.tables.closures, host.doc().accounts).length : 0;
-    };
+    const count = () => listOf().length;
 
-    return { card, count };
+    /**
+     * For the card "Count TBSZ closures as sales": a button that fills the missing closing-day prices of every closure from the price file, or null
+     * when no closure lacks one. label: the text of the button.
+     */
+    function fillAllButton(label) {
+      const owners = listOf().filter((r) => r.state === "OK" && r.owner === r.name && r.unpriced > 0).map((r) => r.name);
+      if (!owners.length) return null;
+      return el("button", { type: "button", class: "btn small primary", "data-key": "ce-fill-all", onclick: () => fill(owners), text: label || "Fill the missing prices from the price file" });
+    }
+
+    return { card, count, fillAllButton, fillNote };
   }
 
   return { create };
@@ -20733,7 +21085,7 @@ const SellUI = (function () {
  * One card under "If you sold everything today", three pictures of the same position as filed, one at a time (a switch above them):
  *   What you hold      a ring of the value of each security (the pie of section 27.3)
  *   After tax          one bar for each security: tax cost, gain left after tax, tax on selling
- *   Fund income tax    a bar for each year (the KESt on the fund income, agE, of that year) and a grid with a row for each security (architecture 29.3)
+ *   Fund income tax    a stacked bar for each year (the KESt on the fund income, agE, of that year) with a part for each security, and a grid with a row for each security (architecture 29.3)
  * Each has its table (from 640 px) or list (below), with every figure of the picture.
  *
  * Securities chosen in the ring (architecture 28.5): a press on a slice, on its row in the legend or on its name in the table chooses that security (the
@@ -20867,7 +21219,7 @@ const HoldCharts = (function () {
       const f = v.fund;
       return [
         el("h3", { text: v.chosen ? "KESt on fund income, by year, the chosen securities" : "KESt on fund income, by year" }),
-        C.bars({ categories: f.categories, series: [{ id: "total", name: "KESt on fund income", color: "var(--c-austria)", values: f.total.values, texts: f.total.texts }], mode: "grouped", labelMax: true, details: f.details, height: 200, ariaLabel: "KESt on the fund income of each year, as bars" }),
+        C.bars({ categories: f.categories, series: f.stack.series, mode: "stacked", legend: true, skipZero: true, totalTexts: f.total.texts, labelMax: true, details: f.details, height: 220, ariaLabel: "KESt on the fund income of each year, as stacked bars with a part for each security" }),
         el("p", { class: "note", text: f.note }),
         el("h3", { text: "By security and year" }),
         twin(f.twin, FUND_TWIN, null, el("div", { class: "fi-box" }, fundGrid(f, FUND_TWIN))),
@@ -21891,11 +22243,19 @@ const RegularUI = (function () {
     return fold({ class: "banner info", "data-k": "notincluded" }, !!ui.notOpen, (v) => { ui.notOpen = v; render(); }, [el("strong", { text: "Not yet in these numbers" }), el("span", { class: "muted small", text: NOT_INCLUDED.length + " items" })], el("div", { class: "body" }, el("ul", { class: "list" }, NOT_INCLUDED.map((t) => listItem("warn", t))), el("p", { class: "note", text: "A year says “Inputs complete” when every sale and report was found. That is not the same as “the tax is final”." })));
   }
 
+  /** The text of an engine message for the page. A TBSZ closure counted as a sale that has no closing-day price says what to do about it. */
+  function engineText(e) {
+    if (e && e.id === "MISSING_MARKET_VALUE" && /^tbsz:/.test(String(e.eventId || ""))) {
+      return "A TBSZ closure counted as a sale has no closing-day price for " + (e.isin ? secShort(e.isin) : "one of its securities") + (e.date ? " (" + fd(e.date) + ")" : "") + ". Enter the price in the card at the top of the What-if tab, or fill it from the price file there.";
+    }
+    return e.text;
+  }
+
   /** Shown when the ticked selection could not be calculated at all (the filed position is still shown). */
   function selectionProblem() {
     const msgs = [];
     for (const p of [R.selection].concat(R.perSwitch)) {
-      for (const e of (p.errors || []).concat(p.engineErrors || [])) if (msgs.indexOf(e.text) < 0) msgs.push(e.text);
+      for (const e of (p.errors || []).map((x) => x.text).concat((p.engineErrors || []).map(engineText))) if (msgs.indexOf(e) < 0) msgs.push(e);
     }
     return el("div", { class: "banner bad" }, el("strong", { text: "Your selection could not be calculated" }), el("span", { text: msgs.length ? msgs.join(" ") : "See the What-if tab." }), el("div", {}, btn("Clear selection", () => setState((s) => Object.assign(s, M.defaultState(meta))))));
   }
@@ -22262,6 +22622,21 @@ const RegularUI = (function () {
     return out;
   }
 
+  /**
+   * Counting a closure as a sale is worked out at the market value of the closing day, and the tracker never guesses it. When a closure lacks the
+   * closing-day price of a security, say so here, in plain words, with the one button that fills them from the price file (the card at the top of
+   * this tab has the fields to type them). Without it the calculation stops with a message about a missing market value.
+   */
+  function closurePriceHint(closures) {
+    const lacking = closures.filter((c) => c.items.some((i) => !i.hasValue));
+    if (!lacking.length) return null;
+    const asSale = lacking.filter((c) => (state.closures[c.key] || c.filed) === M.TREAT.SALE);
+    const n = lacking.reduce((s, c) => s + c.items.filter((i) => !i.hasValue).length, 0);
+    const text = (asSale.length ? "Counting a closure as a sale needs the price of each security on the closing day, and " : "To count a closure as a sale you need the price of each security on the closing day, and ") + plural(n, "security has", "securities have") + " none yet. Type the prices in the card at the top of this tab (the broker's own valuation on the closing day is the best source), or fill them from the price file.";
+    const btn2 = closureUI.fillAllButton();
+    return el("div", { class: "stack", "data-k": "closure-price-hint" }, el("div", { class: "banner" + (asSale.length ? "" : " info"), role: "status" }, el("span", { text }), btn2 ? el("div", { class: "btn-row" }, btn2) : null), closureUI.fillNote());
+  }
+
   function switchCards() {
     const out = [];
     const closureEditor = closureUI.card();
@@ -22272,11 +22647,13 @@ const RegularUI = (function () {
       const rows = closures.map((c) => {
         const val = state.closures[c.key] || c.filed;
         const items = c.items.map((i) => secShort(i.isin)).join(", ");
-        return el("div", { class: "sub-row", "data-k": "closure:" + c.key }, el("span", { class: "what" }, el("strong", { text: depotLabel(c.fromDepot) }), " → " + depotLabel(c.toDepot), el("br"), el("span", { class: "muted", text: fd(c.date) + " · " + items })), seg("closure-" + c.key, [[M.TREAT.CARRY, "As filed"], [M.TREAT.SALE, "Counted as a sale"]], val, (nv) => setState((s) => { s.closures[c.key] = nv; }), "closure:" + c.key));
+        const lacking = c.items.filter((i) => !i.hasValue).length;
+        return el("div", { class: "sub-row", "data-k": "closure:" + c.key }, el("span", { class: "what" }, el("strong", { text: depotLabel(c.fromDepot) }), " → " + depotLabel(c.toDepot), el("br"), el("span", { class: "muted", text: fd(c.date) + " · " + items + (lacking ? " · no closing-day price for " + lacking + " of " + c.items.length : "") })), seg("closure-" + c.key, [[M.TREAT.CARRY, "As filed"], [M.TREAT.SALE, "Counted as a sale"]], val, (nv) => setState((s) => { s.closures[c.key] = nv; }), "closure:" + c.key));
       });
       out.push(el("section", { class: "card" },
         tickRow("all-closures", allSale, "Count TBSZ closures as sales", "Closing a TBSZ moves its securities to a regular account at the same foreign bank. The statute calls that no sale; the guideline asks for carried-over costs or a notification, which was not made. Switch one closure or all.", (on) => setState((s) => { for (const c of closures) s.closures[c.key] = on ? M.TREAT.SALE : M.TREAT.CARRY; }), chip(LEGAL.GUIDELINE[0], LEGAL.GUIDELINE[1])),
         el("div", { class: "sub-controls" }, rows),
+        closurePriceHint(closures),
         effectLine({ id: "TBSZ" })
       ));
     } else {
@@ -22344,7 +22721,7 @@ const RegularUI = (function () {
     for (const p of R.perSwitch.concat([v])) {
       for (const e of p.errors || []) push("bad", e.text);
       for (const w of p.warnings || []) push("warn", w.text);
-      for (const e of p.engineErrors || []) push("bad", e.text);
+      for (const e of p.engineErrors || []) push("bad", engineText(e));
     }
     const head = el("div", {}, v.complete ? chip("Inputs complete", "ok") : chip("Incomplete: see messages", "bad"), " ", btn("Clear selection", () => setState((s) => Object.assign(s, M.defaultState(meta)))));
     root.appendChild(card("Your selection against the filed position", v.label, head, el("p", {}, explainSpan(v)), issues.length ? el("ul", { class: "list" }, issues.map((x) => listItem(x[0], x[1]))) : null,
@@ -22818,7 +23195,7 @@ const RegularUI = (function () {
   });
 
   // "When your TBSZ accounts were closed" at the top of the What-if tab (architecture section 28.4): the day and the depot of each closure.
-  const closureUI = ClosureUI.create({ mode: () => ui.mode, conv: () => conv, doc: () => doc, commit, fd });
+  const closureUI = ClosureUI.create({ mode: () => ui.mode, conv: () => conv, doc: () => doc, commit, fd, book: () => (perfUI && perfUI.book ? perfUI.book() : null) });
 
   async function init() {
     loadPrefs();
