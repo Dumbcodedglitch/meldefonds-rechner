@@ -194,6 +194,44 @@ const require = (p) => { if (p === "../lib/decimal.js") return Dec; throw new Er
     return ms / 86400000;
   }
 
+  /** The date text (yyyy-mm-dd) of a day number. */
+  const isoOfDay = (dn) => new Date(dn * 86400000).toISOString().slice(0, 10);
+
+  /** Easter Sunday of a year as a day number (the anonymous Gregorian algorithm of Meeus, Jones and Butcher). */
+  function easterDay(y) {
+    const a = y % 19;
+    const b = Math.floor(y / 100);
+    const c = y % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return Date.UTC(y, month - 1, day) / 86400000;
+  }
+
+  /**
+   * Does the ECB publish its reference rates on this day? Not on the TARGET closing days: Saturday, Sunday, 1 January,
+   * Good Friday, Easter Monday, 1 May, 25 and 26 December (ECB, "Euro foreign exchange reference rates"; checked by the
+   * review of 19 Nov 2026, architecture 32). dn is a day number (dayNumber).
+   */
+  function publishesOn(dn) {
+    const wd = (((dn + 4) % 7) + 7) % 7; // 1970-01-01 (day 0) was a Thursday; 0 = Sunday
+    if (wd === 0 || wd === 6) return false;
+    const t = new Date(dn * 86400000);
+    const mo = t.getUTCMonth() + 1;
+    const d = t.getUTCDate();
+    if ((mo === 1 && d === 1) || (mo === 5 && d === 1) || (mo === 12 && (d === 25 || d === 26))) return false;
+    const easter = easterDay(t.getUTCFullYear());
+    return dn !== easter - 2 && dn !== easter + 1;
+  }
+
   /* ------------------------------------------------------------------ *
    * 3. CSV reading (RFC 4180 style: quotes, doubled quotes, CRLF/LF/CR)
    * ------------------------------------------------------------------ */
@@ -354,6 +392,17 @@ const require = (p) => { if (p === "../lib/decimal.js") return Dec; throw new Er
           (seenHeaders.length ? " First row of your file: " + seenHeaders.join(" | ") : ""),
         { firstRow: seenHeaders }
       );
+    }
+
+    // --- every line has as many fields as the header (review of 19 Nov 2026, RD-004): a line with a comma too many or too few would
+    // shift the columns, and a line cut inside a field has too few; such a file is refused, chosen by hand or fetched
+    const width = (r) => (r.length > 1 && r[r.length - 1].trim() === "" ? r.length - 1 : r.length); // the ECB ends its lines with a comma
+    const headerWidth = width(rows[headerAt]);
+    for (let k = headerAt + 1; k < rows.length; k++) {
+      const m = width(rows[k]);
+      if (m !== headerWidth) {
+        return fail("Line " + (k + 1) + " of the rate file has " + m + " fields but the header has " + headerWidth + " (a comma too many or too few, or the line is cut off). The columns would be shifted, so the file is not used. Load the file again from the ECB.");
+      }
     }
 
     // --- collect observations
@@ -529,6 +578,26 @@ const require = (p) => { if (p === "../lib/decimal.js") return Dec; throw new Er
         else hi = mid - 1;
       }
       const lag = dn - dns[lo];
+      // The earlier rate stands in only for days the ECB published none (weekends, TARGET holidays). A day it did publish that
+      // the file lacks (after the file's last day, or a gap inside it) is never filled with an older rate (review of 19 Nov 2026,
+      // RD-003 and RD-005). allowStale: a what-if valued "today" may use the latest rate on purpose (it says which day).
+      if (lag <= maxLag && !(opts && opts.allowStale)) {
+        for (let d = dns[lo] + 1; d <= dn; d++) {
+          if (!publishesOn(d)) continue;
+          // a day from today on: the ECB publishes the rate of a day on that day, around 16:00 Central European time
+          const notYet = !!(opts && typeof opts.today === "string" && isoOfDay(d) >= opts.today);
+          return {
+            ok: false,
+            missing: isoOfDay(d),
+            notYet,
+            reason: notYet
+              ? "the " + currency + " rate of " + isoOfDay(d) + " is not in the file yet: the ECB publishes it on that day, around 16:00 Central European time (needed for " + date + "). The row waits for it; the automatic update or a newer rate file brings it."
+              : dn > dns[n - 1]
+                ? "the " + currency + " rate file ends on " + dates[n - 1] + ", but the ECB published a rate on " + isoOfDay(d) + " (needed for " + date + "). Load a newer rate file (step 4 of the Data tab)."
+                : "the " + currency + " rate file has no rate for " + isoOfDay(d) + ", a day the ECB published one (needed for " + date + "). A day is missing inside the file: load the complete file from the ECB.",
+          };
+        }
+      }
       if (lag > maxLag) return { ok: false, reason: "the latest " + currency + " rate on or before " + date + " is from " + dates[lo] + ", " + lag + " days earlier than allowed (" + maxLag + "). The file ends " + dates[n - 1] + "." };
       return { ok: true, rate: dStr(decs[lo]), rateDate: dates[lo], lagDays: lag, exact: lag === 0, _dec: decs[lo] };
     }
@@ -589,6 +658,10 @@ const require = (p) => { if (p === "../lib/decimal.js") return Dec; throw new Er
     VERSION,
     readEcbFile,
     makeLedger,
+    publishesOn: (iso) => {
+      const dn = dayNumber(iso);
+      return dn === null ? null : publishesOn(dn);
+    },
     decParse,
     dStr,
     dRound,
