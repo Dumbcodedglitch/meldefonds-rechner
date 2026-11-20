@@ -9,7 +9,7 @@ name: Fetch prices
   workflow_dispatch: {}
 
 permissions:
-  contents: write   # lets the job save data/prices.json in this repository
+  contents: write   # lets the save step store data/prices.json in this repository (only that step gets the token)
   pages: write      # lets the job ask GitHub Pages to publish the new file (last step)
 
 concurrency:
@@ -22,24 +22,31 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          # the token is not stored for the steps that read the answers from the internet; only the save step below gets it
+          persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Fetch the prices
         run: node scripts/fetch-prices.js data/tickers.txt data/prices.json
 
       - name: Save the prices
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "price-bot"
           git config user.email "actions@users.noreply.github.com"
           if [ -f data/prices.json ]; then git add data/prices.json; fi
-          git diff --quiet --cached || git commit -m "Update prices ($(date -u +%Y-%m-%d))"
-          git pull --rebase
-          git push
+          # hooksPath: no script left in the folder by an earlier step runs while the token is in use
+          git -c core.hooksPath=/dev/null diff --quiet --cached || git -c core.hooksPath=/dev/null commit -m "Update prices ($(date -u +%Y-%m-%d))"
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git -c core.hooksPath=/dev/null pull --rebase "$remote" "$GITHUB_REF_NAME"
+          git -c core.hooksPath=/dev/null push "$remote" "HEAD:$GITHUB_REF_NAME"
 
       - name: Ask GitHub Pages to publish the new file
         # GitHub does not publish a Pages site again after a push made by a job with its built-in token, so the copy of
