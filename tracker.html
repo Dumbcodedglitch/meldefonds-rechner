@@ -1,8 +1,5 @@
 <title>Austria Tax Tracker</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap">
 <style>
 /* Layout: a sticky tab bar over one column of cards on a phone, two columns from 860 px; big figures in the body face, table figures in a mono face.
    One deliberate dark look: deep ink-blue neutrals, a periwinkle accent, panels with a lit top edge, and status colours kept apart from
@@ -51,8 +48,22 @@
   --c-pie-4: #a170fb;
   --c-pie-5: #2b98b0;
   --c-pie-other: #B4BED4;
+  /* the holdings of the side-by-side chart and of the table of winners and losers (34.7, checked with the palette validator against the card #0E1423): one colour for each holding,
+     by the order of its first purchase, the same in every chart and in the table; no red (a loss), no gain green, no realised-gain orange. A ninth holding and later get the grey. */
+  --c-sec-1: #155bd6;
+  --c-sec-2: #c98500;
+  --c-sec-3: #d55181;
+  --c-sec-4: #a170fb;
+  --c-sec-5: #2b98b0;
+  --c-sec-6: #b4561a;
+  --c-sec-7: #58a959;
+  --c-sec-8: #a34aac;
+  --c-sec-other: #B4BED4;
+  --c-bench: #B4BED4; /* a benchmark is never a hue: a light neutral line, dashed, and an empty dashed cell */
+  /* The fonts are the device's own (architecture 33.3): nothing is loaded from another site. A Manrope or JetBrains Mono installed on the device is used
+     when the browser lets the page see it. */
   --font-body: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -274,6 +285,15 @@ details .body { padding-top: 8px; display: grid; gap: 10px; }
 .swatch.tx-checker { background-image: conic-gradient(var(--sw) 25%, transparent 0 50%, var(--sw) 0 75%, transparent 0) !important; background-size: 6px 6px !important; }
 .swatch.tx-grid { background-image: linear-gradient(var(--sw) 1.3px, transparent 1.3px), linear-gradient(90deg, var(--sw) 1.3px, transparent 1.3px) !important; background-size: 4px 4px !important; }
 .swatch.dash { background-image: repeating-linear-gradient(90deg, transparent 0 3px, var(--bg) 3px 5px) !important; }
+/* the four dash patterns of the benchmark lines (Charts dashStyle a to d), in the key of the legend and of the hover box */
+.swatch.dash-a { background-image: repeating-linear-gradient(90deg, transparent 0 6px, var(--bg) 6px 9px) !important; }
+.swatch.dash-b { background-image: repeating-linear-gradient(90deg, transparent 0 1.5px, var(--bg) 1.5px 4px) !important; }
+.swatch.dash-c { background-image: repeating-linear-gradient(90deg, transparent 0 6px, var(--bg) 6px 8px, transparent 8px 9.5px, var(--bg) 9.5px 11.5px) !important; }
+.swatch.dash-d { background-image: repeating-linear-gradient(90deg, transparent 0 3px, var(--bg) 3px 5px, transparent 5px 8px, var(--bg) 8px 10px, transparent 10px 16px, var(--bg) 16px 18px) !important; }
+/* many slim lines (Charts thin: true): a smaller legend that scrolls inside its own box when there are many */
+.legend.dense { gap: 4px 6px; max-height: 140px; overflow-y: auto; padding-right: 2px; }
+.legend.dense .lg { min-height: 28px; padding: 2px 10px; font-size: 12px; }
+.legend.dense .swatch.ln { height: 3px; }
 /* a piece that is not there but shown (27.6: the loss below the cost): a dashed outline, in the legend and on the bar */
 .swatch.gh { box-sizing: border-box; width: 14px; height: 10px; background: transparent !important; border: 1.5px dashed var(--sw, var(--muted)); }
 .sbars .ghost { fill: color-mix(in srgb, var(--c-more) 12%, transparent); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
@@ -328,6 +348,10 @@ button.pick-btn:hover .pb-name { text-decoration: underline; text-underline-offs
 @media (min-width: 640px) { .pie-body { grid-template-columns: minmax(200px, 280px) minmax(0, 1fr); align-items: center; justify-items: stretch; column-gap: 28px; } .pie-legend { max-width: 400px; } }
 @media (prefers-reduced-motion: reduce) { .pie .slice, .pie .slice-ring, .pie-legend li { transition: none; } }
 .line { fill: none; stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
+.line.thin { stroke-width: 1.25; opacity: 0.85; transition: opacity 0.12s, stroke-width 0.12s; }
+.line.thin.dim { opacity: 0.2; }
+.line.thin.hot { stroke-width: 2.6; opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .line.thin { transition: none; } }
 .lineglow { fill: none; stroke-width: 7; stroke-linejoin: round; stroke-linecap: round; opacity: 0.5; pointer-events: none; }
 .barglow { opacity: 0.5; pointer-events: none; }
 .area { stroke: none; pointer-events: none; }
@@ -346,6 +370,8 @@ button.pick-btn:hover .pb-name { text-decoration: underline; text-underline-offs
 .tip-row.head { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
 .tip-row.head .tip-name { color: var(--fg); font-weight: 600; }
 .tip-name { color: var(--muted); flex: 1 1 auto; }
+.tip-row.hot .tip-name { color: var(--fg); font-weight: 700; }
+.tip-row.hot .tip-val { color: var(--fg); font-weight: 700; }
 .tip-val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12px; text-align: right; white-space: nowrap; flex: none; }
 .tip-val.pos { color: var(--ok); }
 .tip-val.neg { color: var(--bad); }
@@ -489,6 +515,20 @@ button.rowlink:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .ychip span { display: block; padding: 7px 13px; min-height: 38px; font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); font-variant-numeric: tabular-nums; }
 .ychip input:checked + span { background: linear-gradient(180deg, #AEC0FF, var(--accent)); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; box-shadow: 0 0 16px -4px var(--accent-glow); }
 .ychip input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ychip:has(input:disabled) { cursor: not-allowed; }
+.ychip input:disabled { cursor: not-allowed; }
+.ychip input:disabled + span { opacity: 0.45; }
+/* "Compare with" (34.3): a chip for each benchmark, with the dash its line has */
+.benchbar { display: grid; gap: 4px; min-width: 0; margin: 2px 0 4px; }
+.benchbar .ychips { flex-wrap: wrap; overflow: visible; padding-bottom: 0; }
+.bchip span { display: inline-flex; align-items: center; gap: 8px; }
+.bsw { display: inline-block; width: 20px; height: 2px; flex: 0 0 auto; background-image: repeating-linear-gradient(90deg, var(--c-bench) 0 8px, transparent 8px 12px); }
+.bsw.b { background-image: repeating-linear-gradient(90deg, var(--c-bench) 0 1.5px, transparent 1.5px 5px); }
+.bsw.c { background-image: repeating-linear-gradient(90deg, var(--c-bench) 0 8px, transparent 8px 11px, var(--c-bench) 11px 12.5px, transparent 12.5px 15.5px); }
+.bsw.d { background-image: repeating-linear-gradient(90deg, var(--c-bench) 0 3px, transparent 3px 6px, var(--c-bench) 6px 9px, transparent 9px 12px, var(--c-bench) 12px 22px, transparent 22px 25px); }
+.bchip input:checked + span .bsw { filter: brightness(0.25); }
+.linkish { background: none; border: 0; padding: 0 0 0 6px; margin: 0; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
+.linkish:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
 .band { stroke: none; fill-opacity: 0.22; }
 .band.soft { fill-opacity: 0.13; } /* the gain so far between the value and the money put in; the realised fade on top of it sets its own opacity on each shape */
 
@@ -553,6 +593,51 @@ span.hc { cursor: default; }
 .ft-name.on { color: var(--accent); font-weight: 700; }
 .ft-name:focus-visible, .hc:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .hfoot { display: grid; gap: 6px; }
+/* the funds' own running costs (34.6): a row for each fund, the editor under the row that is open, the totals at the end */
+.ter-list { display: grid; gap: 8px; list-style: none; padding: 0; margin: 0; }
+.ter-row { display: grid; gap: 6px; padding: 10px 12px; background: var(--surface-2); border-radius: 10px; min-width: 0; }
+.ter-row .sec-top { justify-content: space-between; }
+.ter-row .sec-sub { display: flex; flex-wrap: wrap; gap: 2px 12px; color: var(--muted); font-size: 13px; }
+.ter-edit { padding-top: 8px; border-top: 1px solid var(--line); }
+.ter-hist { display: grid; gap: 4px; list-style: none; padding: 0; margin: 0; }
+.ter-hist li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.ter-hist-when { color: var(--muted); font-size: 13px; min-width: 9.5em; }
+.ter-tot { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.ter-tot-row { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.ter-tot-row > span { color: var(--muted); font-size: 13px; }
+.ter-tot-row > strong { white-space: nowrap; }
+.note.bad-note { color: var(--bad); }
+/* winners and losers by calendar year (34.5): a column for each year, every column sorted from the best to the worst */
+.quilt-box { display: grid; gap: 10px; min-width: 0; }
+.quilt-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 8px; scrollbar-width: thin; }
+.quilt-wrap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.quilt { display: flex; gap: 4px; align-items: flex-start; width: max-content; }
+.q-col { flex: 0 0 104px; display: grid; gap: 3px; }
+.q-col.per { margin-left: 8px; padding-left: 8px; border-left: 1px solid var(--line-hi); flex-basis: 113px; }
+.q-head { text-align: center; font: 600 12px var(--font-mono); color: var(--muted); padding: 2px 0 4px; }
+.qc { position: relative; display: grid; align-content: center; gap: 1px; height: 64px; padding: 4px 7px; border-radius: 6px; overflow: hidden; min-width: 0; cursor: pointer; color: var(--q-ink, #0B1020); background: var(--q-bg, var(--surface-2)); transition: opacity 0.12s; }
+.qc .qn { font-size: 11.5px; line-height: 1.15; font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.qc .qr { font: 700 13px/1.2 var(--font-mono); font-variant-numeric: tabular-nums; }
+.qc .qt { font-size: 10px; line-height: 1.1; opacity: 0.85; }
+.qc:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* the ink of a cell is the one of the two (white or the dark ink) that reads best on its colour: at least 4.8 to 1 */
+.qs1 { --q-bg: var(--c-sec-1); --q-ink: #FFFFFF; }
+.qs2 { --q-bg: var(--c-sec-2); }
+.qs3 { --q-bg: var(--c-sec-3); }
+.qs4 { --q-bg: var(--c-sec-4); }
+.qs5 { --q-bg: var(--c-sec-5); }
+.qs6 { --q-bg: var(--c-sec-6); --q-ink: #FFFFFF; }
+.qs7 { --q-bg: var(--c-sec-7); }
+.qs8 { --q-bg: var(--c-sec-8); --q-ink: #FFFFFF; }
+.qso { --q-bg: var(--c-sec-other); }
+.qb { --q-bg: transparent; --q-ink: var(--c-bench); border: 1.5px dashed var(--c-bench); padding: 2.5px 5.5px; }
+.q-part { outline: 1.5px dashed var(--q-ink); outline-offset: -4px; }
+.qb.q-part { outline-offset: -5px; }
+/* a loss: a real minus sign in the figure and a small red dot with a dark ring, so that it reads on every colour (red is for a loss and nothing else) */
+.q-loss::after { content: ""; position: absolute; top: 5px; right: 5px; width: 9px; height: 9px; border-radius: 50%; background: var(--c-more); box-shadow: 0 0 0 2px #0B1020; }
+.q-dim { opacity: 0.28; }
+.q-hot { box-shadow: 0 0 0 2px var(--accent); z-index: 1; }
+@media (prefers-reduced-motion: reduce) { .qc { transition: none; } }
 .hlegend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
 .hlegend > span:first-child { margin-right: 4px; }
 .hlegend > span:last-child { margin-left: 4px; }
@@ -7378,6 +7463,44 @@ span.hc { cursor: default; }
   }
   const isDecText = (s) => typeof s === "string" && /^\d+(\.\d+)?$/.test(s.trim());
 
+  const TER_MAX_ROWS = 12;
+
+  /**
+   * The running costs of a fund (its TER) as the owner typed them: { rows: [{ from, pct }], checked }. rows is the history in the order of the day
+   * each figure began ("" = from the start); pct is a figure in percent a year from 0 to 10 with at most four decimals (a comma is read as a point),
+   * kept as plain decimal text; checked is the day he last looked the figure up ("" when not said). A row that cannot be read is dropped, two rows on
+   * one day keep the later one, at most TER_MAX_ROWS are kept (the latest). Returns null when no row is left. It has no effect on the tax.
+   */
+  function readTer(raw, ticker, problems) {
+    if (!isObj(raw)) {
+      problems.push("The cost figure (TER) of " + ticker + " could not be read and was dropped.");
+      return null;
+    }
+    const byDay = new Map();
+    let dropped = 0;
+    for (const r of Array.isArray(raw.rows) ? raw.rows : []) {
+      if (!isObj(r)) {
+        dropped++;
+        continue;
+      }
+      const from = typeof r.from === "string" && r.from.trim() === "" ? "" : isIso(str(r.from, 10)) ? str(r.from, 10) : null;
+      const t = (typeof r.pct === "number" && Number.isFinite(r.pct) ? String(r.pct) : str(r.pct, 12)).replace(",", ".");
+      if (from === null || !/^\d{1,2}(\.\d{1,4})?$/.test(t) || Number(t) > 10) {
+        dropped++;
+        continue;
+      }
+      byDay.set(from, { from, pct: String(Number(t)) });
+    }
+    if (dropped) problems.push("The cost figures (TER) of " + ticker + ": " + dropped + (dropped === 1 ? " row was" : " rows were") + " not readable and dropped.");
+    let rows = Array.from(byDay.values()).sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
+    if (rows.length > TER_MAX_ROWS) {
+      problems.push("The cost figures (TER) of " + ticker + " had more than " + TER_MAX_ROWS + " rows; the oldest were dropped.");
+      rows = rows.slice(rows.length - TER_MAX_ROWS);
+    }
+    if (!rows.length) return null;
+    return { rows, checked: isIso(raw.checked) ? raw.checked : "" };
+  }
+
   function emptyDoc() {
     return {
       kind: KIND,
@@ -7556,6 +7679,12 @@ span.hc { cursor: default; }
         if (y !== "") {
           if (YAHOO_SYMBOL.test(y)) e.yahoo = y;
           else problems.push("The Yahoo symbol of " + t + " was not a valid symbol (letters, digits and . - = ^ _) and was dropped.");
+        }
+        // The running costs of the fund (TER), typed by hand. Only kept when there is a figure, so a document that never used it is unchanged.
+        // It has no effect on the tax.
+        if (s.ter !== undefined && s.ter !== null) {
+          const ter = readTer(s.ter, t, problems);
+          if (ter) e.ter = ter;
         }
         doc.securities[t] = e;
       }
@@ -13121,6 +13250,650 @@ span.hc { cursor: default; }
   return { VERSION, PRESETS, addMonths, median, xirr, compute, scopeLines, decisions, resolve, stats, years, byTicker, thin, chartSeries, months, periods, drawdown, drawdowns, risk, riskAdjusted, bridge, realizedSeries, allocation };
 });
 
+/* ---- src/perf/bench.js ---- */
+/*
+ * Bench: the benchmarks of the Performance tab, and the euro price series of any fund in the price book.
+ *
+ * What a benchmark is here: a fund (or a blend of two) whose daily price is compared with the portfolio. VWCE, VGLA, VAGF and a 60/40 blend
+ * of VWCE and VAGF are built in. All four accumulate, so the price is the total return. Nothing here is a tax figure: ordinary floating
+ * point numbers, before tax, never fed into the tax (architecture 34).
+ *
+ * The rules, in the order they matter:
+ *  1. The euro series of a symbol (eurSeries) follows the performance engine's own conventions (perf.js rule 1): for every calendar day from
+ *     the first close to the last day asked for, the last close up to that day, in euro at the ECB rate of that day. The price book holds
+ *     the prices as they were quoted at the time (prices.js), so a split is put back in here: the series is the price times the product of
+ *     the splits up to that day, and a return between two days is right across a split. Before the first close there is no value (NaN):
+ *     nothing is back-filled or guessed. A day without an ECB rate repeats the day before.
+ *  2. A blend (blend) is a synthetic fund: it starts at 100 on the first day on which every part has a price, holds each part at its weight
+ *     and is put back to the weights at the close of every 31 December.
+ *  3. The same-money line (sameMoney): at the start of the time-frame the benchmark is worth what the portfolio is worth; from then on every euro
+ *     put into the portfolio buys units of the benchmark at that day's close and every euro taken out sells units. Units never go below zero.
+ *     A benchmark with no price at the start starts on its first price day at the portfolio's value of that day (late is then true).
+ *  4. The growth line (growth): 100 at the start of the time-frame times the price ratio (at the first price day when that is later).
+ *
+ * Pure functions. Nothing that is passed in is changed.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("../prices/prices.js"));
+  else root.Bench = factory(root.Prices);
+})(typeof self !== "undefined" ? self : this, function (Prices) {
+  "use strict";
+
+  const VERSION = "bench-0.1.0";
+  const DAY = 86400000;
+  const dayNumber = Prices.dayNumber;
+  const isoOf = (dn) => new Date(dn * DAY).toISOString().slice(0, 10);
+
+  /** The benchmarks, in the order of the strip. A fund has a Yahoo symbol; a blend has parts (keys of funds) and weights that add up to 1. */
+  const FUNDS = [
+    { key: "VWCE", label: "VWCE", kind: "fund", symbol: "VWCE.DE", name: "Vanguard FTSE All-World UCITS ETF (accumulating)" },
+    { key: "VGLA", label: "VGLA", kind: "fund", symbol: "VGLA.DE", name: "Vanguard FTSE Global All-Cap UCITS ETF (accumulating)" },
+    { key: "VAGF", label: "VAGF", kind: "fund", symbol: "VAGF.DE", name: "Vanguard Global Aggregate Bond UCITS ETF, EUR hedged (accumulating)" },
+  ];
+  const BLENDS = [{ key: "60/40", label: "60/40", kind: "blend", name: "60 % VWCE and 40 % VAGF, put back to 60/40 every 31 December", parts: [{ key: "VWCE", weight: 0.6 }, { key: "VAGF", weight: 0.4 }] }];
+  const LIST = FUNDS.concat(BLENDS);
+
+  const fundOf = (key) => FUNDS.find((f) => f.key === key) || null;
+
+  /** The benchmarks, each with the Yahoo symbols it needs (symbols). */
+  function list() {
+    return LIST.map((b) => Object.assign({}, b, { symbols: b.kind === "fund" ? [b.symbol] : b.parts.map((p) => fundOf(p.key).symbol) }));
+  }
+
+  /** Every Yahoo symbol the benchmarks need, once each, sorted: they go into the list the price job reads. */
+  function symbols() {
+    return Array.from(new Set(FUNDS.map((f) => f.symbol))).sort();
+  }
+
+  /** The value of a series on a day number: NaN before its first day or after its last. */
+  function at(series, dn) {
+    if (!series) return NaN;
+    const i = dn - series.d0;
+    return i >= 0 && i < series.n ? series.v[i] : NaN;
+  }
+
+  /**
+   * The euro series of one price-book entry ({ currency, splits, closes }), from its first close to endDn (a day number).
+   * fx: (currency, "YYYY-MM-DD") => { ok, rate } (units of the currency per euro), only asked for a currency other than EUR.
+   * Returns { d0, n, v (Float64Array, euro, NaN where there is none), first, lastClose, ccy } or null when the entry cannot give one;
+   * why (an object passed in) then holds a reason: NO_PRICES, NO_CURRENCY, NO_FX or LATER (the first close is after endDn).
+   */
+  function eurSeries(entry, fx, endDn, why) {
+    const fail = (r) => {
+      if (why && typeof why === "object") why.reason = r;
+      return null;
+    };
+    if (!entry || !Array.isArray(entry.closes) || !Number.isFinite(endDn)) return fail("NO_PRICES");
+    const rows = [];
+    for (const c of entry.closes) {
+      if (!Array.isArray(c)) continue;
+      const d = dayNumber(c[0]);
+      const p = Number(c[1]);
+      if (d !== null && p > 0 && Number.isFinite(p)) rows.push([d, p]);
+    }
+    if (!rows.length) return fail("NO_PRICES");
+    rows.sort((a, b) => a[0] - b[0]);
+    const ccy = typeof entry.currency === "string" ? entry.currency.trim().toUpperCase() : "";
+    if (ccy === "") return fail("NO_CURRENCY");
+    const d0 = rows[0][0];
+    if (d0 > endDn) return fail("LATER");
+    const splits = (Array.isArray(entry.splits) ? entry.splits : [])
+      .map((s) => ({ dn: dayNumber(s && s.date), ratio: Number(s && s.num) / Number(s && s.den) }))
+      .filter((s) => s.dn !== null && s.ratio > 0 && Number.isFinite(s.ratio))
+      .sort((a, b) => a.dn - b.dn);
+    const n = endDn - d0 + 1;
+    const v = new Float64Array(n).fill(NaN);
+    let ci = 0;
+    let si = 0;
+    let factor = 1;
+    let prev = NaN;
+    let usable = 0;
+    for (let k = 0; k < n; k++) {
+      const dn = d0 + k;
+      while (ci + 1 < rows.length && rows[ci + 1][0] <= dn) ci++;
+      while (si < splits.length && splits[si].dn <= dn) factor *= splits[si++].ratio;
+      let eur = NaN;
+      if (ccy === "EUR") eur = rows[ci][1] * factor;
+      else if (typeof fx === "function") {
+        const x = fx(ccy, isoOf(dn));
+        if (x && x.ok && Number(x.rate) > 0) eur = (rows[ci][1] / Number(x.rate)) * factor;
+      }
+      if (Number.isFinite(eur)) {
+        prev = eur;
+        usable++;
+      } else eur = prev; // no rate that day: the day before (NaN while there has been none)
+      v[k] = eur;
+    }
+    if (!usable) return fail("NO_FX");
+    let lastClose = rows[0][0];
+    for (const r of rows) if (r[0] <= endDn) lastClose = r[0];
+    let first = 0;
+    while (first < n && !Number.isFinite(v[first])) first++;
+    return { d0: d0 + first, n: n - first, v: first ? v.subarray(first) : v, first: isoOf(d0 + first), lastClose: isoOf(lastClose), ccy };
+  }
+
+  const isDec31 = (dn) => {
+    const t = new Date(dn * DAY);
+    return t.getUTCMonth() === 11 && t.getUTCDate() === 31;
+  };
+
+  /**
+   * A synthetic fund of the given series at the given weights (adding up to 1), put back to the weights at the close of every 31 December.
+   * Starts at 100 on the first day on which every part has a value; ends on the earliest last day of the parts. Returns a series like
+   * eurSeries (without lastClose), or null when the parts never overlap.
+   */
+  function blend(parts, weights) {
+    if (!Array.isArray(parts) || !parts.length || parts.length !== (weights || []).length || parts.some((p) => !p)) return null;
+    const total = weights.reduce((a, w) => a + w, 0);
+    if (!(Math.abs(total - 1) < 1e-9) || weights.some((w) => !(w > 0))) return null;
+    const start = Math.max(...parts.map((p) => p.d0));
+    const end = Math.min(...parts.map((p) => p.d0 + p.n - 1));
+    if (start > end) return null;
+    const n = end - start + 1;
+    const v = new Float64Array(n);
+    const units = parts.map((p, k) => (100 * weights[k]) / at(p, start));
+    for (let k = 0; k < n; k++) {
+      const dn = start + k;
+      let value = 0;
+      for (let j = 0; j < parts.length; j++) value += units[j] * at(parts[j], dn);
+      v[k] = value;
+      if (isDec31(dn)) for (let j = 0; j < parts.length; j++) units[j] = (value * weights[j]) / at(parts[j], dn);
+    }
+    return { d0: start, n, v, first: isoOf(start), lastClose: isoOf(end), ccy: "EUR" };
+  }
+
+  /**
+   * Every benchmark of the list, ready for use. getEntry: (symbol) => price-book entry or null; fx as for eurSeries; endDn the last day of the model.
+   * Returns { [key]: { key, label, name, kind, symbols, ok, series, missing (the symbols that have no usable series), reason, first } }.
+   */
+  function resolveAll(getEntry, fx, endDn) {
+    const out = {};
+    const bySymbol = {};
+    for (const f of FUNDS) {
+      const why = {};
+      const s = eurSeries(typeof getEntry === "function" ? getEntry(f.symbol) : null, fx, endDn, why);
+      bySymbol[f.symbol] = s;
+      out[f.key] = { key: f.key, label: f.label, name: f.name, kind: "fund", symbols: [f.symbol], ok: !!s, series: s, missing: s ? [] : [f.symbol], reason: s ? "" : why.reason || "NO_PRICES", first: s ? s.first : "" };
+    }
+    for (const b of BLENDS) {
+      const parts = b.parts.map((p) => out[p.key]);
+      const missing = [];
+      for (const p of parts) for (const m of p.missing) missing.push(m);
+      const s = missing.length ? null : blend(parts.map((p) => p.series), b.parts.map((p) => p.weight));
+      out[b.key] = { key: b.key, label: b.label, name: b.name, kind: "blend", symbols: parts.map((p) => p.symbols[0]), ok: !!s, series: s, missing, reason: s ? "" : missing.length ? parts.find((p) => !p.ok).reason : "NO_OVERLAP", first: s ? s.first : "" };
+    }
+    return out;
+  }
+
+  /**
+   * The same-money line over the time-frame win ({ s, e }, indexes of the model's days): the value the benchmark would have had if every euro
+   * put into the portfolio (and taken out of it) had gone into it. model: a Perf model (dn0, total.value, total.inflow, total.outflow).
+   * Returns { values (Float64Array of e - s + 1, NaN before the benchmark has a price), from (first day with a value), late (it starts after the
+   * time-frame does), soldOut (the first day a sale was larger than what the benchmark held, or "") }.
+   */
+  function sameMoney(series, model, win) {
+    const { s, e } = win;
+    const T = model.total;
+    const values = new Float64Array(e - s + 1).fill(NaN);
+    let units = 0;
+    let started = false;
+    let from = "";
+    let soldOut = "";
+    for (let i = s; i <= e; i++) {
+      const dn = model.dn0 + i;
+      const p = at(series, dn);
+      if (!started) {
+        if (!(p > 0)) continue;
+        started = true;
+        from = isoOf(dn);
+        units = T.value[i] > 0 ? T.value[i] / p : 0;
+      } else if (p > 0) {
+        units += (T.inflow[i] - T.outflow[i]) / p;
+        if (units < 0) {
+          if (units < -1e-9 && !soldOut) soldOut = isoOf(dn); // a hair below zero is rounding, not a sale larger than the holding
+          units = 0;
+        }
+      }
+      if (p > 0) values[i - s] = units * p;
+    }
+    return { values, from, late: from !== "" && from !== isoOf(model.dn0 + s), soldOut };
+  }
+
+  /** The growth line over the time-frame: 100 at its first day with a price, then 100 times the price ratio. Same result shape as sameMoney (without soldOut). */
+  function growth(series, model, win) {
+    const { s, e } = win;
+    const values = new Float64Array(e - s + 1).fill(NaN);
+    let base = NaN;
+    let from = "";
+    for (let i = s; i <= e; i++) {
+      const dn = model.dn0 + i;
+      const p = at(series, dn);
+      if (!(p > 0)) continue;
+      if (!Number.isFinite(base)) {
+        base = p;
+        from = isoOf(dn);
+      }
+      values[i - s] = (p / base) * 100;
+    }
+    return { values, from, late: from !== "" && from !== isoOf(model.dn0 + s) };
+  }
+
+  return { VERSION, FUNDS, BLENDS, list, symbols, at, eurSeries, blend, resolveAll, sameMoney, growth };
+});
+
+/* ---- src/perf/compare.js ---- */
+/*
+ * Compare: what the two comparison views of the Performance tab draw: every holding as a line next to the others, and the table of winners and
+ * losers by calendar year (architecture 34.4 and 34.5), plus the colour slot each holding keeps.
+ *
+ * Before tax, ordinary floating point numbers, never fed into the tax. It reads what Perf.compute returned (days, per[k].units, inflow,
+ * outflow, index) and the euro series of Bench; it calculates nothing that the engine already knows: a line of a holding is its own
+ * time-weighted index (rebased to 100), so the end of a line is the figure of the table of securities for the same time-frame.
+ *
+ * The rules, in the order they matter:
+ *  1. Slots (slots): a holding keeps one colour everywhere. The slot is the rank of its first purchase (ties by ticker) among every holding
+ *     of the model, so a later purchase never repaints an earlier holding; from the ninth on there is no slot (-1: the neutral colour).
+ *  2. Lines (holdingLines): a holding that was held at the start of the time-frame starts at 100 on that day; one bought later starts at 100
+ *     on the day before its first held day. A day is on the line when units were held at its close or at the close of the day before (so the
+ *     day of a sale is on it); every other day is a gap (NaN), and a holding bought again goes on from the level it left. A holding valued
+ *     by the owner's own transactions (a bond without a market price) has no line.
+ *  3. The table (quilt): for every calendar year, the price return in euro of each fund: the euro close of the last day of the year over the
+ *     euro close of the last day of the year before (Bench.eurSeries, splits included). A holding shows in a year only if it was held at a close
+ *     of that year or traded in it. A cell is partial when the year is not complete for it: the fund's prices start after 1 January, or the
+ *     year is not over, or the prices stop more than ten days before the end of the year. "Per year" is the compound average of the complete
+ *     years of the cell's row, at least two of them. A fund that paid dividends is marked price-only: its dividends are not in the figure.
+ *
+ * Pure functions. Nothing that is passed in is changed.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("../prices/prices.js"), require("./bench.js"));
+  else root.Compare = factory(root.Prices, root.Bench);
+})(typeof self !== "undefined" ? self : this, function (Prices, Bench) {
+  "use strict";
+
+  const VERSION = "compare-0.1.0";
+  const DAY = 86400000;
+  const EPS = 1e-9;
+  const SLOTS = 8;
+  const STALE_DAYS = 10; // the prices stop this long before the end of a year: the year is partial for that fund
+  const dayNumber = Prices.dayNumber;
+  const isoOf = (dn) => new Date(dn * DAY).toISOString().slice(0, 10);
+  const yearStart = (y) => Date.UTC(y, 0, 1) / DAY;
+  const yearEnd = (y) => Date.UTC(y, 11, 31) / DAY;
+
+  /** The first index at which the holding was held or bought, or -1. */
+  function firstHeld(A) {
+    for (let i = 1; i < A.units.length; i++) if (A.units[i] > EPS || A.inflow[i] > 0) return i;
+    return -1;
+  }
+
+  /** The market-priced holdings of a model: not a bond valued by its own transactions. */
+  const priced = (A) => !(A.bond === true || A.valuedBy === "TRADES");
+
+  /**
+   * { ticker: slot } for the holdings of the model: 0 to SLOTS - 1 by the order of the first purchase (then the ticker), -1 for the rest.
+   * Hand in the model of the whole portfolio, so that the colours do not change with the view.
+   */
+  function slots(model) {
+    const rows = [];
+    for (const A of model.per) {
+      if (!priced(A)) continue;
+      const f = firstHeld(A);
+      rows.push({ ticker: A.ticker, f: f < 0 ? Infinity : f });
+    }
+    rows.sort((a, b) => a.f - b.f || (a.ticker < b.ticker ? -1 : a.ticker > b.ticker ? 1 : 0));
+    const out = {};
+    rows.forEach((r, k) => (out[r.ticker] = k < SLOTS ? k : -1));
+    return out;
+  }
+
+  /**
+   * One line for each market-priced holding that was held in the time-frame win ({ s, e }): { ticker, name, values (Float64Array of
+   * e - s + 1: 100 at the start, NaN in the gaps), from, to (the first and last day with a value), ret (the last value over 100, minus 1) }.
+   * Also { skipped: [tickers of the holdings without a market price] } and the lines in the order of their tickers.
+   */
+  function holdingLines(model, win) {
+    const { s, e } = win;
+    const lines = [];
+    const skipped = [];
+    for (const A of model.per) {
+      if (!priced(A)) {
+        skipped.push(A.ticker);
+        continue;
+      }
+      let base = -1;
+      if (A.units[s] > EPS) base = s;
+      else {
+        for (let i = s + 1; i <= e; i++) {
+          if (A.units[i] > EPS) {
+            base = i - 1;
+            break;
+          }
+        }
+      }
+      if (base < 0) continue;
+      const values = new Float64Array(e - s + 1).fill(NaN);
+      let first = -1;
+      let last = -1;
+      for (let i = base; i <= e; i++) {
+        const held = i === base || A.units[i] > EPS || A.units[i - 1] > EPS;
+        if (!held) continue;
+        values[i - s] = (A.index[i] / A.index[base]) * 100;
+        if (first < 0) first = i;
+        last = i;
+      }
+      lines.push({ ticker: A.ticker, name: A.name || "", values, from: model.days[first], to: model.days[last], ret: values[last - s] / 100 - 1 });
+    }
+    lines.sort((a, b) => (a.ticker < b.ticker ? -1 : a.ticker > b.ticker ? 1 : 0));
+    return { lines, skipped };
+  }
+
+  /** Was the holding held at a close of the calendar year, or bought or sold in it? */
+  function heldIn(model, A, year) {
+    const a = Math.max(1, yearStart(year) - model.dn0);
+    const b = Math.min(model.N - 1, yearEnd(year) - model.dn0);
+    for (let i = a; i <= b; i++) if (A.units[i] > EPS || A.inflow[i] > 0 || A.outflow[i] > 0) return true;
+    return false;
+  }
+
+  /** The cell of one series in one calendar year, or null: { ret, partial, partialStart, partialEnd, from, to }. lastDn is the last day of the model. */
+  function yearCell(series, year, lastDn) {
+    if (!series) return null;
+    const yEnd = yearEnd(year);
+    const endDn = Math.min(yEnd, lastDn);
+    if (series.d0 >= endDn) return null; // nothing to compare: the prices start on or after the last day of the span
+    const bDn = yearEnd(year - 1);
+    let v0 = Bench.at(series, bDn);
+    let fromDn = bDn;
+    let partialStart = false;
+    if (!(v0 > 0)) {
+      v0 = series.v[0];
+      fromDn = series.d0;
+      partialStart = true;
+    }
+    const lastClose = dayNumber(series.lastClose);
+    const toDn = Math.min(endDn, lastClose);
+    const v1 = Bench.at(series, toDn);
+    if (!(v0 > 0) || !(v1 > 0) || toDn <= fromDn) return null;
+    const partialEnd = endDn < yEnd || yEnd - toDn > STALE_DAYS;
+    return { ret: v1 / v0 - 1, partial: partialStart || partialEnd, partialStart, partialEnd, from: isoOf(fromDn), to: isoOf(toDn) };
+  }
+
+  const byRank = (a, b) => b.ret - a.ret || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+
+  /** The compound average of the complete years of a row (at least two): { ret, years } or null. */
+  function perYear(rets) {
+    if (rets.length < 2) return null;
+    let p = 1;
+    for (const r of rets) p *= 1 + r;
+    return { ret: Math.pow(p, 1 / rets.length) - 1, years: rets.length };
+  }
+
+  /**
+   * The table of winners and losers by calendar year.
+   * o: { seriesOf: (A) => euro series of the holding (Bench.eurSeries) or null, benches: [{ key, label, name, series }], maxYears (default 10),
+   *      all (true: every year) }.
+   * Returns { years: [2019, ...] (the oldest first), cols: [{ year, cells }] (each column best first), perYear: { cells },
+   *           noSeries: [tickers held but without a euro series], skipped: [tickers without a market price], firstYear, lastYear, hiddenYears }.
+   * A cell: { kind: "holding" | "bench", key, ticker?, label?, name?, ret, partial, partialStart, partialEnd, from, to, priceOnly }.
+   */
+  function quilt(model, o) {
+    o = o || {};
+    const lastDn = model.dn0 + model.N - 1;
+    const lastYear = +model.days[model.N - 1].slice(0, 4);
+    const benches = Array.isArray(o.benches) ? o.benches.filter((b) => b && b.series) : [];
+    const holdings = [];
+    const noSeries = [];
+    const skipped = [];
+    let firstYear = Infinity;
+    for (const A of model.per) {
+      if (!priced(A)) {
+        skipped.push(A.ticker);
+        continue;
+      }
+      const f = firstHeld(A);
+      if (f < 0) continue;
+      const series = typeof o.seriesOf === "function" ? o.seriesOf(A) : null;
+      if (!series) {
+        noSeries.push(A.ticker);
+        continue;
+      }
+      const priceOnly = A.dividends.some((x) => x > 0);
+      holdings.push({ A, series, priceOnly });
+      firstYear = Math.min(firstYear, +isoOf(model.dn0 + f).slice(0, 4));
+    }
+    const out = { years: [], cols: [], perYear: { cells: [] }, noSeries, skipped, firstYear: Number.isFinite(firstYear) ? firstYear : null, lastYear, hiddenYears: 0 };
+    if (!holdings.length) return out;
+    let years = [];
+    for (let y = firstYear; y <= lastYear; y++) years.push(y);
+    const maxYears = Number.isInteger(o.maxYears) && o.maxYears > 0 ? o.maxYears : 10;
+    if (!o.all && years.length > maxYears) {
+      out.hiddenYears = years.length - maxYears;
+      years = years.slice(-maxYears);
+    }
+    out.years = years;
+    const rows = new Map(); // key -> { cell template, rets of the complete years }
+    const row = (key, tpl) => {
+      if (!rows.has(key)) rows.set(key, Object.assign({ key, rets: [] }, tpl));
+      return rows.get(key);
+    };
+    for (const y of years) {
+      const cells = [];
+      for (const h of holdings) {
+        if (!heldIn(model, h.A, y)) continue;
+        const c = yearCell(h.series, y, lastDn);
+        if (!c) continue;
+        const cell = Object.assign({ kind: "holding", key: h.A.ticker, ticker: h.A.ticker, name: h.A.name || "", priceOnly: h.priceOnly }, c);
+        cells.push(cell);
+        const r = row(cell.key, { kind: "holding", ticker: h.A.ticker, name: h.A.name || "", priceOnly: h.priceOnly });
+        if (!c.partial) r.rets.push(c.ret);
+      }
+      for (const b of benches) {
+        const c = yearCell(b.series, y, lastDn);
+        if (!c) continue;
+        const cell = Object.assign({ kind: "bench", key: "bench:" + b.key, label: b.label || b.key, name: b.name || b.label || b.key, priceOnly: false }, c);
+        cells.push(cell);
+        const r = row(cell.key, { kind: "bench", label: cell.label, name: cell.name, priceOnly: false });
+        if (!c.partial) r.rets.push(c.ret);
+      }
+      cells.sort(byRank);
+      out.cols.push({ year: y, cells });
+    }
+    const pcells = [];
+    for (const r of rows.values()) {
+      const p = perYear(r.rets);
+      if (!p) continue;
+      const cell = { kind: r.kind, key: r.key, ret: p.ret, years: p.years, partial: false, partialStart: false, partialEnd: false, from: "", to: "", priceOnly: r.priceOnly };
+      if (r.kind === "holding") {
+        cell.ticker = r.ticker;
+        cell.name = r.name;
+      } else {
+        cell.label = r.label;
+        cell.name = r.name;
+      }
+      pcells.push(cell);
+    }
+    pcells.sort(byRank);
+    out.perYear.cells = pcells;
+    return out;
+  }
+
+  return { VERSION, SLOTS, slots, holdingLines, heldIn, yearCell, perYear, quilt };
+});
+
+/* ---- src/perf/ter.js ---- */
+/*
+ * Ter: the running costs of the funds (their TER), as the owner typed them, and what they come to.
+ *
+ * A figure per fund is typed by hand (architecture 34.6): { rows: [{ from, pct }], checked }. rows is the history in the order of the day each
+ * figure began ("" = from the start), pct the percent a year as plain decimal text, checked the day it was last looked up. The shape is read and
+ * checked by store.js; this module only reads it and works out what follows.
+ *
+ * What the figure means: the TER is already inside the fund's price. It is not paid separately and it is not in the tax. The estimates here are
+ * what the funds kept for their running costs, worked from the value of each holding day by day: the value at the close of the day before
+ * times the figure in force on the day, over 365. They are estimates (the fund takes its cost from its own net asset value, which the closing
+ * price follows closely but not exactly), and a holding with no figure is left out of every total and counted.
+ *
+ * Pure functions, ordinary floating point numbers, never fed into the tax. Nothing that is passed in is changed.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.Ter = factory();
+})(typeof self !== "undefined" ? self : this, function () {
+  "use strict";
+
+  const VERSION = "ter-0.1.0";
+  const DAYS_PER_YEAR = 365;
+  const OLD_AFTER_DAYS = 365; // a figure that was checked longer ago than this is shown as due for a look
+  const EPS = 1e-9;
+  const DAY = 86400000;
+
+  const dayNumber = (iso) => (/^\d{4}-\d{2}-\d{2}$/.test(String(iso)) ? Date.parse(iso + "T00:00:00Z") / DAY : null);
+
+  /** The rows of a TER record, or []. */
+  const rowsOf = (ter) => (ter && Array.isArray(ter.rows) ? ter.rows : []);
+
+  /** The figure in force now (the latest row): { pct (a number, percent a year), from, checked } or null. */
+  function current(ter) {
+    const rows = rowsOf(ter);
+    if (!rows.length) return null;
+    const r = rows[rows.length - 1];
+    return { pct: Number(r.pct), from: r.from, checked: ter.checked || "" };
+  }
+
+  /** The percent a year in force on a day ("YYYY-MM-DD"), or null before the first row began. */
+  function rateAt(ter, iso) {
+    let found = null;
+    for (const r of rowsOf(ter)) {
+      if (r.from <= iso) found = Number(r.pct);
+      else break;
+    }
+    return found;
+  }
+
+  /** Days since the figure was checked (null when it never was or a date is unreadable). */
+  function age(ter, todayIso) {
+    const a = dayNumber(ter && ter.checked);
+    const b = dayNumber(todayIso);
+    return a === null || b === null ? null : b - a;
+  }
+
+  /** True when the figure was never checked or was checked more than a year ago. */
+  function due(ter, todayIso) {
+    const a = age(ter, todayIso);
+    return a === null || a > OLD_AFTER_DAYS;
+  }
+
+  /** The text of a figure as the owner types it: { ok, pct (canonical text), error }. A comma is read as a point; 0 to 10 with at most four decimals. */
+  function parsePct(text) {
+    const t = String(text === undefined || text === null ? "" : text).trim().replace(",", ".").replace(/\s*%$/, "");
+    if (t === "") return { ok: false, pct: "", error: "Type the TER in percent a year, for example 0.19." };
+    if (!/^\d{1,2}(\.\d{1,4})?$/.test(t)) return { ok: false, pct: "", error: "The TER is a figure like 0.19 (percent a year, at most four decimals)." };
+    if (Number(t) > 10) return { ok: false, pct: "", error: "A TER above 10 % a year cannot be right." };
+    return { ok: true, pct: String(Number(t)), error: "" };
+  }
+
+  const sortRows = (rows) => rows.slice().sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
+
+  /** The record with its latest figure set (the first figure of a fund, or a correction of the current one), checked on todayIso. */
+  function withCurrent(ter, pct, todayIso) {
+    const rows = rowsOf(ter).map((r) => Object.assign({}, r));
+    if (!rows.length) rows.push({ from: "", pct });
+    else rows[rows.length - 1].pct = pct;
+    return { rows, checked: todayIso };
+  }
+
+  /** The record with a new row: from this day the fund's figure is pct (a row on the same day is replaced). checked is set to todayIso. */
+  function withChange(ter, fromIso, pct, todayIso) {
+    const rows = rowsOf(ter).filter((r) => r.from !== fromIso).map((r) => Object.assign({}, r));
+    rows.push({ from: fromIso, pct });
+    return { rows: sortRows(rows), checked: todayIso };
+  }
+
+  /** The record without row k (null when no row is left). */
+  function withoutRow(ter, k) {
+    const rows = rowsOf(ter).filter((_, i) => i !== k).map((r) => Object.assign({}, r));
+    return rows.length ? { rows, checked: ter.checked || "" } : null;
+  }
+
+  /** The record checked on todayIso ("still right today"). */
+  function withChecked(ter, todayIso) {
+    return ter ? { rows: rowsOf(ter).map((r) => Object.assign({}, r)), checked: todayIso } : ter;
+  }
+
+  /**
+   * The value-weighted average of the figures: items [{ value, pct }]; items without a figure (pct null) or without value are left out.
+   * Returns { pct (null when nothing is left), used, total (items with a value) }.
+   */
+  function weighted(items) {
+    let sum = 0;
+    let w = 0;
+    let used = 0;
+    let total = 0;
+    for (const it of items) {
+      if (!(it.value > EPS)) continue;
+      total++;
+      if (it.pct === null || it.pct === undefined || !Number.isFinite(it.pct)) continue;
+      sum += it.value * it.pct;
+      w += it.value;
+      used++;
+    }
+    return { pct: w > 0 ? sum / w : null, used, total };
+  }
+
+  /**
+   * What the figures come to over the time-frame win ({ s, e }, indexes of the model's days; default the whole history).
+   * ters: { ticker: record }. Returns { rows, totals }.
+   * A row: { ticker, name, pct (the figure now, or null), checked, valueEnd, held (valued at the end), yearlyNow (euro a year at the value at the end),
+   *          cost (euro over the time-frame), uncoveredDays (days with value and no figure in force) }.
+   * totals: { yearlyNow, cost, avgPct (weighted by the value at the end), withFigure, held (held at the end), missing: [tickers held without a figure],
+   *           uncoveredDays }.
+   * Bonds valued by the owner's own transactions have no row.
+   */
+  function estimate(model, ters, win) {
+    const s = win ? win.s : 0;
+    const e = win ? win.e : model.N - 1;
+    const rows = [];
+    for (const A of model.per) {
+      if (A.bond === true || A.valuedBy === "TRADES") continue;
+      const ter = ters && ters[A.ticker] ? ters[A.ticker] : null;
+      const list = rowsOf(ter);
+      const cur = current(ter);
+      let cost = 0;
+      let uncovered = 0;
+      let r = -1;
+      for (let i = s + 1; i <= e; i++) {
+        const day = model.days[i];
+        while (r + 1 < list.length && list[r + 1].from <= day) r++;
+        const base = A.value[i - 1];
+        if (!(base > EPS)) continue;
+        if (r < 0) {
+          uncovered++;
+          continue;
+        }
+        cost += (base * Number(list[r].pct)) / 100 / DAYS_PER_YEAR;
+      }
+      const valueEnd = A.value[e];
+      const held = valueEnd > EPS;
+      if (!held && cost === 0 && uncovered === 0) continue; // nothing of it in this time-frame
+      rows.push({ ticker: A.ticker, name: A.name || "", pct: cur ? cur.pct : null, checked: ter && ter.checked ? ter.checked : "", valueEnd, held, yearlyNow: cur && held ? (valueEnd * cur.pct) / 100 : 0, cost, uncoveredDays: uncovered });
+    }
+    const w = weighted(rows.filter((x) => x.held).map((x) => ({ value: x.valueEnd, pct: x.pct })));
+    const totals = {
+      yearlyNow: rows.reduce((a, x) => a + x.yearlyNow, 0),
+      cost: rows.reduce((a, x) => a + x.cost, 0),
+      avgPct: w.pct,
+      withFigure: w.used,
+      held: w.total,
+      missing: rows.filter((x) => x.held && x.pct === null).map((x) => x.ticker),
+      uncoveredDays: rows.reduce((a, x) => a + x.uncoveredDays, 0),
+    };
+    return { rows, totals };
+  }
+
+  return { VERSION, OLD_AFTER_DAYS, DAYS_PER_YEAR, rowsOf, current, rateAt, age, due, parsePct, withCurrent, withChange, withoutRow, withChecked, weighted, estimate };
+});
+
 /* ---- src/app/perf-input.js ---- */
 /*
  * PerfInput: puts together what the performance engine (perf.js) needs from the owner's document, the converted ledger and the
@@ -14712,7 +15485,7 @@ span.hc { cursor: default; }
    * (kind "ghost": a loss below the cost, architecture 27.6), a square otherwise. The colour is also kept as --sw, so that the key of a switched-off line can be drawn hollow.
    */
   function keyOf(x) {
-    const sw = h("span", { class: "swatch" + (x.kind === "line" ? " ln" : x.kind === "band" ? " bd" : x.kind === "hatch" ? " hatch" : x.kind === "ghost" ? " gh" : "") + (x.dash ? " dash" : "") + (TEXTURES.indexOf(x.pattern) >= 0 ? " tx tx-" + x.pattern : "") });
+    const sw = h("span", { class: "swatch" + (x.kind === "line" ? " ln" : x.kind === "band" ? " bd" : x.kind === "hatch" ? " hatch" : x.kind === "ghost" ? " gh" : "") + (x.dashStyle ? " dash dash-" + x.dashStyle : x.dash ? " dash" : "") + (TEXTURES.indexOf(x.pattern) >= 0 ? " tx tx-" + x.pattern : "") });
     sw.style.setProperty("--sw", x.color);
     sw.style.background = x.kind === "band" ? "linear-gradient(180deg, " + x.color + " 0 3px, color-mix(in srgb, " + x.color + " 40%, transparent) 3px, transparent 100%)" : x.color;
     return sw;
@@ -14913,8 +15686,8 @@ span.hc { cursor: default; }
         tip.textContent = "";
         tip.appendChild(h("div", { class: "tip-title", text: title }));
         for (const r of rows) {
-          const line = h("div", { class: "tip-row" + (r.plain ? " plain" : "") + (r.head ? " head" : "") });
-          if (r.color) line.appendChild(keyOf({ color: r.color, kind: r.kind, pattern: r.pattern }));
+          const line = h("div", { class: "tip-row" + (r.plain ? " plain" : "") + (r.head ? " head" : "") + (r.hot ? " hot" : "") });
+          if (r.color) line.appendChild(keyOf({ color: r.color, kind: r.kind, pattern: r.pattern, dashStyle: r.dashStyle }));
           line.appendChild(h("span", { class: "tip-name", text: r.name }));
           line.appendChild(h("span", { class: "tip-val" + (r.tone ? " " + r.tone : ""), text: r.value }));
           tip.appendChild(line);
@@ -15396,6 +16169,31 @@ span.hc { cursor: default; }
     return out;
   }
 
+  /** The dash patterns a line can have besides the plain one (series dashStyle "a" to "d"), so that lines of one colour stay apart by more than colour. */
+  const DASH_STYLES = { a: "8 4", b: "1.5 3.5", c: "8 3 1.5 3", d: "3 3 10 3" };
+
+  /** The last position of a list of numbers that is a number (-1 when there is none): a line that ends before the chart does (a holding that was sold) has gaps. */
+  function finiteLast(values) {
+    for (let k = values.length - 1; k >= 0; k--) if (Number.isFinite(values[k])) return k;
+    return -1;
+  }
+
+  /** The path of a line over positions from to to of vals (heights through y): a position that is not a number is a gap, and the pen goes down again after it. */
+  function runPath(vals, xs, from, to, y) {
+    let d = "";
+    let pen = false;
+    for (let k = from; k <= to; k++) {
+      const v = vals[k];
+      if (!Number.isFinite(v)) {
+        pen = false;
+        continue;
+      }
+      d += (pen ? "L" : "M") + xs[k].toFixed(1) + " " + y(v).toFixed(1);
+      pen = true;
+    }
+    return d;
+  }
+
   /**
    * One to four lines over a stretch of days, many points (the caller thins them): the value of a portfolio, the growth of 100.
    * The pointer, a finger or the arrow keys move a cross hair that shows the exact values of that day.
@@ -15408,7 +16206,13 @@ span.hc { cursor: default; }
    *         between 0 and 1 makes the shading strongest at a, with that opacity, and fading to nothing at b, see fadeShapes),
    *         a series with area: true shades between its line and zero (stronger the further from zero), with fade: true under its line,
    *         key: a name that keeps what the owner switched off in the legend when the chart is drawn again,
-   *         rows: (index) => [[label, text, tone?], ...] more rows for the tooltip of a day }
+   *         rows: (index) => [[label, text, tone?], ...] more rows for the tooltip of a day,
+   *         a series may have opacity (0 to 1, its line only), dashStyle "a" to "d" (four dash patterns, also in its key) and noPill: true (no pill at its right end, and it does not count towards
+   *         the four lines that get pills: a benchmark line),
+   *         dense: true (a smaller legend that scrolls inside its own box when there are many entries; thin implies it),
+   *         thin: true (architecture 34.4): many slim, light lines for comparing holdings: no glow, no end pills, a smaller legend, the tooltip lists the
+   *         lines highest first, and the line nearest the pointer is picked out; a value that is not a number is a gap in its line (a holding that was
+   *         sold, or not yet bought) and has no row in the tooltip that day }
    * A series with stackOn: i sits on top of series i: it is drawn at the values of series i plus its own, while its own values are the figures
    * of its tooltip row and end pill (a realised gain stacked on the money put in). It is drawn behind the others (so that where it lies on the
    * line it sits on, that line stays visible), and with downColor its line, its pill and its key in the tooltip take that colour where its own
@@ -15426,7 +16230,7 @@ span.hc { cursor: default; }
     const n = days.length;
     // where each series is drawn: one that sits on another runs at the other's values plus its own
     const pos = series.map((x) => (x.stackOn === undefined ? x.values : x.values.map((v, k) => v + series[x.stackOn].values[k])));
-    const endTexts = series.map((x) => x.endText || fmt(x.values[n - 1]));
+    const endTexts = series.map((x) => x.endText || fmt(x.values[Math.max(0, finiteLast(x.values))]));
     const wrap = h("div", { class: "chart-wrap" });
     const box = h("figure", { class: "chart" }, []);
     const hidden = hiddenFor(opts.key, series.map((x) => x.name));
@@ -15443,6 +16247,7 @@ span.hc { cursor: default; }
         },
       });
       syncLegend(legendNode, hidden);
+      if (opts.thin || opts.dense) legendNode.classList.add("dense");
       box.appendChild(legendNode);
     }
     box.appendChild(wrap);
@@ -15461,13 +16266,15 @@ span.hc { cursor: default; }
       for (const i of vis) if (series[i].stackOn !== undefined) used.add(series[i].stackOn);
       for (const i of used) for (const v of pos[i]) { if (v < lo) lo = v; if (v > hi) hi = v; }
       if (opts.zero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+      if (!(lo <= hi)) { lo = 0; hi = 1; } // nothing shown has a value
       const sc = niceScaleFree(lo, hi, 4);
       const tickText = (t) => (opts.tickFormat ? opts.tickFormat(t, sc.step) : fmt(t));
       // the left margin is as wide as the longest tick label (a phone has no room to spare), the right one as wide as the pills
       const ml = Math.max(36, Math.ceil(Math.max.apply(null, sc.ticks.map((t) => tickText(t).length)) * 6.7) + 12);
-      const pills = vis.length <= 4;
+      const pillSet = vis.filter((i) => !series[i].noPill); // a line with noPill (a benchmark) has no pill and does not count towards the four
+      const pills = !opts.thin && pillSet.length <= 4;
       const pillW = (i) => Math.round(endTexts[i].length * 6.8 + 22);
-      const mr = pills ? Math.min(100, Math.max(14, Math.max.apply(null, vis.map(pillW)) + 12)) : 14;
+      const mr = pills && pillSet.length ? Math.min(100, Math.max(14, Math.max.apply(null, pillSet.map(pillW)) + 12)) : 14;
       const pw = Math.max(20, W - ml - mr), ph = H - mt - mb; // never narrower than 20: a box a few dozen pixels wide must not make a rectangle of negative width
       const svg = s("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H, role: "group", "aria-label": (opts.ariaLabel || "Chart") + ". Use the left and right arrow keys to read the values of each day." });
       wrap.insertBefore(svg, wrap.firstChild);
@@ -15541,33 +16348,37 @@ span.hc { cursor: default; }
             for (const d of sp.up) out.push({ d, color: x.color });
             for (const d of sp.down) out.push({ d, color: x.downColor });
           } else {
-            out.push({ d: pos[i].slice(from, to + 1).map((v, k) => (k ? "L" : "M") + xs[from + k].toFixed(1) + " " + y(v).toFixed(1)).join(""), color: x.color });
+            out.push({ d: runPath(pos[i], xs, from, to, y), color: x.color });
           }
         }
         return out;
       };
       for (const i of order) {
         const x = series[i];
-        if (x.glow === false) continue;
+        if (x.glow === false || opts.thin) continue;
         for (const pc of piecesOf(i)) {
           const gl = s("path", { d: pc.d, class: "lineglow", filter: defs.glow }, svg);
           gl.style.stroke = pc.color;
           if (x.dash) gl.setAttribute("stroke-dasharray", "6 4");
         }
       }
+      const lineNodes = series.map(() => []);
       for (const i of order) {
         const x = series[i];
         for (const pc of piecesOf(i)) {
-          const p = s("path", { d: pc.d, class: "line" }, svg);
+          const p = s("path", { d: pc.d, class: "line" + (opts.thin ? " thin" : "") }, svg);
           p.style.stroke = pc.color;
           if (x.width) p.style.strokeWidth = x.width;
-          if (x.dash) p.setAttribute("stroke-dasharray", "6 4");
+          if (x.opacity !== undefined) p.style.opacity = x.opacity;
+          const dashes = x.dashStyle && DASH_STYLES[x.dashStyle] ? DASH_STYLES[x.dashStyle] : x.dash ? (opts.thin ? "4 3" : "6 4") : "";
+          if (dashes) p.setAttribute("stroke-dasharray", dashes);
+          lineNodes[i].push(p);
         }
       }
       // the value at the right end of every line (at most four lines) in a small pill, pushed apart where they would touch (up from the
       // bottom of the plot when they run out of room there) and joined to the end of the line by a short stroke where one had to move
       if (pills) {
-        const ends = vis.map((i) => ({ i, at: y(pos[i][n - 1]), y: y(pos[i][n - 1]) })).sort((p, q) => p.y - q.y);
+        const ends = pillSet.filter((i) => Number.isFinite(pos[i][n - 1])).map((i) => ({ i, at: y(pos[i][n - 1]), y: y(pos[i][n - 1]) })).sort((p, q) => p.y - q.y);
         for (let k = 1; k < ends.length; k++) if (ends[k].y - ends[k - 1].y < 22) ends[k].y = ends[k - 1].y + 22;
         const floor = mt + ph + 6;
         for (let k = ends.length - 1; k >= 0; k--) {
@@ -15598,31 +16409,58 @@ span.hc { cursor: default; }
       let linePts = null;
       let side = "";
       const place = (tw, th, Wd, Hd) => {
-        if (!linePts) linePts = vis.map((i) => lineSamples(xs, pos[i].map((v) => y(v)), 4));
-        const f = opts.follow !== undefined && vis.includes(opts.follow) ? opts.follow : vis[0];
-        const p = tipSpot({ W: Wd, H: Hd, tw, th, x: xs[current], y: y(pos[f][current]), lines: linePts, prev: side, room: roomAround(wrap) });
+        if (!linePts) {
+          linePts = vis.map((i) => {
+            const ok = [];
+            for (let k = 0; k < n; k++) if (Number.isFinite(pos[i][k])) ok.push(k);
+            return lineSamples(ok.map((k) => xs[k]), ok.map((k) => y(pos[i][k])), 4);
+          });
+        }
+        const f0 = opts.follow !== undefined && vis.includes(opts.follow) ? opts.follow : vis[0];
+        const f = Number.isFinite(pos[f0][current]) ? f0 : vis.find((i) => Number.isFinite(pos[i][current]));
+        const p = tipSpot({ W: Wd, H: Hd, tw, th, x: xs[current], y: f === undefined ? mt + ph / 2 : y(pos[f][current]), lines: linePts, prev: side, room: roomAround(wrap) });
         side = p.side;
         return p;
       };
-      const show = (k) => {
+      // thin lines: the line nearest the pointer (by height, on the day of the cross hair) is picked out and the others go dimmer
+      const pick = (hot) => {
+        if (!opts.thin) return;
+        for (const i of vis) for (const p of lineNodes[i]) {
+          p.classList.toggle("hot", hot === i);
+          p.classList.toggle("dim", hot !== null && hot !== i);
+        }
+      };
+      const show = (k, py) => {
         current = Math.max(0, Math.min(n - 1, k));
         cross.setAttribute("x1", xs[current]);
         cross.setAttribute("x2", xs[current]);
         cross.style.display = "";
+        const here = vis.filter((i) => Number.isFinite(pos[i][current]));
         for (const i of vis) {
           for (const node of [marks[i], rings[i]]) {
+            if (!Number.isFinite(pos[i][current])) {
+              node.style.display = "none";
+              continue;
+            }
             node.setAttribute("cx", xs[current]);
             node.setAttribute("cy", y(pos[i][current]));
             node.style.fill = colorAt(i, current);
             node.style.display = "";
           }
         }
-        const rows = vis.map((i) => ({ name: series[i].tipName || series[i].name, color: colorAt(i, current), kind: series[i].kind, value: series[i].texts && series[i].texts[current] ? series[i].texts[current] : fmt(series[i].values[current]) }));
+        let hot = null;
+        if (opts.thin && Number.isFinite(py) && here.length) {
+          hot = here.reduce((best, i) => (Math.abs(y(pos[i][current]) - py) < Math.abs(y(pos[best][current]) - py) ? i : best), here[0]);
+        }
+        pick(hot);
+        let rows = here.map((i) => ({ name: series[i].tipName || series[i].name, color: colorAt(i, current), kind: series[i].kind, dashStyle: series[i].dashStyle, hot: hot === i, num: series[i].values[current], value: series[i].texts && series[i].texts[current] ? series[i].texts[current] : fmt(series[i].values[current]) }));
+        if (opts.thin) rows = rows.sort((p, q) => q.num - p.num);
         tipper.show((opts.dateText || String)(days[current]), rows.concat(plainRows(opts.rows ? opts.rows(current) : null)), xs[current], null, vis.length ? place : undefined);
       };
       const hide = () => {
         cross.style.display = "none";
         for (const m of marks.concat(rings)) m.style.display = "none";
+        pick(null);
         tipper.hide();
       };
       const hit = s("rect", { x: ml, y: mt, width: Math.max(1, pw), height: ph + mb, class: "hit", tabindex: 0, role: "img", "aria-label": (opts.ariaLabel || "Chart") + ". Use the left and right arrow keys to read the values of each day.", style: "touch-action: pan-y" }, svg);
@@ -15630,13 +16468,17 @@ span.hc { cursor: default; }
         const r = hit.getBoundingClientRect();
         return nearestIndex(xs, ml + ((ev.clientX - r.left) / Math.max(1, r.width)) * pw);
       };
+      const atY = (ev) => {
+        const r = hit.getBoundingClientRect();
+        return mt + ((ev.clientY - r.top) / Math.max(1, r.height)) * (ph + mb);
+      };
       hit.addEventListener("pointermove", (ev) => {
         clearTimeout(touchTimer);
-        show(at(ev));
+        show(at(ev), atY(ev));
       });
       hit.addEventListener("pointerdown", (ev) => {
         clearTimeout(touchTimer);
-        show(at(ev));
+        show(at(ev), atY(ev));
       });
       hit.addEventListener("pointerleave", (ev) => {
         if (ev.pointerType === "touch") touchTimer = setTimeout(hide, 4000);
@@ -16166,7 +17008,7 @@ span.hc { cursor: default; }
     return h("div", { class: "tbl-wrap" }, [t]);
   }
 
-  return { niceScale, niceScaleFree, timeTicks, nearestIndex, barPath, hBarPath, compactEuro, bandPaths, splitLinePaths, fadeShapes, nonZeroRuns, pieSlices, donutPath, pieFold, pieChosen, pieToggle, lineSamples, roomAround, tipSpot, tipPlaces, tipSpotRing, bars, line, timeLines, hbars, stackRuns, sbars, pie, tableOf, legend, constants: { MAX_BAR, RADIUS, GAP, PIE_HUES, TEXTURES } };
+  return { niceScale, niceScaleFree, timeTicks, nearestIndex, barPath, hBarPath, compactEuro, bandPaths, splitLinePaths, fadeShapes, nonZeroRuns, finiteLast, runPath, pieSlices, donutPath, pieFold, pieChosen, pieToggle, lineSamples, roomAround, tipSpot, tipPlaces, tipSpotRing, bars, line, timeLines, hbars, stackRuns, sbars, pie, tableOf, legend, constants: { MAX_BAR, RADIUS, GAP, PIE_HUES, TEXTURES } };
 });
 
 /* ---- src/app/hold-view.js ---- */
@@ -20208,6 +21050,380 @@ const LedgerUI = (function () {
   return { create };
 })();
 
+/* ---- src/app/ui-compare.js ---- */
+/*
+ * The comparison parts of the Performance tab (browser only; architecture section 34).
+ *
+ *  - "Compare with": a row of chips, one for each benchmark (VWCE, VGLA, VAGF and a 60/40 blend of VWCE and VAGF). The choice is kept while the page is
+ *    open and drives three places: the value chart (what the same money would be worth in the benchmark), the Line view of the returns (the benchmark's
+ *    growth from 100) and the two cards below.
+ *  - "Holdings side by side": every holding as one slim, light line, the return since the start of the time-frame, next to the others.
+ *  - "Winners and losers by year": one column for each calendar year, every column sorted from the best to the worst (a "periodic table of returns").
+ *
+ * What is drawn comes from Bench (the euro price series and the benchmark lines) and Compare (the lines of the holdings, the table, the colour slots), which
+ * only read what Perf returned. Nothing is calculated here. Text is always put in with textContent. Before tax; nothing here feeds the tax.
+ *
+ * The colours: a holding keeps one of eight colours (the slot of its first purchase) in the chart and in the table; a benchmark is never a hue, it is a light
+ * dashed line and a dashed, empty cell. Red is only for a loss.
+ */
+const CompareUI = (function () {
+  "use strict";
+
+  const { el } = Dom;
+  const C = Charts;
+  const MINUS = "−";
+
+  // The four benchmarks differ by their dash as well as by their name (their colour is the same light neutral): the pattern is also in the legend and the hover box.
+  const DASH_OF = { VWCE: "a", VGLA: "b", VAGF: "c", "60/40": "d" };
+  const REASON = {
+    NO_PRICES: "no prices yet",
+    NO_CURRENCY: "the price file does not say which currency it is in",
+    NO_FX: "there are no ECB rates for its currency",
+    LATER: "its prices start after your history ends",
+    NO_OVERLAP: "its two funds have no day in common yet",
+  };
+  const slotColor = (slot) => (slot >= 0 && slot < Compare.SLOTS ? "var(--c-sec-" + (slot + 1) + ")" : "var(--c-sec-other)");
+  const slotClass = (slot) => (slot >= 0 && slot < Compare.SLOTS ? "qs" + (slot + 1) : "qso");
+
+  /** The cell text of a return: one decimal, a real minus sign (U+2212), no plus. A loss is a figure that shows as below zero. */
+  const isLoss = (x) => x * 100 <= -0.05;
+  const pct1 = (x) => (isLoss(x) ? MINUS : "") + Math.abs(x * 100).toFixed(1) + " %";
+  /** An axis tick in percent points: "+20 %", "0 %", "−10 %". */
+  const axisPts = (v) => (v < -1e-9 ? MINUS : v > 1e-9 ? "+" : "") + +Math.abs(v).toFixed(2) + " %";
+  const uniq = (a) => Array.from(new Set(a));
+
+  /**
+   * host: {
+   *   book()          the price book, or null while the saved prices are being read
+   *   doc()           the document (the ECB files)
+   *   base()          the performance model of the whole portfolio (the colours follow it, whatever the view)
+   *   names()         the name resolver (Names)
+   *   money, pct, fd, plural   the formatters of the Performance tab
+   *   chartCard(key, title, note, chart, table, before)   a card with the Chart / Table switch
+   *   openSetup()     opens the card "Prices and Yahoo symbols" and scrolls to it
+   *   refresh()
+   * }
+   */
+  function create(host) {
+    const st = { bench: new Set(), all: false, hot: "" };
+
+    // ------------------------------------------------------------ the euro price series (kept until the prices, the ECB files or the last day change)
+
+    let memo = { book: null, key: "", fx: null, endDn: 0, res: null, own: new Map() };
+    const ecbKey = (d) => JSON.stringify(Object.keys(d.files.ecb).sort().map((c) => [c, d.files.ecb[c].hash]));
+
+    /** { res (Bench.resolveAll), fx, endDn, own (the series of holdings) } for what is on screen, or null while there are no prices to read. */
+    function resolved(m) {
+      const book = host.book();
+      if (!book || !book.store || !book.store.symbols || !m || !m.ok) return null;
+      const d = host.doc();
+      const endDn = Prices.dayNumber(m.end);
+      const key = ecbKey(d) + "|" + endDn;
+      if (memo.book !== book || memo.key !== key) {
+        const fx = PerfInput.makeFx(d);
+        const symbols = book.store.symbols;
+        memo = { book, key, fx, endDn, own: new Map(), res: Bench.resolveAll((s) => symbols[s] || null, fx, endDn) };
+      }
+      return memo;
+    }
+
+    /** The euro series of a holding (a `per` entry of the model), or null. */
+    function seriesOfHolding(A, r) {
+      const sym = A.symbol;
+      if (!sym) return null;
+      if (!r.own.has(sym)) r.own.set(sym, Bench.eurSeries(memo.book.store.symbols[sym] || null, r.fx, r.endDn, {}));
+      return r.own.get(sym);
+    }
+
+    const chosen = (r) => Bench.list().filter((b) => st.bench.has(b.key) && r.res[b.key].ok);
+
+    // ------------------------------------------------------------ the strip
+
+    function toggle(key, on) {
+      if (on) st.bench.add(key);
+      else st.bench.delete(key);
+      host.refresh();
+    }
+
+    /**
+     * The chips "Compare with" and, under them, what is missing. key: where the strip sits (value, line, holdings, quilt); w: the time-frame (a chip that is on
+     * but has no price in it is said so), or null when the card does not depend on it.
+     */
+    function strip(m, w, key) {
+      const r = resolved(m);
+      if (!r) return null;
+      const list = Bench.list();
+      const chips = list.map((b) => {
+        const x = r.res[b.key];
+        const on = st.bench.has(b.key) && x.ok;
+        const input = el("input", { type: "checkbox", "data-key": "bench-" + key + ":" + b.key, checked: on, disabled: !x.ok, onchange: (e) => toggle(b.key, e.target.checked) });
+        return el("label", { class: "ychip bchip", title: x.ok ? b.name : b.label + ": " + (REASON[x.reason] || x.reason) }, input, el("span", {}, el("i", { class: "bsw " + DASH_OF[b.key], "aria-hidden": "true" }), b.label));
+      });
+      const notes = [];
+      const bad = list.filter((b) => !r.res[b.key].ok);
+      if (bad.length) {
+        const syms = uniq([].concat(...bad.filter((b) => r.res[b.key].reason === "NO_PRICES").map((b) => r.res[b.key].missing)));
+        const other = bad.filter((b) => r.res[b.key].reason !== "NO_PRICES").map((b) => b.label + ": " + (REASON[r.res[b.key].reason] || r.res[b.key].reason));
+        const text = (syms.length ? "No prices yet for " + syms.join(", ") + ". " : "") + (other.length ? other.join(". ") + ". " : "");
+        notes.push(el("p", { class: "note", "data-k": "pf-bench-missing:" + key }, text, host.openSetup ? el("button", { type: "button", class: "linkish", "data-key": "bench-how:" + key, onclick: () => host.openSetup(), text: "How to get them" }) : null));
+      }
+      if (w) {
+        for (const b of chosen(r)) {
+          const g = Bench.growth(r.res[b.key].series, m, w);
+          if (!g.values.some(Number.isFinite)) notes.push(el("p", { class: "note", "data-k": "pf-bench-none:" + key + ":" + b.key, text: b.label + " has no prices in this time-frame: its prices start on " + host.fd(r.res[b.key].first) + "." }));
+        }
+      }
+      return el("div", { class: "benchbar", "data-k": "pf-bench:" + key },
+        el("span", { class: "yearbar-lab", text: "Compare with" }),
+        el("div", { class: "ychips", role: "group", "aria-label": "Benchmarks to compare with" }, chips),
+        notes);
+    }
+
+    // ------------------------------------------------------------ benchmark lines on the charts of days
+
+    /**
+     * The benchmark lines for a chart over `days` (ISO days inside the time-frame w): mode "money" (what the same money would be worth, in euro) or "growth"
+     * (the price, 100 at the start). Returns { series: [for Charts.timeLines], columns: [{ name, texts }] for a table over the same days }.
+     */
+    function lines(m, w, days, mode) {
+      const out = { series: [], columns: [] };
+      const r = resolved(m);
+      if (!r) return out;
+      const at = days.map((d) => Prices.dayNumber(d) - m.dn0 - w.s);
+      for (const b of chosen(r)) {
+        const g = mode === "money" ? Bench.sameMoney(r.res[b.key].series, m, w) : Bench.growth(r.res[b.key].series, m, w);
+        if (!g.values.some(Number.isFinite)) continue;
+        const values = at.map((i) => (i >= 0 && i < g.values.length ? g.values[i] : NaN));
+        const texts = values.map((v) => (Number.isFinite(v) ? (mode === "money" ? host.money(v) : v.toFixed(2)) : ""));
+        let name = b.label + (mode === "money" ? ", same money" : "");
+        if (g.late) name += ", from " + host.fd(g.from);
+        if (g.soldOut) name += ", sold out " + host.fd(g.soldOut);
+        out.series.push({ name, tipName: name, color: "var(--c-bench)", kind: "line", width: 1.4, glow: false, noPill: true, opacity: 0.85, dashStyle: DASH_OF[b.key], values, texts });
+        out.columns.push({ name, texts: texts.map((t) => t || "–") });
+      }
+      return out;
+    }
+
+    /** The sentence under a chart that has benchmark lines. */
+    function lineNote(mode) {
+      return mode === "money"
+        ? " The light dashed lines show what the same money would be worth in a benchmark: at the start of the time-frame it is worth what your portfolio is worth, and every euro you put in or took out afterwards buys or sells units of it at that day's close. Before tax and fees; the fund's own running cost (TER) is already in its price."
+        : " The light dashed lines are the price of a benchmark, 100 at the start of the time-frame. Your line counts your dividends and fees as well; a fund's price already has its own running cost (TER) in it. Both are before tax.";
+    }
+
+    // ------------------------------------------------------------ holdings side by side (34.4)
+
+    const colorOf = (slots, ticker) => slotColor(slots && slots[ticker] !== undefined ? slots[ticker] : -1);
+
+    function holdingsCard(m, w) {
+      const base = host.base();
+      if (!base || !base.ok) return null;
+      const n = host.names();
+      const slots = Compare.slots(base);
+      const { lines: own } = Compare.holdingLines(m, w);
+      const r = resolved(m);
+      const picked = r ? chosen(r) : [];
+      // the days drawn: the thinned days of the time-frame and, for each line, its own first and last day, so that a line ends at the figure of the table
+      const set = new Set(Perf.thin(w.s, w.e, 300));
+      for (const L of own) {
+        set.add(Prices.dayNumber(L.from) - m.dn0);
+        set.add(Prices.dayNumber(L.to) - m.dn0);
+      }
+      const idx = Array.from(set).filter((i) => i >= w.s && i <= w.e).sort((a, b) => a - b);
+      const days = idx.map((i) => m.days[i]);
+      const series = [];
+      const rows = [];
+      for (const L of own) {
+        const label = n.ofTicker(L.ticker).label;
+        const values = idx.map((i) => {
+          const v = L.values[i - w.s];
+          return Number.isFinite(v) ? v - 100 : NaN;
+        });
+        series.push({ name: label, tipName: label, color: colorOf(slots, L.ticker), kind: "line", noPill: true, values, texts: values.map((v) => (Number.isFinite(v) ? host.pct(v / 100, true) : "")) });
+        rows.push([label, host.fd(L.from), host.fd(L.to), host.pct(L.ret, true)]);
+      }
+      if (r) {
+        for (const b of picked) {
+          const g = Bench.growth(r.res[b.key].series, m, w);
+          if (!g.values.some(Number.isFinite)) continue;
+          const values = idx.map((i) => {
+            const v = g.values[i - w.s];
+            return Number.isFinite(v) ? v - 100 : NaN;
+          });
+          const name = b.label + " (benchmark)";
+          series.push({ name, tipName: name, color: "var(--c-bench)", kind: "line", noPill: true, dashStyle: DASH_OF[b.key], values, texts: values.map((v) => (Number.isFinite(v) ? host.pct(v / 100, true) : "")) });
+          const last = g.values.length - 1 - Array.from(g.values).reverse().findIndex(Number.isFinite);
+          rows.push([name, host.fd(g.from), host.fd(m.days[w.s + last]), host.pct(g.values[last] / 100 - 1, true)]);
+        }
+      }
+      if (series.length < 2) return null; // one line is the value chart, not a comparison
+      const chart = C.timeLines({
+        days,
+        series,
+        thin: true,
+        zero: true,
+        format: (v) => axisPts(v),
+        tickFormat: (v) => axisPts(v),
+        dateText: host.fd,
+        key: "holdings",
+        ariaLabel: "The return of each holding since the start of the time-frame, from " + host.fd(w.from) + " to " + host.fd(w.to),
+        height: 300,
+      });
+      const table = C.tableOf(["Holding", "First day shown", "Last day shown", "Return over that span"], rows, "Return of each holding over the days it is shown");
+      const note = "Every line starts at 0 % on the first day it is shown: the start of the time-frame for what you held then, the day before the first day of a holding you bought later. A line is the holding's own time-weighted return (dividends in, fees in), so its end is the figure in the table of securities for the same time-frame. It ends on the day of the last sale; a gap means you did not hold it then. Move over the chart: the nearest line is picked out."
+        + (picked.length ? " Dashed lines are benchmarks (their price)." : "");
+      return host.chartCard("holdings", "Holdings side by side", note, chart, table, strip(m, w, "holdings"));
+    }
+
+    // ------------------------------------------------------------ winners and losers by year (34.5)
+
+    function paintHot(root, who) {
+      for (const c of Array.from(root.querySelectorAll(".qc"))) {
+        const same = c.getAttribute("data-who") === who;
+        c.classList.toggle("q-hot", !!who && same);
+        c.classList.toggle("q-dim", !!who && !same);
+      }
+    }
+
+    const whoOf = (cell) => (cell.kind === "bench" ? cell.key : "t:" + cell.key);
+
+    function cellNode(cell, year, slots, n) {
+      const bench = cell.kind === "bench";
+      const full = bench ? cell.name : n.ofTicker(cell.ticker).full;
+      const label = bench ? cell.label : n.ofTicker(cell.ticker).label;
+      const per = cell.years !== undefined;
+      const tag = per ? plural(cell.years, "year") : cell.partial ? (cell.partialStart ? "from " + shortDay(cell.from) : "so far") : "";
+      const say = [label + (cell.priceOnly ? "*" : ""), per ? "per year" : String(year), pct1(cell.ret)].concat(tag ? [tag] : []).join(", ");
+      const rows = [[per ? "Average per year" : "Year", per ? plural(cell.years, "complete year") : String(year)], [per ? "Compounded" : "Return in euro", host.pct(cell.ret, true), isLoss(cell.ret) ? "neg" : cell.ret > 0 ? "pos" : undefined]];
+      if (!per && cell.partial) rows.push(["Counted", "from " + host.fd(cell.from) + " to " + host.fd(cell.to) + " (not a whole year)"]);
+      const tip = Tip.attr({ t: full || label, r: rows, n: (bench ? "Benchmark: the price of the fund in euro, before tax." : "Price return in euro, before tax.") + (cell.priceOnly ? " It paid you dividends: they are not in this figure." : "") });
+      const cls = ["qc", bench ? "qb" : slotClass(slots[cell.ticker] !== undefined ? slots[cell.ticker] : -1)];
+      if (isLoss(cell.ret)) cls.push("q-loss");
+      if (!per && cell.partial) cls.push("q-part");
+      const who = whoOf(cell);
+      if (st.hot) cls.push(st.hot === who ? "q-hot" : "q-dim");
+      return el("div", { class: cls.join(" "), role: "img", tabindex: "0", "aria-label": say, "data-who": who, "data-tip": tip || false },
+        el("span", { class: "qn", text: label + (cell.priceOnly ? "*" : "") }),
+        el("span", { class: "qr", text: pct1(cell.ret) }),
+        tag ? el("span", { class: "qt", text: tag }) : null);
+    }
+
+    const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const shortDay = (iso) => (iso ? +iso.slice(8, 10) + " " + MON[+iso.slice(5, 7) - 1] : "");
+    const plural = (k, one) => host.plural(k, one);
+
+    function quiltCard(m) {
+      const base = host.base();
+      const r = resolved(m);
+      if (!base || !base.ok || !r) return null;
+      const n = host.names();
+      const slots = Compare.slots(base);
+      const benches = chosen(r).map((b) => ({ key: b.key, label: b.label, name: b.name, series: r.res[b.key].series }));
+      const q = Compare.quilt(m, { seriesOf: (A) => seriesOfHolding(A, r), benches, maxYears: 10, all: st.all });
+      const cells = q.cols.reduce((a, c) => a + c.cells.length, 0);
+      const chips = strip(m, null, "quilt");
+      if (!q.cols.length || !cells) {
+        return el("section", { class: "card", "data-k": "pf-quilt" },
+          el("div", { class: "card-head" }, el("h2", { text: "Winners and losers by year" })),
+          el("p", { class: "note", text: "No holding has prices that cover a calendar year yet." }));
+      }
+      // the grid: one column for each year, oldest at the left, and the average per year at the end
+      const cols = q.cols.map((c) => el("div", { class: "q-col", "data-k": "q-col:" + c.year }, el("div", { class: "q-head", text: String(c.year) }), c.cells.map((cell) => cellNode(cell, c.year, slots, n))));
+      if (q.perYear.cells.length) cols.push(el("div", { class: "q-col per", "data-k": "q-col:per" }, el("div", { class: "q-head", text: "Per year" }), q.perYear.cells.map((cell) => cellNode(cell, 0, slots, n))));
+      // a press (a click, Enter or Space) keeps the holding of the cell lifted; the same again lets go
+      const press = (root, c) => {
+        const who = c.getAttribute("data-who");
+        st.hot = st.hot === who ? "" : who;
+        paintHot(root, st.hot);
+      };
+      const grid = el("div", {
+        class: "quilt",
+        onpointerover: (e) => {
+          const c = e.target && e.target.closest ? e.target.closest(".qc") : null;
+          if (c && e.pointerType === "mouse") paintHot(e.currentTarget, c.getAttribute("data-who"));
+        },
+        onpointerleave: (e) => paintHot(e.currentTarget, st.hot),
+        // the keyboard does what the pointer does: a cell in focus lifts every cell of its holding, Enter or Space presses it
+        onfocusin: (e) => {
+          const c = e.target && e.target.closest ? e.target.closest(".qc") : null;
+          if (c) paintHot(e.currentTarget, c.getAttribute("data-who"));
+        },
+        onfocusout: (e) => paintHot(e.currentTarget, st.hot),
+        onkeydown: (e) => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          const c = e.target && e.target.closest ? e.target.closest(".qc") : null;
+          if (!c) return;
+          e.preventDefault();
+          press(e.currentTarget, c);
+        },
+        onclick: (e) => {
+          const c = e.target && e.target.closest ? e.target.closest(".qc") : null;
+          if (c) press(e.currentTarget, c);
+        },
+      }, cols);
+      const wrap = el("div", { class: "quilt-wrap", tabindex: "0", role: "region", "aria-label": "Winners and losers by calendar year: scrolls sideways, newest year at the right" }, grid);
+      // the first time it is drawn it shows the newest years (the patcher keeps the position of one that is already on the page)
+      if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => { if (wrap.isConnected && !wrap.__seen) { wrap.__seen = true; wrap.scrollLeft = wrap.scrollWidth; } });
+      const foot = [];
+      const before = el("div", { class: "stack", "data-k": "pf-quilt-before" }, chips, q.hiddenYears > 0 || st.all
+        ? el("div", { class: "btn-row" }, el("button", { type: "button", class: "btn small quiet", "data-key": "quilt-all", onclick: () => { st.all = !st.all; host.refresh(); }, text: st.all ? "Show the last 10 years" : "Show all " + (q.years.length + q.hiddenYears) + " years" }))
+        : null);
+      const anyPriceOnly = q.cols.some((c) => c.cells.some((x) => x.priceOnly));
+      const anyPartial = q.cols.some((c) => c.cells.some((x) => x.partial));
+      const text = "Each column is a calendar year, sorted from the best to the worst. The figure is the price return of the fund in euro for the year (the close of its last day over the close of the last day of the year before), the same for every fund whatever day you bought. A fund is in a year only if you held it or traded it then."
+        + (anyPartial ? " A dashed outline is a year that is not whole for that fund (the year is not over, or its prices start later)." : "")
+        + " A red dot marks a loss. “Per year” is the compound average of the whole years you held it (two or more)."
+        + (anyPartial ? " In the table, † marks a year that is not whole." : "")
+        + (anyPriceOnly ? " * The fund paid you dividends; they are not in its figure." : "")
+        + (benches.length ? " Dashed empty cells are benchmarks." : "");
+      const miss = q.noSeries.length ? q.noSeries.map((t) => n.ofTicker(t).label) : [];
+      if (miss.length) foot.push(el("p", { class: "note", "data-k": "pf-quilt-miss", text: host.plural(miss.length, "holding") + " not in the table because there are no prices for them: " + miss.join(", ") + "." }));
+      if (q.skipped.length) foot.push(el("p", { class: "note", "data-k": "pf-quilt-skip", text: host.plural(q.skipped.length, "holding") + " valued by your own transactions (no market price) not in the table: " + q.skipped.map((t) => n.ofTicker(t).label).join(", ") + "." }));
+      const chart = el("div", { class: "quilt-box", "data-k": "pf-quilt-chart" }, wrap, foot);
+      // the table of the same figures: a row for each holding and benchmark, a column for each year
+      const rowsOf = new Map();
+      const order = [];
+      const put = (cell, year) => {
+        if (!rowsOf.has(cell.key)) {
+          rowsOf.set(cell.key, { cell, by: new Map() });
+          order.push(cell.key);
+        }
+        rowsOf.get(cell.key).by.set(year, cell);
+      };
+      for (const c of q.cols) for (const cell of c.cells) put(cell, c.year);
+      for (const cell of q.perYear.cells) put(cell, "per");
+      order.sort((a, b) => {
+        const A = rowsOf.get(a).cell;
+        const B = rowsOf.get(b).cell;
+        if (A.kind !== B.kind) return A.kind === "holding" ? -1 : 1;
+        if (A.kind === "bench") return a < b ? -1 : 1;
+        const sa = slots[A.ticker] === undefined || slots[A.ticker] < 0 ? 99 : slots[A.ticker];
+        const sb = slots[B.ticker] === undefined || slots[B.ticker] < 0 ? 99 : slots[B.ticker];
+        return sa - sb || (a < b ? -1 : 1);
+      });
+      const cellText = (c) => {
+        if (!c) return "–";
+        const per = c.years !== undefined;
+        const text = host.pct(c.ret, true) + (per ? " · " + c.years + " y" : c.partial ? " †" : "");
+        if (!c.partial) return text;
+        return { text, tip: Tip.attr({ t: "Not a whole year", r: [["Counted", "from " + host.fd(c.from) + " to " + host.fd(c.to)]], n: c.partialStart ? "The prices of this fund start after 1 January." : "The year is not over yet, or the prices stop before its end." }) };
+      };
+      const head = ["Holding"].concat(q.years.map(String), q.perYear.cells.length ? ["Per year"] : []);
+      const body = order.map((k) => {
+        const row = rowsOf.get(k);
+        const label = row.cell.kind === "bench" ? row.cell.label + " (benchmark)" : n.ofTicker(row.cell.ticker).label + (row.cell.priceOnly ? "*" : "");
+        return [label].concat(q.years.map((y) => cellText(row.by.get(y))), q.perYear.cells.length ? [cellText(row.by.get("per"))] : []);
+      });
+      const table = C.tableOf(head, body, "Price return in euro of each holding by calendar year");
+      return host.chartCard("quilt", "Winners and losers by year", text, chart, table, before);
+    }
+
+    return { state: st, strip, lines, lineNote, holdingsCard, quiltCard };
+  }
+
+  return { create, DASH_OF, pct1, axisPts };
+})();
+
 /* ---- src/app/ui-perf.js ---- */
 /*
  * The Performance tab (browser only).
@@ -20556,15 +21772,41 @@ const PerfUI = (function () {
 
     // ------------------------------------------------------------ small pieces
 
-    function chartCard(key, title, sub, chart, table) {
+    function chartCard(key, title, sub, chart, table, before) {
       const tableOn = st.view[key] === "table";
       chart.hidden = tableOn;
       table.hidden = !tableOn;
       table.classList.add("perf-tbl");
       const bC = el("button", { type: "button", "aria-pressed": String(!tableOn), text: "Chart", onclick: () => { st.view[key] = "chart"; host.refresh(); } });
       const bT = el("button", { type: "button", "aria-pressed": String(tableOn), text: "Table", onclick: () => { st.view[key] = "table"; host.refresh(); } });
-      return el("section", { class: "card", "data-k": "pc:" + key }, el("div", { class: "card-head" }, el("h2", { text: title }), el("div", { class: "view-switch", role: "group", "aria-label": "Chart or table" }, bC, bT)), chart, table, sub ? el("p", { class: "note", text: sub }) : null);
+      return el("section", { class: "card", "data-k": "pc:" + key }, el("div", { class: "card-head" }, el("h2", { text: title }), el("div", { class: "view-switch", role: "group", "aria-label": "Chart or table" }, bC, bT)), before || null, chart, table, sub ? el("p", { class: "note", text: sub }) : null);
     }
+
+    /** Opens the card "Prices and Yahoo symbols" with the steps for the daily update, and brings it into view (from a chip that has no prices yet). */
+    function openSetup() {
+      st.open.setup = true;
+      st.open.kit = true;
+      host.refresh();
+      setTimeout(() => {
+        const node = typeof document !== "undefined" ? document.querySelector('[data-k="pf-setup"]') : null;
+        if (node && node.scrollIntoView) node.scrollIntoView({ block: "start", behavior: "smooth" });
+      }, 0);
+    }
+
+    // The benchmarks, the holdings side by side and the table of winners and losers (architecture 34): their own file, ui-compare.js
+    const cmp = CompareUI.create({
+      book: () => (st.loaded ? st.book : null),
+      doc,
+      base: () => (st.loaded && cv() ? model() : null),
+      names: () => nm(),
+      money,
+      pct,
+      fd,
+      plural,
+      chartCard,
+      openSetup,
+      refresh: () => host.refresh(),
+    });
 
     /** The calendar years of the history as chips, newest first: one of them is the time-frame. */
     function yearBar(m) {
@@ -20692,6 +21934,9 @@ const PerfUI = (function () {
       // shading between the white line and the realised line, strongest at that line (40 %) and fading to nothing at the white line (orange above, red below)
       const bands = [{ a: 0, b: 1, up: "var(--c-gain)", down: "var(--c-more)", cls: "soft" }];
       if (sold) bands.push({ a: 2, b: 1, up: "var(--c-real-line)", down: "var(--c-more)", cls: "real", show: [2], fade: 0.4 });
+      // benchmarks: what the same money would be worth in each one that is switched on in the strip above the chart (34.3)
+      const bl = cmp.lines(m, w, cs.days, "money");
+      for (const x of bl.series) series.push(x);
       const chart = C.timeLines({
         days: cs.days,
         series,
@@ -20699,16 +21944,18 @@ const PerfUI = (function () {
         tickFormat: (v, step) => C.compactEuro(v, step),
         dateText: fd,
         key: "value",
+        dense: bl.series.length > 0,
         rows: (i) => (sold ? [["Not yet realised, after fees", money(openAt(i), true), toneOf(openAt(i))]] : []).concat([["Gain so far, before dividends", money(gainAt(i), true), toneOf(gainAt(i))], ["Dividends so far", money(cs.dividends[i])]]),
-        ariaLabel: "Value of the portfolio and the money put in" + (sold ? ", with the realised gain stacked on it" : "") + ", from " + fd(w.from) + " to " + fd(w.to),
+        ariaLabel: "Value of the portfolio and the money put in" + (sold ? ", with the realised gain stacked on it" : "") + (bl.series.length ? ", with " + plural(bl.series.length, "benchmark line") : "") + ", from " + fd(w.from) + " to " + fd(w.to),
         height: 250,
       });
-      const table = C.tableOf(["Date", "Value", "Money put in", "Realised gain", "Not yet realised, after fees", "Gain so far", "Dividends so far"], t.days.map((d, k) => [fd(d), money(t.value[k]), money(t.capital[k]), money(t.realized[k], true), money(t.value[k] - t.stack[k], true), money(t.value[k] - t.capital[k], true), money(t.dividends[k])]), "Value of the portfolio, the money put in, the realised gain, the gain not yet realised, the gain so far and the dividends");
+      const bt = cmp.lines(m, w, t.days, "money");
+      const table = C.tableOf(["Date", "Value", "Money put in", "Realised gain", "Not yet realised, after fees", "Gain so far", "Dividends so far"].concat(bt.columns.map((c) => c.name)), t.days.map((d, k) => [fd(d), money(t.value[k]), money(t.capital[k]), money(t.realized[k], true), money(t.value[k] - t.stack[k], true), money(t.value[k] - t.capital[k], true), money(t.dividends[k])].concat(bt.columns.map((c) => c.texts[k]))), "Value of the portfolio, the money put in, the realised gain, the gain not yet realised, the gain so far and the dividends" + (bt.columns.length ? ", and the same money in each benchmark" : ""));
       const note = "White: the money put in (what the holdings were worth when the time-frame began, plus purchases less sales, fees included). Green: the value. "
         + (sold
           ? "Orange: the gain you have already realised by selling, before tax, stacked on the white line (the hover shows it as a figure); between it and the green line is what is not yet realised, after fees. Red is a loss."
           : "No units were sold in this time-frame, so there is no realised gain. The shaded gap is the gain so far, before dividends: green above the white line, red below it.");
-      return chartCard("value", "Value and money put in", note, chart, table);
+      return chartCard("value", "Value and money put in", note + (bl.series.length ? cmp.lineNote("money") : ""), chart, table, cmp.strip(m, w, "value"));
     }
 
     // ------------------------------------------------------------ the returns: bars, heatmap, line, table
@@ -20772,13 +22019,15 @@ const PerfUI = (function () {
         sub = "Every month of your history.";
       } else if (view === "line") {
         const cs = Perf.chartSeries(m, w, 300);
-        const chart = C.timeLines({ days: cs.days, series: [{ name: "Growth of 100", color: "var(--c-gain)", values: cs.index, texts: cs.index.map((v) => v.toFixed(2)) }], format: (v) => String(+v.toFixed(1)), dateText: fd, key: "growth", rows: (i) => [["Return so far", pct(cs.twr[i], true), toneP(cs.twr[i])]], ariaLabel: "Growth of 100 invested at the start of the time-frame, from " + fd(w.from) + " to " + fd(w.to), height: 220 });
+        const gl = cmp.lines(m, w, cs.days, "growth"); // the benchmarks switched on in the strip: their price, 100 at the start
+        const chart = C.timeLines({ days: cs.days, series: [{ name: "Growth of 100", color: "var(--c-gain)", values: cs.index, texts: cs.index.map((v) => v.toFixed(2)) }].concat(gl.series), format: (v) => String(+v.toFixed(1)), dateText: fd, key: "growth", dense: gl.series.length > 0, rows: (i) => [["Return so far", pct(cs.twr[i], true), toneP(cs.twr[i])]], ariaLabel: "Growth of 100 invested at the start of the time-frame, from " + fd(w.from) + " to " + fd(w.to), height: 220 });
         const T = m.total;
         const rowsAt = Perf.thin(w.s, w.e, 48);
-        const numbers = C.tableOf(["Date", "Growth of 100"], rowsAt.map((i) => [fd(m.days[i]), ((T.index[i] / T.index[w.s]) * 100).toFixed(2)]), "Growth of 100");
+        const gt = cmp.lines(m, w, rowsAt.map((i) => m.days[i]), "growth");
+        const numbers = C.tableOf(["Date", "Growth of 100"].concat(gt.columns.map((c) => c.name)), rowsAt.map((i, k) => [fd(m.days[i]), ((T.index[i] / T.index[w.s]) * 100).toFixed(2)].concat(gt.columns.map((c) => c.texts[k]))), "Growth of 100");
         numbers.classList.add("perf-tbl");
         body = el("div", { class: "stack" }, chart, fold({ class: "mini", "data-k": "pr-line-numbers" }, st.open.lineNumbers, (o) => { st.open.lineNumbers = o; host.refresh(); }, "Show the numbers", el("div", { class: "body" }, numbers)));
-        sub = "The time-weighted return as a line: 100 at the start of the time-frame. It ignores how much you added or took out.";
+        sub = "The time-weighted return as a line: 100 at the start of the time-frame. It ignores how much you added or took out." + (gl.series.length ? cmp.lineNote("growth") : "");
       } else if (view === "table") {
         body = C.tableOf(["Period", "Return", "Gain", "Net put in", "Dividends", "Value at the end"], per.map((r) => ({ cells: [name(r), r.held ? pct(r.twr, true) : "–", money(r.gain, true), money(r.net, true), money(r.dividends), money(r.valueEnd)], tip: Tip.attr(Tips.period(r, title(r))) })), "Returns per " + unit);
         body.classList.add("perf-tbl");
@@ -20799,6 +22048,7 @@ const PerfUI = (function () {
       }
       return el("section", { class: "card", "data-k": "pf-returns" },
         el("div", { class: "card-head" }, el("h2", { text: "Returns" }), el("div", { class: "view-switch", role: "group", "aria-label": "How to show the returns" }, bT)),
+        view === "line" ? cmp.strip(m, w, "line") : null,
         sub ? el("p", { class: "note", text: sub }) : null,
         body);
     }
@@ -21146,11 +22396,13 @@ const PerfUI = (function () {
         el("div", { class: "note" }, !sym ? (c.suggestion ? "A guess from your ticker: check it on finance.yahoo.com before you use it." : "Search the security on finance.yahoo.com and type the symbol it shows.") : have ? num(c.rows) + " daily prices from " + fd(c.first) + " to " + fd(c.last) + " · " + c.currency + (c.state === "STALE" ? " · the last one is " + c.lagDays + " days old" : "") : c.fetchStatus === "error" && c.fetchError ? "The last update failed: " + c.fetchError : "No prices yet for " + sym + "."));
     }
 
+    /** The symbols the price job reads: those of the securities and, once each, those of the benchmarks (architecture 34.3), sorted. */
+    function jobSymbols(tickers) {
+      return Array.from(new Set(PriceBook.symbolList(doc(), tickers).concat(Bench.symbols()))).sort();
+    }
+
     function kitText(path) {
-      if (path === "data/tickers.txt") {
-        const syms = PriceBook.symbolList(doc(), tickerRows().map((t) => t.ticker));
-        return PriceBook.tickersFile(syms);
-      }
+      if (path === "data/tickers.txt") return PriceBook.tickersFile(jobSymbols(tickerRows().map((t) => t.ticker)));
       return Kit[path];
     }
 
@@ -21169,7 +22421,9 @@ const PerfUI = (function () {
       const missing = cov.filter((c) => c.state !== "OK").length;
       const open = st.open.setup === null ? missing > 0 : st.open.setup;
       const noMap = cov.filter((c) => c.state === "NO_MAPPING");
-      const syms = PriceBook.symbolList(doc(), cov.map((c) => c.ticker));
+      const own = PriceBook.symbolList(doc(), cov.map((c) => c.ticker));
+      const syms = jobSymbols(cov.map((c) => c.ticker));
+      const onlyBench = syms.length - own.length; // the benchmark symbols the securities do not have already
       const body = el("div", { class: "stack" },
         st.msg ? el("div", { class: "banner " + (st.msg.kind === "bad" ? "bad" : st.msg.kind === "warn" ? "" : st.msg.kind === "ok" ? "ok" : "info") }, el("strong", { text: st.msg.text }), st.msg.lines.length ? el("ul", { class: "list" }, st.msg.lines.map((t) => listItem("info", t))) : null, el("div", {}, button("Close", () => { st.msg = null; host.refresh(); }, "small quiet", "pf-msg-close"))) : null,
         st.note ? el("p", { class: "note", text: st.note }) : null,
@@ -21185,7 +22439,7 @@ const PerfUI = (function () {
           st.book.last && (!st.auto || st.auto.kind !== "ok") ? el("p", { class: "note", text: PriceBook.lastLine(st.book) }) : null),
         fold({ class: "mini", "data-k": "pf-kit" }, st.open.kit, (o) => { st.open.kit = o; host.refresh(); }, "Set up the daily update on GitHub", el("div", { class: "body" },
           el("p", { class: "note", text: "This works when this page lives in the same GitHub repository as your data folder (the one that already runs your OeKB update). Add the three files below to that repository: open the folder named in front of the file name (data, scripts, .github/workflows), choose Add file → Upload files, drop the downloaded file in and press Commit changes. Or choose Add file → Create new file, type the path exactly as shown, paste the copied text and commit. A scheduled job then fetches the prices from Tuesday to Saturday and saves data/prices.json; this page reads it by itself." }),
-          el("ul", { class: "list kit" }, kitRow("data/tickers.txt", "The list of Yahoo symbols (" + syms.length + (syms.length === 1 ? " symbol" : " symbols") + " now). Replace it when you add or sell a security.", "symbols to fetch"), kitRow("scripts/fetch-prices.js", "The job. It needs no packages.", "the fetch program"), kitRow(".github/workflows/fetch-prices.yml", "Tells GitHub to run it. Then open the Actions tab, choose “Fetch prices” and press Run workflow once to test it.", "the schedule")),
+          el("ul", { class: "list kit" }, kitRow("data/tickers.txt", "The list of Yahoo symbols (" + syms.length + (syms.length === 1 ? " symbol" : " symbols") + " now" + (onlyBench > 0 ? ", " + onlyBench + " of them only for the benchmarks of “Compare with”" : "") + "). Replace it when you add or sell a security.", "symbols to fetch"), kitRow("scripts/fetch-prices.js", "The job. It needs no packages.", "the fetch program"), kitRow(".github/workflows/fetch-prices.yml", "Tells GitHub to run it. Then open the Actions tab, choose “Fetch prices” and press Run workflow once to test it.", "the schedule")),
           el("p", { class: "note", text: "The symbol list becomes public in your repository, like your list of ISINs. It holds Yahoo symbols only: no dates and no amounts. Yahoo has no official interface for this; if it refuses the job, load a history file by hand below." }))),
         fold({ class: "mini", "data-k": "pf-load" }, st.open.load, (o) => { st.open.load = o; host.refresh(); }, "Load a price file by hand", el("div", { class: "body" },
           el("p", { class: "note", text: "A prices.json made by the job, or its text pasted here." }),
@@ -21278,6 +22532,8 @@ const PerfUI = (function () {
       if (st.sel.ticker) add(root, places);
       root.appendChild(valueCard(m, wv.w));
       root.appendChild(returnsCard(m, wv.w));
+      add(root, cmp.holdingsCard(m, wv.w)); // every holding as a line next to the others (34.4)
+      add(root, cmp.quiltCard(m)); // winners and losers by calendar year (34.5)
       root.appendChild(breakdownCard(m, wv.w));
       root.appendChild(riskCard(m, wv.w));
       if (!st.sel.ticker) add(root, places);
@@ -21850,6 +23106,250 @@ const FundTaxUI = (function () {
   }
 
   return { create };
+})();
+
+/* ---- src/app/ui-costs.js ---- */
+/*
+ * "Running costs of your funds (TER)" on the Holdings tab (browser only; architecture section 34.6).
+ *
+ * The TER is typed by hand, once for each fund, with the day it was looked up; a change is added as a new row with its day (the old figure stays for the earlier
+ * days). There is no free, official source with a history to read it from, so nothing is fetched (34.6). What was typed is part of the document (the backup, the
+ * fingerprint that tells whether the backup is out of date) and goes through commitLight(): it has no effect on the tax, so nothing is converted again.
+ *
+ * The card lists the funds of the securities (a share or a bond only when it has a figure already), one row each: the figure now, when it was checked, what the fund
+ * keeps from today's value in a year and what it kept over the years you held it (Ter.estimate, from the performance model, so these need the prices). A fund
+ * held on two exchanges (one ISIN, two tickers) is one row and the figure is written to both. The figures come from Ter (ter.js); this file only draws and
+ * collects what is typed. Text is put in with textContent.
+ *
+ * On the demo the card is a note: the demo has no daily prices and no figures of its own.
+ */
+const CostsUI = (function () {
+  "use strict";
+
+  const { el, fold } = Dom;
+  const M = Model;
+  const fd = M.fmtDate;
+  const money = (x) => (Number.isFinite(x) ? M.fmtMoney(x.toFixed(2)) : "–");
+  const plural = (n, one, many) => n + " " + (n === 1 ? one : many || one + "s");
+  /** A figure in percent a year as the page writes it: at most four decimals, none that are zero at the end, at least two ("0.19", "0.2" becomes "0.20"). */
+  function pctText(x) {
+    if (!Number.isFinite(x)) return "–";
+    let t = String(+x.toFixed(4));
+    if (t.indexOf(".") < 0) t += ".00";
+    else if (t.split(".")[1].length === 1) t += "0";
+    return t;
+  }
+  const idOf = (dataKey) => "f-" + String(dataKey).replace(/[^A-Za-z0-9_-]/g, "-");
+
+  /**
+   * host: {
+   *   mode()          "mine" | "demo"
+   *   conv(), doc()   the conversion (the tickers, their ISIN and type) and the document (where the figures are kept)
+   *   commit(fn)      changes a copy of the document, checks it, saves it and draws again without converting (ui.js commitLight)
+   *   today()         today as YYYY-MM-DD
+   *   perfModel()     the performance model of the whole portfolio, or null (the estimates need it)
+   *   label(isin, ticker), name(isin, ticker)   the short and the whole name of a fund
+   *   refresh()
+   * }
+   */
+  function create(host) {
+    const st = { edit: "", draft: {}, msg: {}, open: false };
+
+    /** The funds: one for each ISIN (or for a ticker without one), with its tickers and the figure typed for it. */
+    function groups() {
+      const c = host.conv();
+      const tickers = c && c.tables && Array.isArray(c.tables.tickers) ? c.tables.tickers : [];
+      const d = host.doc();
+      const by = new Map();
+      for (const t of tickers) {
+        if (t.needed === false) continue;
+        const sec = d.securities && d.securities[t.ticker] ? d.securities[t.ticker] : null;
+        const ter = sec && sec.ter ? sec.ter : null;
+        if ((t.type === "SHARE" || t.type === "BOND") && !ter) continue;
+        const key = t.isin && t.isinStatus === "OK" ? "i:" + t.isin : "t:" + t.ticker;
+        if (!by.has(key)) by.set(key, { key, isin: t.isinStatus === "OK" ? t.isin : "", tickers: [], ter: null });
+        const g = by.get(key);
+        g.tickers.push(t.ticker);
+        if (ter && !g.ter) g.ter = ter;
+      }
+      const out = Array.from(by.values());
+      for (const g of out) {
+        g.tickers.sort();
+        g.label = host.label(g.isin, g.tickers[0]);
+        g.name = host.name(g.isin, g.tickers[0]);
+      }
+      out.sort((a, b) => (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
+      return out;
+    }
+
+    /** Writes a record (or none) to every ticker of the fund. */
+    function save(g, record) {
+      host.commit((d) => {
+        for (const t of g.tickers) {
+          const cur = d.securities[t] || {};
+          const next = Object.assign({}, cur);
+          if (record) next.ter = record;
+          else delete next.ter;
+          d.securities[t] = next;
+        }
+      });
+    }
+
+    const say = (g, text) => {
+      st.msg[g.key] = text;
+      host.refresh();
+    };
+    const draftOf = (g) => st.draft[g.key] || (st.draft[g.key] = { now: "", from: "", pct: "" });
+
+    function openEditor(g) {
+      st.edit = g.key;
+      const cur = Ter.current(g.ter);
+      st.draft[g.key] = { now: cur ? pctText(cur.pct) : "", from: "", pct: "" };
+      st.msg[g.key] = "";
+      host.refresh();
+    }
+
+    function setNow(g) {
+      const p = Ter.parsePct(draftOf(g).now);
+      if (!p.ok) return say(g, p.error);
+      st.msg[g.key] = "";
+      st.edit = "";
+      save(g, Ter.withCurrent(g.ter, p.pct, host.today()));
+    }
+
+    function addChange(g) {
+      const dr = draftOf(g);
+      const p = Ter.parsePct(dr.pct);
+      if (!Store.isIso(dr.from) || dr.from > host.today()) return say(g, "Choose the day the fund changed its figure (a day that has passed).");
+      if (!p.ok) return say(g, p.error);
+      const from = dr.from; // read before the draft is emptied: a change on the day "" would replace the first figure
+      st.draft[g.key] = Object.assign({}, dr, { from: "", pct: "" });
+      st.msg[g.key] = "";
+      st.edit = "";
+      save(g, Ter.withChange(g.ter, from, p.pct, host.today()));
+    }
+
+    const field = (label, dataKey, input) => el("div", { class: "field" }, el("label", { for: idOf(dataKey), text: label }), input);
+    const enter = (fn) => (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      fn(e.target.value);
+    };
+
+    function editor(g) {
+      const dr = draftOf(g);
+      const rows = Ter.rowsOf(g.ter);
+      const kids = [];
+      kids.push(el("div", { class: "fields tight" },
+        field(rows.length ? "The figure now, % a year" : "TER, % a year", "ter-now:" + g.key, el("input", { type: "text", inputmode: "decimal", "data-key": "ter-now:" + g.key, value: dr.now, placeholder: "0.19", maxlength: 8, autocomplete: "off", spellcheck: "false", onchange: (e) => { dr.now = e.target.value; }, onkeydown: enter((v) => { dr.now = v; setNow(g); }) })),
+        el("button", { type: "button", class: "btn small primary", "data-key": "ter-save:" + g.key, onclick: () => setNow(g), text: rows.length ? "Correct the figure" : "Save" })));
+      if (rows.length) {
+        kids.push(el("ul", { class: "ter-hist", "aria-label": "The figures and the days they began" }, rows.map((r, k) => el("li", { "data-k": "ter-row:" + g.key + ":" + k },
+          el("span", { class: "ter-hist-when", text: r.from ? "from " + fd(r.from) : "from the start" }),
+          el("strong", { class: "num", text: pctText(Number(r.pct)) + " %" }),
+          rows.length > 1 ? el("button", { type: "button", class: "btn small quiet", "data-key": "ter-del:" + g.key + ":" + k, onclick: () => save(g, Ter.withoutRow(g.ter, k)), text: "Remove" }) : null))));
+        kids.push(el("p", { class: "note", text: "The fund lowered or raised its figure? Add the day it changed and the new figure; the old one stays for the days before." }));
+        kids.push(el("div", { class: "fields tight" },
+          field("It changed on", "ter-from:" + g.key, el("input", { type: "date", "data-key": "ter-from:" + g.key, value: dr.from, max: host.today(), onchange: (e) => { dr.from = e.target.value; } })),
+          field("to, % a year", "ter-pct:" + g.key, el("input", { type: "text", inputmode: "decimal", "data-key": "ter-pct:" + g.key, value: dr.pct, placeholder: "0.17", maxlength: 8, autocomplete: "off", spellcheck: "false", onchange: (e) => { dr.pct = e.target.value; }, onkeydown: enter((v) => { dr.pct = v; addChange(g); }) })),
+          el("button", { type: "button", class: "btn small", "data-key": "ter-add:" + g.key, onclick: () => addChange(g), text: "Add the change" })));
+      }
+      if (st.msg[g.key]) kids.push(el("p", { class: "note bad-note", role: "alert", "data-k": "ter-msg:" + g.key, text: st.msg[g.key] }));
+      const row = [el("button", { type: "button", class: "btn small quiet", "data-key": "ter-close:" + g.key, onclick: () => { st.edit = ""; host.refresh(); }, text: "Close" })];
+      if (rows.length) row.push(el("button", { type: "button", class: "btn small quiet", "data-key": "ter-clear:" + g.key, onclick: () => { st.edit = ""; save(g, null); }, text: "Remove the figures of this fund" }));
+      kids.push(el("div", { class: "btn-row" }, row));
+      return el("div", { class: "ter-edit stack", "data-k": "ter-edit:" + g.key }, kids);
+    }
+
+    function rowNode(g, est, today) {
+      const cur = Ter.current(g.ter);
+      const old = g.ter ? Ter.due(g.ter, today) : false;
+      const e = est ? est.get(g.key) : null;
+      const sub = [];
+      if (cur) {
+        sub.push(el("span", { text: g.ter.checked ? "checked " + fd(g.ter.checked) : "never checked" }));
+        if (Ter.rowsOf(g.ter).length > 1) sub.push(el("span", { text: "since " + (cur.from ? fd(cur.from) : "the start") }));
+        if (old) sub.push(el("span", { class: "chip warn", text: g.ter.checked ? "look it up again" : "not checked yet" }));
+      }
+      const figures = [];
+      if (cur && e) {
+        figures.push(el("span", { text: e.held ? "from today's value " + money(e.value) + ": " + money(e.yearly) + " a year" : "no longer held" }));
+        figures.push(el("span", { text: "over the years you held it: about " + money(e.cost) }));
+      }
+      const open = st.edit === g.key;
+      const actions = [];
+      if (cur) actions.push(el("button", { type: "button", class: "btn small", "data-key": "ter-ok:" + g.key, onclick: () => save(g, Ter.withChecked(g.ter, today)), text: "Still right today" }));
+      actions.push(el("button", { type: "button", class: "btn small" + (cur ? " quiet" : " primary"), "data-key": "ter-edit:" + g.key, "aria-expanded": String(open), onclick: () => (open ? (st.edit = "", host.refresh()) : openEditor(g)), text: cur ? "Change" : "Add the figure" }));
+      return el("li", { class: "ter-row", "data-k": "ter:" + g.key },
+        el("div", { class: "sec-top" }, el("strong", { class: "sec-name", title: g.name, text: g.label }), el("span", { class: "num sec-value", text: cur ? pctText(cur.pct) + " % a year" : "no figure yet" })),
+        sub.length ? el("div", { class: "sec-sub" }, sub) : null,
+        figures.length ? el("div", { class: "sec-sub" }, figures) : null,
+        el("div", { class: "btn-row" }, actions),
+        open ? editor(g) : null);
+    }
+
+    function render(root) {
+      if (host.mode() === "demo") {
+        root.appendChild(el("section", { class: "card", "data-k": "costs" },
+          el("div", { class: "card-head" }, el("h2", { text: "Running costs of your funds (TER)" })),
+          el("p", { class: "note", text: "On “My data” this card lists your funds, lets you type the yearly running cost (TER) of each one once, and works out what the funds keep from today's values and what they kept over the years you held them. The demo has no figures of its own." })));
+        return;
+      }
+      const gs = groups();
+      if (!gs.length) return;
+      const today = host.today();
+      const m = host.perfModel();
+      const ters = {};
+      for (const g of gs) for (const t of g.tickers) ters[t] = g.ter;
+      // only the funds of this card are estimated: a share held next to them has no figure and must not count as a fund without one
+      const mine = new Set(Object.keys(ters));
+      const est = m && m.ok ? Ter.estimate(Object.assign({}, m, { per: m.per.filter((A) => mine.has(A.ticker)) }), ters) : null;
+      // one entry for each fund: its tickers added together (a fund on two exchanges is one row)
+      const byFund = est ? new Map() : null;
+      if (est) {
+        for (const g of gs) {
+          const rows = est.rows.filter((r) => g.tickers.includes(r.ticker));
+          if (rows.length) byFund.set(g.key, { held: rows.some((r) => r.held), value: rows.reduce((a, r) => a + r.valueEnd, 0), yearly: rows.reduce((a, r) => a + r.yearlyNow, 0), cost: rows.reduce((a, r) => a + r.cost, 0) });
+        }
+      }
+      const withFigure = gs.filter((g) => g.ter);
+      const kids = [el("div", { class: "card-head" }, el("h2", { text: "Running costs of your funds (TER)" }), el("span", { class: "sub", text: "already inside each fund's price" }))];
+      kids.push(el("p", { class: "note", text: "The TER is what a fund keeps every year for its running costs, as a percent of what you have in it. It is taken inside the fund, so it is already in the price: you do not pay it separately, it is not part of your tax, and it is the reason a fund returns a little less than its index. Type each figure once and press “Still right today” whenever you have looked it up again; a figure that is older than a year is marked." }));
+      kids.push(fold({ class: "mini", "data-k": "ter-how" }, st.open, (o) => { st.open = o; host.refresh(); }, "Where do I find the figure?", el("div", { class: "body" },
+        el("p", { class: "note", text: "On the fund company's own page or factsheet it is called “ongoing charges” or “TER”; fund sites such as justETF show it on the page of each fund. The page does not read it from the internet by itself: no free source gives it reliably with its history, the sites give slightly different figures for the same fund, and a reader of their pages would break whenever they change. A fund usually changes its figure only once in a few years. The figures you type are part of your backup." }))));
+      kids.push(el("ul", { class: "ter-list", "aria-label": "The funds and their yearly running cost" }, gs.map((g) => rowNode(g, byFund, today))));
+      // the totals
+      const dueN = withFigure.filter((g) => Ter.due(g.ter, today)).length;
+      const foot = [];
+      if (est) {
+        const t = est.totals;
+        const held = gs.filter((g) => byFund.get(g.key) && byFund.get(g.key).held);
+        const heldWith = held.filter((g) => g.ter);
+        if (heldWith.length) {
+          foot.push(el("div", { class: "ter-tot", "data-k": "ter-totals" },
+            el("div", { class: "ter-tot-row" }, el("span", { text: "Average TER of the funds you hold" + (heldWith.length < held.length ? " that have a figure" : "") + ", by today's value" }), el("strong", { class: "num", text: pctText(t.avgPct) + " %" })),
+            el("div", { class: "ter-tot-row" }, el("span", { text: "What they keep in a year at today's values" }), el("strong", { class: "num", text: money(t.yearlyNow) })),
+            el("div", { class: "ter-tot-row" }, el("span", { text: "About what they kept over the years you held them" }), el("strong", { class: "num", text: money(t.cost) }))));
+        }
+        if (held.length && !heldWith.length) foot.push(el("p", { class: "note", "data-k": "ter-missing", text: "Type a figure for the funds you hold to see the totals." }));
+        else if (held.length > heldWith.length) {
+          const names = held.filter((g) => !g.ter).map((g) => g.label);
+          foot.push(el("p", { class: "note", "data-k": "ter-missing", text: heldWith.length + " of " + held.length + " funds you hold " + (heldWith.length === 1 ? "has" : "have") + " a figure. Left out of the totals: " + names.join(", ") + "." }));
+        }
+        if (t.uncoveredDays > 0) foot.push(el("p", { class: "note", "data-k": "ter-uncovered", text: "For " + plural(t.uncoveredDays, "day") + " of some fund no figure was in force yet (the first figure starts after the first purchase), so those days are not in the estimate." }));
+        if (heldWith.length || withFigure.length) foot.push(el("p", { class: "note", text: "The estimates take the value of each fund at the close of the day before, times its figure, over 365. They are estimates: the fund takes its cost from its own value every day, which its price follows closely but not exactly." }));
+      } else {
+        foot.push(el("p", { class: "note", "data-k": "ter-need-prices", text: "What the funds keep, in euro, is worked out from the daily prices: load them on the Performance tab." }));
+      }
+      if (dueN) foot.push(el("p", { class: "note", "data-k": "ter-due", text: plural(dueN, "figure") + " " + (dueN === 1 ? "was" : "were") + " last looked up more than a year ago or never. Look them up again and press “Still right today” or “Change”." }));
+      kids.push(foot);
+      root.appendChild(el("section", { class: "card", "data-k": "costs" }, kids));
+    }
+
+    return { render, state: st, groups };
+  }
+
+  return { create, pctText };
 })();
 
 /* ---- src/app/ui-regular.js ---- */
@@ -23266,6 +24766,7 @@ const RegularUI = (function () {
     }
     else root.appendChild(el("p", { class: "note", "data-k": "sell-selection", text: "“If you sold everything today” is worked out for the position as filed. Choose “As filed” above to see it." }));
     fundUI.render(root); // the share of each fund's price that was taxed as fund income (architecture 28.3); the same for a selection, it uses reports and prices only
+    costsUI.render(root); // the funds' own running costs, typed by hand (architecture 34.6)
     // securities chosen in the ring (28.5): only they get a card, and a bar says so
     const only = asFiled ? pickOnly() : null;
     if (only) root.appendChild(HoldCharts.bar("list", HoldCharts.barText(only.length, groups.length), clearPick));
@@ -23636,6 +25137,19 @@ const RegularUI = (function () {
     today: todayIso,
     secName,
     secLabel: secShort,
+    refresh: () => render(),
+  });
+
+  // "Running costs of your funds (TER)" under that card (architecture section 34.6): typed by hand, kept in the document, no effect on the tax (so commitLight, no new conversion).
+  const costsUI = CostsUI.create({
+    mode: () => ui.mode,
+    conv: () => conv,
+    doc: () => doc,
+    commit: commitLight,
+    today: todayIso,
+    perfModel: () => perfUI.model(),
+    label: (isin, ticker) => (isin ? secShort(isin) : names().ofTicker(ticker).label),
+    name: (isin, ticker) => (isin ? secName(isin) : names().ofTicker(ticker).full),
     refresh: () => render(),
   });
 
