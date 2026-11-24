@@ -1,0 +1,69 @@
+# Downloads the monthly consumer prices of Austria and Hungary (Eurostat) and saves them in data/inflation.json for the real returns of the tracker.
+# Made by the Austria Tax Tracker. You can also start it by hand: Actions tab > Fetch inflation > Run workflow.
+name: Fetch inflation
+
+"on":
+  schedule:
+    # The 21st and the 28th of every month at 06:23 UTC. Eurostat publishes the month before around the 17th to 20th; the second run catches a late release.
+    # A run that finds nothing new changes nothing. GitHub may start it some minutes late.
+    - cron: '23 6 21,28 * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # lets the save step store data/inflation.json in this repository (only that step gets the token)
+  pages: write      # lets the job ask GitHub Pages to publish the new file (last step)
+
+concurrency:
+  group: fetch-inflation
+  cancel-in-progress: false
+
+jobs:
+  inflation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          # the token is not stored for the steps that read the answers from the internet; only the save step below gets it
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Fetch the inflation figures
+        id: fetch
+        # The next steps still run when this one fails, so that the country that could be updated is saved; the last step then makes the run fail,
+        # which is what makes GitHub tell you.
+        continue-on-error: true
+        run: node scripts/fetch-inflation.js data/inflation.json
+
+      - name: Save the figures
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "inflation-bot"
+          git config user.email "actions@users.noreply.github.com"
+          if [ -f data/inflation.json ]; then git add data/inflation.json; fi
+          # hooksPath: no script left in the folder by an earlier step runs while the token is in use
+          git -c core.hooksPath=/dev/null diff --quiet --cached || git -c core.hooksPath=/dev/null commit -m "Update inflation ($(date -u +%Y-%m-%d))"
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git -c core.hooksPath=/dev/null pull --rebase "$remote" "$GITHUB_REF_NAME"
+          git -c core.hooksPath=/dev/null push "$remote" "HEAD:$GITHUB_REF_NAME"
+
+      - name: Ask GitHub Pages to publish the new file
+        # GitHub does not publish a Pages site again after a push made by a job with its built-in token, so the copy of
+        # data/inflation.json on the site would stay old. This step asks for it. The tracker reads the newest copy straight from
+        # the repository, so it does not depend on this step; the step keeps the copy on the site up to date as well.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${{ github.repository }}/pages/builds" --silent || echo "Pages could not be asked to publish. This step is only a safety net."
+
+      - name: Tell GitHub if the fetch failed
+        if: steps.fetch.outcome == 'failure'
+        run: |
+          echo "::error::The inflation figures of at least one country could not be updated. The step 'Fetch the inflation figures' above says why."
+          exit 1
