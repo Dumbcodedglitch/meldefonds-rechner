@@ -19046,12 +19046,12 @@ span.hc { cursor: default; }
  * Pure: no DOM, no clock. Runs in Node (tests) and in the page.
  */
 (function (root, factory) {
-  if (typeof module === "object" && module.exports) module.exports = factory(require("../lib/decimal.js"));
-  else root.SpendFx = factory(root.Dec);
-})(typeof self !== "undefined" ? self : this, function (Dec) {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("../lib/decimal.js"), require("../fx/ecb.js"));
+  else root.SpendFx = factory(root.Dec, root.EcbFx);
+})(typeof self !== "undefined" ? self : this, function (Dec, Ecb) {
   "use strict";
 
-  const VERSION = "spendfx-0.1.0";
+  const VERSION = "spendfx-0.2.0";
   const DP = 6;
   const MAX_LAG_DAYS = 7;
   const ONE = Dec.mk(1n, 0);
@@ -19103,7 +19103,35 @@ span.hc { cursor: default; }
     return { rate, convert };
   }
 
-  return { VERSION, DP, MAX_LAG_DAYS, create };
+  /**
+   * ledgersFromFiles(files): the ledgerFor of create() made from the Investments book's stored ECB files (doc.files.ecb: currency -> { text, hash }),
+   * read only. The file stored for a currency is tried first, then the others (the ECB's history file and the GitHub job's file hold every
+   * currency, so the one file stored under USD also serves HUF). Each currency is read once.
+   * Until 24 Nov 2026 (architecture 38.11) this lived in the page and called the ECB reader by a name the page does not have; the error was
+   * swallowed and every currency looked as if it had no file. It is here now, so that a test reads real files through it.
+   */
+  function ledgersFromFiles(files) {
+    const fl = files && typeof files === "object" ? files : {};
+    const names = Object.keys(fl).sort();
+    const done = new Map();
+    return (ccy) => {
+      if (done.has(ccy)) return done.get(ccy);
+      let l = null;
+      for (const n of (fl[ccy] ? [ccy] : []).concat(names.filter((x) => x !== ccy))) {
+        const f = fl[n];
+        if (!f || typeof f.text !== "string") continue;
+        const r = Ecb.readEcbFile(f.text, { currency: ccy });
+        if (r && r.ok && r.ledger) {
+          l = r.ledger;
+          break;
+        }
+      }
+      done.set(ccy, l);
+      return l;
+    };
+  }
+
+  return { VERSION, DP, MAX_LAG_DAYS, create, ledgersFromFiles };
 });
 
 /* ---- src/spend/book.js ---- */
@@ -25959,7 +25987,8 @@ const RegularUI = (function () {
  * The Spending book is its own store (key "spend"): the page hands in host.book() and host.save(book). The tax engine never sees it.
  *
  * host: { mode(), book(), fx(), today(), now(), save(book) -> Promise<{ ok, durable, text }>, download(name, text) -> Promise<{ ok, text }>,
- *         render(), goInvestData() }
+ *         render(), goInvestData(), folds (a Folds store, optional: which cards are open, kept in the browser) }
+ * Every card under "Your spending" opens and shuts like the cards of the Holdings tab (architecture 38.11); a bar says how many are open.
  */
 const SpendUI = (function () {
   "use strict";
@@ -26051,6 +26080,29 @@ const SpendUI = (function () {
   // ---------------------------------------------------------------- the area
 
   function create(host) {
+    // which cards are open (architecture 38.11): kept by host.folds in the browser, never in the Spending book
+    const folds = host.folds || Folds.create({ storage: null, key: "att-spend-folds-v1" });
+    const seen = new Map(); // the cards drawn now and whether each is open; emptied at the start of every drawing
+    /**
+     * A card that opens and shuts. o: { key, title, sub, glance, dflt (open until the owner chooses), busy (something is going on inside it:
+     * it stays open, and shutting it ends that thing through o.stop) }. body: a function, only called when the card is open.
+     */
+    const openOf = (o) => !!o.busy || folds.isOpen(o.key, o.dflt === true);
+    function fcard(o, body) {
+      const open = openOf(o);
+      seen.set(o.key, open);
+      return Dom.foldCard({ key: o.key, title: o.title, sub: o.sub, glance: o.glance, open, onToggle: (want) => { if (!want && o.stop) o.stop(); folds.set(o.key, want); host.render(); } }, body);
+    }
+    function foldBar() {
+      const keys = Array.from(seen.keys());
+      const open = keys.filter((k) => seen.get(k));
+      const all = (want) => () => { if (!want) { st.pending = null; st.msg.import = null; st.remove = null; st.restore = null; st.wipe = false; st.msg.backup = null; } folds.setAll(keys, want); host.render(); };
+      return el("div", { class: "fold-bar", "data-k": "spend-fold-bar" },
+        el("span", { class: "fold-count", "data-k": "spend-fold-count", text: open.length + " of " + keys.length + " cards open" }),
+        el("button", { type: "button", class: "btn small", "data-key": "spend-fold-expand", disabled: open.length === keys.length, onclick: all(true), text: "Expand all" }),
+        el("button", { type: "button", class: "btn small", "data-key": "spend-fold-collapse", disabled: open.length === 0, onclick: all(false), text: "Collapse all" }));
+    }
+
     const st = {
       cur: "EUR",
       period: "12m",
@@ -26164,7 +26216,10 @@ const SpendUI = (function () {
       kids.push(el("div", { class: "field" }, el("label", { for: "spend-file", text: "Spendee CSV files" }), el("input", { id: "spend-file", type: "file", accept: ".csv,text/csv,text/plain", multiple: true, "data-key": "spend-file", onchange: (e) => { const fs = Array.from(e.target.files || []); e.target.value = ""; choose(fs); } })));
       if (st.msg.import) kids.push(banner(st.msg.import.kind, st.msg.import.kind === "ok" ? "Done" : "Not imported", el("span", { text: st.msg.import.text })));
       if (st.pending) kids.push(previewOf());
-      return card("Import from Spendee", isDemo() ? "demo: kept in this page only" : "files stay in this browser", kids);
+      if (empty) return card("Import from Spendee", isDemo() ? "demo: kept in this page only" : "files stay in this browser", kids);
+      const ws = SpendBook.wallets(b);
+      const last = ws.map((w) => (w.lastImport ? w.lastImport.on.slice(0, 10) : "")).sort().pop();
+      return fcard({ key: "spend-import", title: "Import from Spendee", sub: isDemo() ? "demo: kept in this page only" : "files stay in this browser", glance: last ? "Last import " + last : "", busy: !!(st.pending || st.msg.import), stop: () => { st.pending = null; st.msg.import = null; } }, () => kids);
     }
 
     function previewOf() {
@@ -26229,6 +26284,7 @@ const SpendUI = (function () {
       if (!v.missing.n) return null;
       const days = v.missing.days;
       return banner("bad", plural(v.missing.n, "entry", "entries") + " could not be shown in " + v.cur, el("span", { text: "No usable " + v.missing.ccys.join(", ") + " rate for " + (days.length > 4 ? days.slice(0, 3).join(", ") + " and " + (days.length - 3) + " more days" : days.join(", ")) + ". They are left out, so the totals below are incomplete. The rates come from the ECB rate file of the Investments part (Data, step 4); a rate up to 7 days old is used." }),
+        v.missing.reasons.length ? el("p", { class: "small", "data-k": "spend-missing-why", text: "Why: " + v.missing.reasons[0] + (v.missing.reasons.length > 1 ? " (and " + plural(v.missing.reasons.length - 1, "other reason") + ")" : "") }) : null,
         el("div", { class: "btn-row" }, isDemo() ? null : btn("Open Investments, Data", () => host.goInvestData(), "small", "spend-to-data")));
     }
 
@@ -26281,9 +26337,10 @@ const SpendUI = (function () {
       }
       const rows = v.cats.map((c) => ({ cells: [c.cat, String(c.n), money(c.spent, cur), share(c.spent, v.totals.spent)] }));
       rows.push({ cls: "strong", cells: ["Total", String(v.cats.reduce((n, c) => n + c.n, 0)), money(v.totals.spent, cur), "100.0 %"] });
-      return card("Where my money goes", "spent, by category",
+      const top = v.cats[0];
+      return fcard({ key: "spend-ring", title: "Where my money goes", sub: "spent, by category", glance: top.cat + " " + share(top.spent, v.totals.spent) + " · " + plural(v.cats.length, "category", "categories"), dflt: true }, () => [
         C.pie({ items, total: { label: "Spent", text: money(v.totals.spent, cur) }, ariaLabel: "Spending of the period by category, as a ring" }),
-        table(["Category", "Entries", "Spent", "Share"], rows, "Spending by category", "lrrr"));
+        table(["Category", "Entries", "Spent", "Share"], rows, "Spending by category", "lrrr")]);
     }
 
     const tick = (m) => MONTHS[+m.slice(5, 7) - 1] + (m.slice(5, 7) === "01" || v0month === m ? "\n" + m.slice(0, 4) : "");
@@ -26308,11 +26365,12 @@ const SpendUI = (function () {
         series.push({ id: "other", name: "Other (" + s.rest.length + ")", color: s.other, values: sums.map(num), texts: sums.map((x) => money(x, cur)) });
       }
       const rows = v.monthly.map((m) => ({ cells: [monthName(m.month), money(m.spent, cur), money(m.earned, cur), money(m.net, cur, { plus: true })] }));
-      return card("Spending by month", "stacked by category",
+      const lastM = v.monthly[v.monthly.length - 1];
+      return fcard({ key: "spend-months", title: "Spending by month", sub: "stacked by category", glance: monthName(lastM.month) + ": " + money(lastM.spent, cur) + " spent", dflt: true }, () => [
         C.bars({ categories: v.months.map(monthName), tickLabels: v.months.map(tick), series, mode: "stacked", legend: true, toggle: true, key: "spend-month", skipZero: true, totalTexts: v.monthly.map((m) => money(m.spent, cur)), format: compact(cur), height: 240, ariaLabel: "Spending of each month, as stacked bars with a part for each category" }),
         el("h3", { text: "Earned and spent by month" }),
         C.bars({ categories: v.months.map(monthName), tickLabels: v.months.map(tick), series: [{ id: "earn", name: "Earned", color: "var(--c-gain)", values: v.monthly.map((m) => num(m.earned)), texts: v.monthly.map((m) => money(m.earned, cur)) }, { id: "spend", name: "Spent", color: "var(--c-austria)", values: v.monthly.map((m) => num(m.spent)), texts: v.monthly.map((m) => money(m.spent, cur)) }], mode: "grouped", legend: true, toggle: true, key: "spend-earn", format: compact(cur), height: 200, details: v.monthly.map((m) => [["Earned − spent", money(m.net, cur, { plus: true })]]), ariaLabel: "Income and spending of each month, as pairs of bars" }),
-        table(["Month", "Spent", "Earned", "Earned − spent"], rows, "Spending and income by month", "drrr"));
+        table(["Month", "Spent", "Earned", "Earned − spent"], rows, "Spending and income by month", "drrr")]);
     }
 
     function gridCard(v) {
@@ -26324,6 +26382,7 @@ const SpendUI = (function () {
       const pick = (month, cat) => {
         st.filter = { month, cat, kind: "spend", text: "" };
         st.shown = 50;
+        folds.set("spend-rows", true); // the entries of the cell are in that card: it opens
         host.render();
         const n = document.querySelector('[data-k="spend-rows"]');
         if (n && typeof n.scrollIntoView === "function") n.scrollIntoView({ block: "start" });
@@ -26336,30 +26395,33 @@ const SpendUI = (function () {
           .concat(v.monthly.map((m) => el("td", {}, cell(num(m.byCat[k]) > 0 ? compact(cur)(num(m.byCat[k])) : "·", c.cat + ", " + monthName(m.month) + ": " + money(m.byCat[k], cur) + ". Show the entries.", "fi-" + step(m.byCat[k]), m.month, c.cat))))
           .concat([el("td", {}, cell(compact(cur)(num(c.spent)), c.cat + ", whole period: " + money(c.spent, cur) + ". Show the entries.", "tot", "", c.cat))])));
       body.push(el("tr", { class: "sg-sum", "data-k": "sg:sum" }, [el("th", { scope: "row", text: "Total" })].concat(v.monthly.map((m) => el("td", {}, cell(compact(cur)(num(m.spent)), monthName(m.month) + ", all categories: " + money(m.spent, cur) + ". Show the entries.", "tot", m.month, "")))).concat([el("td", {}, el("span", { class: "hc tot", text: compact(cur)(num(v.totals.spent)) }))])));
-      return card("Category by month", "press a cell to see its entries",
+      return fcard({ key: "spend-grid", title: "Category by month", sub: "press a cell to see its entries", glance: plural(v.cats.length, "category", "categories") + " × " + plural(v.months.length, "month"), dflt: true }, () => [
         el("div", { class: "heat-box" }, el("div", { class: "heat-wrap", "data-k": "sg-wrap", "data-end": v.months[v.months.length - 1] + "|" + v.months.length }, el("table", { class: "heat spend-grid", "aria-label": "Spending by category and month" }, el("thead", {}, head), el("tbody", {}, body))),
           el("div", { class: "hlegend", "aria-hidden": "true" }, [el("span", { text: "less" })].concat([1, 2, 3, 4, 5].map((k) => el("span", { class: "hsw fi-" + k }))).concat([el("span", { text: "more" })]))),
-        note("Each cell is tinted by its share of the largest cell. The figures are rounded; the exact ones are in the tables and the entries."));
+        note("Each cell is tinted by its share of the largest cell. The figures are rounded; the exact ones are in the tables and the entries.")]);
     }
 
     function labelsCard(v) {
       if (!v.labels.length) return null;
       const cur = v.cur;
       const rows = v.labels.slice(0, 40).map((l) => ({ cells: [l.label, String(l.n), money(l.spent, cur), share(l.spent, v.totals.spent)] }));
-      return card("Spending by label", plural(v.labels.length, "label"),
+      return fcard({ key: "spend-labels", title: "Spending by label", sub: plural(v.labels.length, "label"), glance: v.labels[0].label + ": " + money(v.labels[0].spent, cur), dflt: true }, () => [
         table(["Label", "Entries", "Spent", "Share"], rows, "Spending by label", "lrrr"),
-        note("An entry with several labels counts under each of them, so the labels do not add up to the total." + (v.labels.length > 40 ? " The 40 largest are shown." : "")));
+        note("An entry with several labels counts under each of them, so the labels do not add up to the total." + (v.labels.length > 40 ? " The 40 largest are shown." : ""))]);
     }
 
     function largestCard(v) {
       if (!v.largest.length) return null;
       const cur = v.cur;
-      return card("Largest expenses", "the ten largest of the period", entryList(v.largest, cur, "largest"));
+      return fcard({ key: "spend-largest", title: "Largest expenses", sub: "the ten largest of the period", glance: "Largest: " + money(v.largest[0].spent, cur) + " · " + v.largest[0].cat, dflt: true }, () => entryList(v.largest, cur, "largest"));
     }
 
     function rowsCard(v) {
       const cur = v.cur;
       const f = st.filter;
+      const filtered = !!(f.month || f.cat || f.text || f.kind !== "spend");
+      const fo = { key: "spend-rows", title: "The entries", dflt: true, glance: plural(v.cats.reduce((n, c) => n + c.n, 0), "expense") + " in the period" + (filtered ? " · a filter is set" : "") };
+      if (!openOf(fo)) return fcard(Object.assign(fo, { sub: "every entry, with search" }), null);
       const o = opts();
       const r = V.rows(book(), host.fx(), o, { month: f.month, cat: f.cat, kind: f.kind, text: f.text, limit: st.shown });
       const set = (k, val) => {
@@ -26373,11 +26435,11 @@ const SpendUI = (function () {
         el("div", { class: "field" }, el("label", { for: "sr-cat", text: "Category" }), el("select", { id: "sr-cat", "data-key": "sr-cat", onchange: (e) => set("cat", e.target.value) }, [el("option", { value: "", text: "Every category", selected: !f.cat })].concat(cats.map((c) => el("option", { value: c, text: c, selected: f.cat === c }))))),
         el("div", { class: "field" }, el("label", { for: "sr-kind", text: "Kind" }), el("select", { id: "sr-kind", "data-key": "sr-kind", onchange: (e) => set("kind", e.target.value) }, [["spend", "Expenses"], ["earn", "Income"], ["other", "Other types"], ["", "Everything"]].map((x) => el("option", { value: x[0], text: x[1], selected: f.kind === x[0] })))),
         el("div", { class: "field" }, el("label", { for: "sr-text", text: "Note or label contains" }), el("input", { id: "sr-text", type: "search", value: f.text, "data-key": "sr-text", onchange: (e) => set("text", e.target.value.trim()) })));
-      return el("section", { class: "card", "data-k": "spend-rows" }, el("div", { class: "card-head" }, el("h2", { text: "The entries" }), el("span", { class: "sub", text: plural(r.n, "entry", "entries") + (r.more ? ", the newest " + r.rows.length + " shown" : "") })),
+      return fcard(Object.assign(fo, { sub: plural(r.n, "entry", "entries") + (r.more ? ", the newest " + r.rows.length + " shown" : "") }), () => [
         fields,
         r.n ? entryList(r.rows, cur, "rows") : note("No entry fits."),
         r.more ? el("div", { class: "btn-row" }, btn("Show " + Math.min(100, r.n - r.rows.length) + " more", () => { st.shown += 100; host.render(); }, "small", "sr-more")) : null,
-        f.month || f.cat || f.text || f.kind !== "spend" ? el("div", { class: "btn-row" }, btn("Show every expense again", () => { st.filter = { month: "", cat: "", kind: "spend", text: "" }; host.render(); }, "small quiet", "sr-clear")) : null);
+        filtered ? el("div", { class: "btn-row" }, btn("Show every expense again", () => { st.filter = { month: "", cat: "", kind: "spend", text: "" }; host.render(); }, "small quiet", "sr-clear")) : null]);
     }
 
     // ---------------------------------------------------------------- wallets and backup
@@ -26396,7 +26458,7 @@ const SpendUI = (function () {
         if (w) kids.push(banner("bad", "Remove " + w.name + "?", el("span", { text: "Its " + plural(w.rows, "entry", "entries") + " leave the Spending book. Nothing else changes. You can import its file again later." }),
           el("div", { class: "btn-row" }, btn("Yes, remove " + w.name, async () => { const b = SpendBook.removeWallet(book(), w.name); st.remove = null; const r = await host.save(b); st.msg.backup = r && r.ok ? { kind: "ok", text: w.name + " was removed." } : { kind: "bad", text: "NOT SAVED: " + ((r && r.text) || "the browser refused") }; host.render(); }, "danger", "spend-remove-yes"), btn("Cancel", () => { st.remove = null; host.render(); }, "", "spend-remove-no"))));
       } else kids.push(el("div", { class: "btn-row" }, ws.map((w) => btn("Remove " + w.name, () => { st.remove = w.name; host.render(); }, "small quiet", "spend-remove:" + w.name))));
-      return card("Your wallets", plural(ws.length, "wallet") + " · " + plural(SpendBook.count(book()), "entry", "entries"), kids);
+      return fcard({ key: "spend-wallets", title: "Your wallets", sub: plural(ws.length, "wallet") + " · " + plural(SpendBook.count(book()), "entry", "entries"), glance: ws.map((w) => w.name).join(", ").slice(0, 90), busy: !!st.remove, stop: () => { st.remove = null; } }, () => kids);
     }
 
     async function saveBackup() {
@@ -26436,12 +26498,14 @@ const SpendUI = (function () {
         if (st.wipe) kids.push(banner("bad", "Delete the whole Spending book from this browser?", el("span", { text: "Every wallet and entry goes. Make a backup first if you may want them back. The Investments part is not touched." }), el("div", { class: "btn-row" }, btn("Yes, delete the Spending book", async () => { st.wipe = false; const r = await host.save(SpendBook.empty()); st.msg.backup = r && r.ok ? { kind: "ok", text: "The Spending book was deleted from this browser." } : { kind: "bad", text: "NOT SAVED: " + ((r && r.text) || "the browser refused") }; host.render(); }, "danger", "spend-wipe-yes"), btn("Cancel", () => { st.wipe = false; host.render(); }, "", "spend-wipe-no"))));
         else kids.push(el("div", { class: "btn-row" }, btn("Delete the Spending book…", () => { st.wipe = true; host.render(); }, "small quiet", "spend-wipe")));
       }
-      return card("Backup of the Spending book", isDemo() ? "not in the demo" : "this part only", kids);
+      if (!has) return card("Backup of the Spending book", isDemo() ? "not in the demo" : "this part only", kids);
+      return fcard({ key: "spend-backup", title: "Backup of the Spending book", sub: isDemo() ? "not in the demo" : "this part only", glance: "Save, restore or delete this part only", busy: !!(st.msg.backup || st.restore || st.wipe), stop: () => { st.msg.backup = null; st.restore = null; st.wipe = false; } }, () => kids);
     }
 
     // ---------------------------------------------------------------- draw
 
     function render(root) {
+      seen.clear();
       const b = book();
       const has = SpendBook.count(b) > 0;
       if (!has) {
@@ -26451,6 +26515,7 @@ const SpendUI = (function () {
         return;
       }
       const v = figures();
+      const at = root.childNodes.length;
       root.appendChild(el("section", { class: "card", "data-k": "spend-top" }, el("div", { class: "card-head" }, el("h2", { text: "Your spending" }), el("span", { class: "sub", text: isDemo() ? "invented demo data" : "from your Spendee wallets" })), controls(v), missingBanner(v), tiles(v)));
       for (const c of [ringCard(v), monthCard(v), gridCard(v), largestCard(v), labelsCard(v)]) if (c) root.appendChild(c);
       root.appendChild(rowsCard(v));
@@ -26458,6 +26523,8 @@ const SpendUI = (function () {
       const w = walletsCard();
       if (w) root.appendChild(w);
       root.appendChild(backupCard());
+      // the bar goes right under "Your spending", once every card has said whether it is open
+      root.insertBefore(foldBar(), root.childNodes[at + 1] || null);
       // the grid of months opens at its newest month (the right end); only when the months shown change, so that a scroll by hand stays
       requestAnimationFrame(() => {
         const w = document.querySelector('[data-k="sg-wrap"]');
@@ -27658,19 +27725,7 @@ const SpendUI = (function () {
     if (ui.mode === "demo") return spend.fxDemo || (spend.fxDemo = SpendFx.create(SpendDemo.ledgerFor));
     const files = doc && doc.files && doc.files.ecb ? doc.files.ecb : {};
     if (spend.fx && spend.fxFiles === files) return spend.fx;
-    const names = Object.keys(files).sort();
-    const ledgerFor = (ccy) => {
-      for (const n of (files[ccy] ? [ccy] : []).concat(names.filter((x) => x !== ccy))) {
-        try {
-          const r = Ecb.readEcbFile(files[n].text, { currency: ccy });
-          if (r && r.ok && r.ledger) return r.ledger;
-        } catch (e) {
-          /* the next file */
-        }
-      }
-      return null;
-    };
-    spend.fx = SpendFx.create(ledgerFor);
+    spend.fx = SpendFx.create(SpendFx.ledgersFromFiles(files));
     spend.fxFiles = files;
     return spend.fx;
   }
@@ -27713,6 +27768,7 @@ const SpendUI = (function () {
     download: spendDownload,
     render: () => render(),
     goInvestData: () => goTab("data"),
+    folds: Folds.create({ storage: foldStorage, key: "att-spend-folds-v1" }), // which Spending cards are open (architecture 38.11), apart from the Holdings tab's
   });
 
   function spendSaveText() {
