@@ -1,6 +1,7 @@
 <meta charset="utf-8">
 <title>Austria Tax Tracker</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>
 /* Layout: a sticky tab bar over one column of cards on a phone, two columns from 860 px; big figures in the body face, table figures in a mono face.
    One deliberate dark look: deep ink-blue neutrals, a periwinkle accent, panels with a lit top edge, and status colours kept apart from
@@ -124,11 +125,37 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
 /* The four parts of the page (architecture 38.2): Investments, Spending, Poker, Cash flow. A row of four buttons over the tabs; on a phone they share the width. */
-.areas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin: 14px 0 0; padding: 4px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
-.part-btn { background: transparent; border: 1px solid transparent; color: var(--muted); border-radius: 10px; padding: 8px 4px; min-height: 40px; cursor: pointer; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The four parts: a floating bar at the bottom of the screen, as in iPhone apps (architecture 41.7). It keeps the home bar's safe area, the
+   page has room under its last card, the hover box stays above it, and it is not printed. */
+.areas { position: fixed; z-index: 60; left: 50%; transform: translateX(-50%); bottom: calc(10px + env(safe-area-inset-bottom, 0px)); width: min(460px, calc(100vw - 20px)); box-sizing: border-box; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; margin: 0; padding: 5px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 28px; background: rgba(21, 29, 49, 0.78); -webkit-backdrop-filter: blur(18px) saturate(1.5); backdrop-filter: blur(18px) saturate(1.5); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+.part-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: transparent; border: 0; color: var(--muted); border-radius: 22px; padding: 6px 2px 5px; min-height: 50px; cursor: pointer; font: 600 11px/1.2 var(--font-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; }
+.part-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.part-btn .pb-l { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .part-btn:hover { color: var(--fg); }
-.part-btn[aria-pressed="true"] { color: var(--fg); background: var(--surface-2); border-color: var(--line-hi); box-shadow: inset 0 -2px 0 var(--accent); }
+.part-btn[aria-pressed="true"] { color: var(--fg); background: rgba(255, 255, 255, 0.11); }
+.part-btn[aria-pressed="true"] svg { stroke: var(--accent); }
 .part-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* Cash flow (architecture 41): the savings rate badge, the flow picture, the coverage grid */
+.rate-badge { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 6px auto 10px; padding: 10px 18px; width: max-content; max-width: 100%; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-2); }
+.rate-badge .label { color: var(--muted); font-size: 13px; }
+.rate-badge .value { font: 600 30px/1.1 var(--font-mono); letter-spacing: -0.5px; }
+.rate-badge .value.neg { color: var(--bad); }
+.sankey-wrap { width: 100%; }
+.sankey-svg { display: block; overflow: visible; }
+.sk-link { transition: opacity 0.15s; }
+.sk-links:hover .sk-link { opacity: 0.55; }
+.sk-links .sk-link:hover, .sk-links .sk-link:focus { opacity: 1; outline: none; }
+.sk-pill-bg { fill: rgba(14, 20, 35, 0.82); stroke: rgba(255, 255, 255, 0.10); }
+.sk-name { fill: var(--fg); font-family: var(--font-body); font-weight: 600; }
+.sk-amt { fill: var(--muted); font-family: var(--font-mono); font-weight: 500; }
+.sk-pill { pointer-events: none; }
+.heat.cover .hc.cv { font: 600 10px/1 var(--font-mono); display: inline-flex; align-items: center; justify-content: center; }
+.hc.cv-on { background: rgba(25, 158, 112, 0.28); color: var(--fg); }
+.hc.cv-off { background: rgba(180, 190, 212, 0.10); color: var(--muted); }
+.cashbar select { max-width: 200px; }
+body { padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px)) !important; }
+html { scroll-padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)); } /* what the browser scrolls into view (a field, the keyboard's focus) stays clear of the bar */
+@media print { .areas { display: none !important; } body { padding-bottom: 0 !important; } }
 .tabs[hidden] { display: none; }
 /* The Spending area (38.4.2) */
 .spendbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
@@ -16283,7 +16310,8 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
 
   /**
    * The free room in the window above and under an element, in pixels, as { above, below }: above is counted from the bar of tabs that sticks to the top of the window
-   * (a box must not go under it), below from the bottom edge of the window; both keep a margin of a few pixels.
+   * (a box must not go under it), below from the floating bar of the four parts at the bottom of the window (architecture 41.7), or from the bottom edge of the
+   * window when there is no such bar; both keep a margin of a few pixels.
    */
   function roomAround(el) {
     const doc = el.ownerDocument;
@@ -16291,7 +16319,10 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     const rect = el.getBoundingClientRect();
     const tabs = doc.querySelector(".tabs");
     const edge = Math.max(8, (tabs ? tabs.getBoundingClientRect().bottom : 0) + 6);
-    return { above: rect.top - edge, below: win.innerHeight - rect.bottom - 8 };
+    const bar = doc.querySelector("nav.areas");
+    const br = bar && win.getComputedStyle(bar).position === "fixed" && win.getComputedStyle(bar).display !== "none" ? bar.getBoundingClientRect() : null;
+    const floor = br && br.height > 0 ? Math.min(win.innerHeight, br.top) : win.innerHeight;
+    return { above: rect.top - edge, below: floor - rect.bottom - 8 };
   }
 
   /**
@@ -20244,7 +20275,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
 })(typeof self !== "undefined" ? self : this, function (XlsxRead) {
   "use strict";
 
-  const VERSION = "pokersheets-0.1.0";
+  const VERSION = "pokersheets-0.2.0";
   const MAX_SITES = 80;
   const MAX_BLOCK = 45;
   const CURS = ["USD", "EUR", "GBP", "HUF"];
@@ -20284,13 +20315,42 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     return { at, all: [...sheet.cells.values()] };
   }
 
-  /** A number cell for an amount: { ok, text } with "" for an empty cell, or { ok: false, why }. */
-  function amount(c) {
+  // A number typed as text, with at most one currency sign before or after it ("1.20", "$ 1.20", "1.20 USD"). Nothing else is read:
+  // no thousands separators, no decimal commas, no words (architecture 40.12).
+  const TEXT_NUM = /^(?:(\$|US\$|USD|€|EUR|£|GBP|Ft|HUF)\s*)?([+-]?\d+(?:\.\d+)?)(?:\s*(\$|US\$|USD|€|EUR|£|GBP|Ft|HUF))?$/i;
+  const SIGN_CUR = { $: "USD", US$: "USD", USD: "USD", "€": "EUR", EUR: "EUR", "£": "GBP", GBP: "GBP", FT: "HUF", HUF: "HUF" };
+  const plainNum = (t) => {
+    let x = t.replace(/^\+/, "");
+    const neg = x.startsWith("-");
+    if (neg) x = x.slice(1);
+    x = x.replace(/^0+(?=\d)/, "");
+    if (x.includes(".")) x = x.replace(/0+$/, "").replace(/\.$/, "");
+    return (neg && x !== "0" ? "-" : "") + x;
+  };
+
+  /**
+   * A number cell for an amount: { ok, text, note? } with "" for an empty cell, or { ok: false, why }. unit: the currency the cell counts in
+   * ("USD" in the income sheets), or "" when a currency sign has no place there. A number typed as text is read when it is plainly a number
+   * and its sign, if any, is the cell's own currency; the note says so.
+   */
+  function amount(c, unit) {
     if (!c) return { ok: true, text: "" };
     if (c.noValue) return { ok: false, why: "cell " + c.ref + " has a formula that Excel saved without its value (open the file in Excel and save it again)" };
     if (c.kind === "n") return { ok: true, text: c.text };
     if (c.kind === "s" && c.text.trim() === "") return { ok: true, text: "" };
     if (c.kind === "e") return { ok: false, why: "cell " + c.ref + " shows the error " + c.text.slice(0, 12) };
+    if (c.kind === "s") {
+      const t = c.text.trim();
+      const m = TEXT_NUM.exec(t);
+      if (m && !(m[1] && m[3])) {
+        const sign = m[1] || m[3] || "";
+        const cur = sign ? SIGN_CUR[sign.toUpperCase()] || SIGN_CUR[sign] : "";
+        const num = plainNum(m[2]);
+        if (!cur) return { ok: true, text: num, note: "cell " + c.ref + " holds the text '" + t.slice(0, 30) + "'; it was read as the number " + num };
+        if (unit && cur === unit) return { ok: true, text: num, note: "cell " + c.ref + " holds the text '" + t.slice(0, 30) + "'; it was read as " + num + " " + unit };
+        return { ok: false, why: "cell " + c.ref + " holds '" + t.slice(0, 30) + "', an amount in " + cur + (unit ? ", where the sheet counts in " + unit : ", where no currency sign belongs") };
+      }
+    }
     return { ok: false, why: "cell " + c.ref + " should hold a number but holds '" + c.text.slice(0, 30) + "'" };
   }
   const orZero = (t) => (t === "" ? "0" : t);
@@ -20303,7 +20363,13 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     if (!heads.length) return null;
     const months = {};
     const hints = {};
+    const notes = [];
+    const blank = [];
     const fail = (text) => ({ fail: text });
+    const use = (a) => {
+      if (a.note) notes.push(a.note);
+      return a;
+    };
     for (const h of heads) {
       const r = h.row;
       const col = { open: h.col };
@@ -20324,8 +20390,9 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       if (!day) return fail("no date of the month above the header in row " + r);
       const month = day.slice(0, 7);
       if (month.slice(0, 4) !== year) return fail("the block in row " + r + " is dated " + day + ", not in " + year);
-      if (months[month]) return fail("two blocks are dated " + month + " (rows " + months[month].row + " and " + r + ")");
+      if (months[month] || blank.some((b) => b.month === month)) return fail("two blocks are dated " + month + " (rows " + (months[month] ? months[month].row : blank.find((b) => b.month === month).row) + " and " + r + ")");
       const sites = [];
+      const rawClose = new Map();
       const rowSite = new Map();
       let rr = r + 1;
       for (; rr <= r + MAX_SITES; rr++) {
@@ -20334,19 +20401,38 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
         const name = nc.text.trim();
         const v = {};
         let any = false;
+        let closeRaw = "";
         for (const f of ["open", "xfer", "bonus", "close"]) {
-          const a = amount(g.at(col[f], rr));
+          const a = use(amount(g.at(col[f], rr), ""));
           if (!a.ok) return fail(a.why);
           if (a.text !== "") any = true;
+          if (f === "close") closeRaw = a.text;
           v[f] = orZero(a.text);
         }
         if (!any) continue; // a site row with nothing in it this month
         if (sites.some((s) => s.name === name)) return fail("the site '" + name.slice(0, 40) + "' stands twice in the block of " + month);
+        rawClose.set(name, closeRaw);
         sites.push({ name, open: v.open, xfer: v.xfer, bonus: v.bonus, close: v.close });
         rowSite.set(rr, name);
         if (!hints[name]) hints[name] = { name: curOfName(name), total: {} };
       }
-      if (!sites.length) return fail("the block of " + month + " (row " + r + ") has no sites");
+      // A month not filled in yet (architecture 40.12): no site has a closing balance (every closing cell empty), or no site has a closing
+      // above zero while some site would show a result. His own net, IF(closing>0, ..., 0), is zero for every site then, and so is his Total.
+      const netOf = (s) => addText(addText(addText(s.close, neg(s.bonus)), neg(s.xfer)), neg(s.open));
+      const allEmpty = sites.every((s) => rawClose.get(s.name) === "");
+      const noneAbove = sites.every((s) => !(Number(s.close) > 0)) && sites.some((s) => !isZeroText(netOf(s)));
+      if (!sites.length || allEmpty || noneAbove) {
+        blank.push({ month, row: r });
+        notes.push(month + ": " + (!sites.length ? "the block has no figures yet" : allEmpty ? "no site has a closing balance yet" : "no site has a closing balance above zero") + " (not filled in yet); the month is left out");
+        continue;
+      }
+      // A site whose closing cell is empty while others are filled: no result this month, as his formula counts it (closing = opening +
+      // transfers + bonuses, so its net is zero); the note names it.
+      for (const s of sites)
+        if (rawClose.get(s.name) === "") {
+          s.close = addText(addText(s.open, s.xfer), s.bonus);
+          notes.push(month + ", " + s.name.slice(0, 40) + ": the closing balance is empty; counted as no result (closing " + s.close + ", net 0), as your formula does");
+        }
       // his month total: a cell "Total:" just below the sites, its value to the right
       let total = "";
       let totalCell = "";
@@ -20356,7 +20442,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
           const c = g.at(k, y);
           if (c && c.kind === "s" && /^total:?$/.test(norm(c.text))) {
             const v = g.at(k + 1, y);
-            const a = amount(v);
+            const a = use(amount(v, ""));
             if (!a.ok) return fail(a.why);
             total = a.text;
             totalCell = v ? v.ref : "";
@@ -20385,7 +20471,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
         const out = {};
         for (const x of heads2) {
           if (x.cur === "EUR") continue;
-          const a = amount(g.at(x.k, eurRow[0]));
+          const a = use(amount(g.at(x.k, eurRow[0]), ""));
           if (!a.ok) return fail(a.why);
           if (a.text !== "") out[x.cur] = a.text;
         }
@@ -20414,7 +20500,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       months[month] = { row: r, sites, rates, rateDay, total, totalCell, mult };
     }
     for (const m of Object.keys(months)) delete months[m].row;
-    return { months, hints };
+    return { months, hints, notes, blank: blank.map((b) => b.month) };
   }
 
   // ---------------------------------------------------------------- the income workbook
@@ -20427,7 +20513,12 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     if (!heads.length) return null;
     const months = {};
     const skipped = [];
+    const blank = [];
     const fail = (text) => ({ fail: text });
+    const use = (a) => {
+      if (a.note) skipped.push(a.note);
+      return a;
+    };
     for (const h of heads) {
       const mi = MONTHS[norm(h.text)];
       const month = year + "-" + String(mi).padStart(2, "0");
@@ -20446,7 +20537,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
         }
       }
       if (!isBlock) continue;
-      const sumA = amount(g.at(vc, h.row));
+      const sumA = use(amount(g.at(vc, h.row), "USD"));
       if (!sumA.ok) return fail(sumA.why);
       const items = [];
       let cost = null;
@@ -20456,16 +20547,26 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       let hands = "";
       let tableRow = 0;
       let end = false;
+      let gap = false; // an empty row after TABLE PROFIT: what follows it is no longer the month's block (architecture 40.12)
+      const filled = (c) => !!c && !(c.kind === "s" && c.text.trim() === "");
       for (let y = h.row + 1; y <= h.row + MAX_BLOCK && !end; y++) {
         const nc = g.at(h.col, y);
-        if (!isText(nc)) continue;
+        if (!isText(nc)) {
+          if (table !== null && !filled(g.at(vc, y))) gap = true;
+          continue;
+        }
         const lab = norm(nc.text);
         if (MONTHS[lab] && g.at(vc, y)) break; // the next month below
-        const a = amount(g.at(vc, y));
+        const vcell = g.at(vc, y);
+        const trailer = L.table.test(lab) || L.eur.test(lab) || L.hours.test(lab) || L.hands.test(lab) || L.handsH.test(lab) || L.hourly.test(lab) || L.cost.test(lab);
+        // Below the month: after an empty row, or a header whose value cell holds words (his summary tables), a label that has no place in a
+        // month ends the block. Right after TABLE PROFIT, without an empty row, such a line still stops the sheet (a line out of place).
+        if (table !== null && !trailer && (gap || (vcell && vcell.kind === "s" && vcell.text.trim() !== ""))) break;
         if (L.handsH.test(lab) || L.hourly.test(lab)) {
           if (L.handsH.test(lab)) end = true;
           continue; // derived cells: worked out by the page itself
         }
+        const a = use(amount(vcell, L.hours.test(lab) || L.hands.test(lab) ? "" : "USD"));
         if (!a.ok) return fail(a.why);
         if (L.table.test(lab)) {
           table = a.text;
@@ -20481,6 +20582,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       if (months[month] || skipped.some((s) => s.startsWith(month))) return fail("the month " + norm(h.text) + " stands twice (" + h.ref + ")");
       if (table === "") {
         skipped.push(month + ": TABLE PROFIT is empty (not filled in yet)");
+        blank.push(month);
         continue;
       }
       if (hands !== "" && !/^\d+$/.test(hands)) return fail("the hands of " + month + " (" + "near row " + tableRow + ") are not a whole number");
@@ -20501,11 +20603,11 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
           continue;
         }
         gap = 0;
-        const a = amount(g.at(listHead.col + 1, y));
+        const a = use(amount(g.at(listHead.col + 1, y), "USD"));
         if (!a.ok) return fail(a.why);
         if (a.text !== "") ex.push({ name: nc.text.trim(), amt: a.text });
       }
-      const s = amount(g.at(listHead.col + 1, listHead.row));
+      const s = amount(g.at(listHead.col + 1, listHead.row), "USD");
       yearData.expenses = ex;
       yearData.expSum = s.ok ? s.text : "";
     }
@@ -20520,16 +20622,19 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
           continue;
         }
         gap = 0;
-        const a = amount(g.at(siteHead.col + 1, y));
-        const b = amount(g.at(siteHead.col + 2, y));
+        const a = use(amount(g.at(siteHead.col + 1, y), "USD"));
+        const b = use(amount(g.at(siteHead.col + 2, y), "USD"));
         if (!a.ok) return fail(a.why);
         if (!b.ok) return fail(b.why);
         rk.push({ site: nc.text.trim(), rake: a.text, rb: b.text });
       }
       yearData.rake = rk;
     }
-    return { months, skipped, yearData };
+    return { months, skipped, blank, yearData };
   }
+
+  const neg = (t) => (t.startsWith("-") ? t.slice(1) : t === "0" ? t : "-" + t);
+  const isZeroText = (t) => /^-?0*(\.0*)?$/.test(t);
 
   function addText(a, b) {
     // exact sum of two decimal texts (both plain decimals)
@@ -20574,7 +20679,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       }
       if (b && b.fail) problems.push({ sheet: s.name, text: b.fail });
       else if (b) {
-        out.bal.push({ name: s.name, year, months: b.months, skipped: [] });
+        out.bal.push({ name: s.name, year, months: b.months, skipped: b.notes, blank: b.blank });
         for (const [k, v] of Object.entries(b.hints)) {
           const h = hints[k] || (hints[k] = { name: v.name, total: {} });
           for (const [c, n] of Object.entries(v.total)) h.total[c] = (h.total[c] || 0) + n;
@@ -20582,7 +20687,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
         continue;
       }
       if (i && i.fail) problems.push({ sheet: s.name, text: i.fail });
-      else if (i) out.inc.push({ name: s.name, year, months: i.months, skipped: i.skipped, yearData: i.yearData });
+      else if (i) out.inc.push({ name: s.name, year, months: i.months, skipped: i.skipped, blank: i.blank, yearData: i.yearData });
       else if (!b) problems.push({ sheet: s.name, text: "neither the balances layout (Opening balance) nor the income layout (month names with TABLE PROFIT) was found" });
     }
     if (out.bal.length && out.inc.length) return { ok: false, error: "This workbook mixes balances sheets (" + out.bal.map((x) => x.name).join(", ") + ") and income sheets (" + out.inc.map((x) => x.name).join(", ") + "). Choose one workbook at a time." };
@@ -20634,7 +20739,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
 })(typeof self !== "undefined" ? self : this, function (Dec) {
   "use strict";
 
-  const VERSION = "pokerbook-0.1.0";
+  const VERSION = "pokerbook-0.2.0";
   const KIND = "austria-tracker-poker";
   const FORMAT = 1;
   const BACKUP_KIND = "austria-tracker-backup";
@@ -20804,6 +20909,15 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
         const changes = state === "replaced" && !same(brief(part, before), brief(part, after));
         rows.push({ month: m, state, before: brief(part, before), after: brief(part, after), changes });
       }
+    // A month the file shows as not filled in yet (architecture 40.12) takes away what an earlier import stored for it (his November
+    // with empty closing balances, read before as a loss of everything); it needs the second press like any change of figures.
+    for (const s of parsed.sheets)
+      for (const m of (s.blank || []).slice().sort()) {
+        if (fileMonths.has(m)) continue;
+        fileMonths.add(m);
+        const before = book.months[m] && book.months[m][part] ? book.months[m][part] : null;
+        if (before) rows.push({ month: m, state: "cleared", before: brief(part, before), after: null, changes: true });
+      }
     if (part === "inc")
       for (const s of parsed.sheets) {
         const before = book.years[s.year] || null;
@@ -20852,6 +20966,12 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
         if (!b.months[m]) b.months[m] = {};
         if (!same(b.months[m][part] || null, after)) changed.push(m);
         b.months[m][part] = after;
+      }
+      for (const m of s.blank || []) {
+        if (has(s.months, m) || !b.months[m] || !b.months[m][part]) continue;
+        delete b.months[m][part];
+        if (!b.months[m].bal && !b.months[m].inc) delete b.months[m];
+        changed.push(m);
       }
       if (part === "inc") b.years[s.year] = cleanYear(s.yearData);
     }
@@ -20933,7 +21053,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
 })(typeof self !== "undefined" ? self : this, function (Dec) {
   "use strict";
 
-  const VERSION = "pokerstats-0.1.0";
+  const VERSION = "pokerstats-0.2.0";
   const DP = 6;
   const Z = Dec.mk(0n, 0);
   const ONE = Dec.mk(1n, 0);
@@ -21304,6 +21424,82 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       .sort((a, b) => f(P(b.netShown)) - f(P(a.netShown)) || (a.name < b.name ? -1 : 1));
   }
 
+  /**
+   * The balance of each site, month by month (architecture 40.13). Only the months with balances count; a site that is not in a month's block
+   * holds nothing that month. { months: [m], total: [number], sites: [{ name, cur, series: [number], own: [text|null], now, nowShown (texts),
+   * share, avg, min, minMonth, max, maxMonth, worst, worstMonth, sd, cover, first }], now: { month, total (text) } | null }, the sites by their
+   * balance now, largest first. Floating point for avg, sd, share and cover (pictures, not tax figures); now and nowShown are the exact texts.
+   */
+  function siteBalances(rs) {
+    const ms = rs.filter((r) => r.bankroll !== null);
+    const months = ms.map((r) => r.month);
+    const names = [];
+    for (const r of ms) for (const s of r.sites) if (names.indexOf(s.name) < 0) names.push(s.name);
+    const total = ms.map((r) => f(P(r.bankroll)));
+    const lastK = ms.length - 1;
+    const out = names.map((name) => {
+      const series = [];
+      const own = [];
+      const nets = [];
+      let cur = "";
+      let first = -1;
+      let worst = null;
+      let worstMonth = "";
+      ms.forEach((r, k) => {
+        const s = r.sites.find((x) => x.name === name);
+        if (s) {
+          cur = s.cur;
+          if (first < 0) first = k;
+          const n = f(P(s.netShown));
+          nets.push(n);
+          if (worst === null || n < worst) {
+            worst = n;
+            worstMonth = r.month;
+          }
+        }
+        series.push(s ? f(P(s.closeShown)) : 0);
+        own.push(s ? s.close : null);
+      });
+      const since = series.slice(first);
+      let min = Infinity;
+      let max = -Infinity;
+      let minMonth = "";
+      let maxMonth = "";
+      since.forEach((x, j) => {
+        if (x < min) {
+          min = x;
+          minMonth = months[first + j];
+        }
+        if (x > max) {
+          max = x;
+          maxMonth = months[first + j];
+        }
+      });
+      const avg = since.reduce((a, b) => a + b, 0) / since.length;
+      let sd = null;
+      if (nets.length >= 2) {
+        const m = nets.reduce((a, b) => a + b, 0) / nets.length;
+        sd = Math.sqrt(nets.reduce((a, b) => a + (b - m) * (b - m), 0) / (nets.length - 1));
+      }
+      const lastSite = lastK >= 0 ? ms[lastK].sites.find((x) => x.name === name) : null;
+      const nowShown = lastSite ? lastSite.closeShown : "0";
+      const nowF = f(P(nowShown));
+      return {
+        name, cur, series, own, first: months[first],
+        now: lastSite ? lastSite.close : "0",
+        nowShown,
+        share: lastK >= 0 && total[lastK] > 0 ? nowF / total[lastK] : null,
+        avg, min, minMonth, max, maxMonth,
+        worst: worst !== null && worst < 0 ? worst : null,
+        worstMonth: worst !== null && worst < 0 ? worstMonth : "",
+        sd,
+        cover: worst !== null && worst < 0 ? nowF / -worst : null,
+      };
+    });
+    out.sort((a, b) => f(P(b.nowShown)) - f(P(a.nowShown)) || b.avg - a.avg || (a.name < b.name ? -1 : 1));
+    return { months, total, sites: out, now: lastK >= 0 ? { month: months[lastK], total: ms[lastK].bankroll } : null };
+  }
+
   /** The rakeback and promotion lines by name: { names: [{ name, total }] largest first, years: [y], cell(name, year) -> text }. */
   function extras(rs) {
     const map = new Map();
@@ -21350,6 +21546,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       down: ds,
       downTable: dsTable,
       sites: sites(rs),
+      balances: siteBalances(rs),
       extras: extras(rs),
       last,
     };
@@ -21361,7 +21558,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     return { months: ms, years: [...new Set(ms.map((m) => m.slice(0, 4)))].sort(), first: ms[0] || "", last: ms[ms.length - 1] || "" };
   }
 
-  return { VERSION, DP, rateOf, conv, netOf, rows, period, checks, totals, byYear, variance, ruin, downswings, streaks, sites, extras, view, span, phi };
+  return { VERSION, DP, rateOf, conv, netOf, rows, period, checks, totals, byYear, variance, ruin, downswings, streaks, sites, siteBalances, extras, view, span, phi };
 });
 
 /* ---- src/poker/demo.js ---- */
@@ -21484,6 +21681,407 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
   }
 
   return { build, SITES, LINES };
+});
+
+/* ---- src/cash/flow.js ---- */
+/*
+ * CashFlow: the household's cash flow, made from the other books and never stored (architecture section 41).
+ *
+ * It has no data of its own and writes nothing. The page hands in, read only:
+ *   - the Spending book's months (SpendView.build: spent and earned per month, by category for a period),
+ *   - the Poker book's months (PokerStats.rows: table result, rakeback and promotions, costs),
+ *   - the ledger of the Investments document as the Transactions tab shows it (purchases, sales, dividends, interest),
+ * all in one currency. Nothing of the tax engine, the tax adviser pack or the performance module is used.
+ *
+ * Every amount is an exact decimal text with 6 places (decimal.js). Per month:
+ *   income   = table + extra + earned + invInc        (each signed: a losing table month lowers it)
+ *   net      = income + cost                          (cost is the poker expense share, negative)
+ *   saved    = net − spent                            rate = saved ÷ net, only when net > 0
+ *   invested = bought − sold                          kept = saved − invested
+ *
+ * Pure functions, no DOM, no clock. Runs in Node (tests) and in the page.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("../lib/decimal.js"));
+  else root.CashFlow = factory(root.Dec);
+})(typeof self !== "undefined" ? self : this, function (Dec) {
+  "use strict";
+
+  const VERSION = "cashflow-0.1.0";
+  const DP = 6;
+  const Z = Dec.mk(0n, DP);
+  const P = (t) => (t === "" || t === null || t === undefined ? Z : Dec.parse(String(t)));
+  const txt = (d) => Dec.str(Dec.round(d, DP));
+  const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+  const FIELDS = ["table", "extra", "cost", "earned", "invInc", "spent", "bought", "sold"];
+
+  /** The months from a to b, both "YYYY-MM", inclusive. */
+  function monthsBetween(a, b) {
+    const out = [];
+    if (!MONTH_RE.test(a) || !MONTH_RE.test(b) || a > b) return out;
+    let y = +a.slice(0, 4);
+    let m = +a.slice(5, 7);
+    for (let k = 0; k < 2400; k++) {
+      const s = y + "-" + String(m).padStart(2, "0");
+      out.push(s);
+      if (s === b) break;
+      m++;
+      if (m > 12) {
+        m = 1;
+        y++;
+      }
+    }
+    return out;
+  }
+
+  // ---------------------------------------------------------------- the investments' money in and out
+
+  /**
+   * The ledger lines (convert.js, tables.ledger) as money in and out of the household, in `cur`. convert(amountDec, from, to, day) is SpendFx's
+   * (one step at the ECB rate of the day, at most 7 days back, 6 decimals). A purchase is money put in (amount + fee), a sale money taken out
+   * (amount − fee), a dividend or interest income (gross − tax withheld). Moves between his own accounts, cash and tax lines are no flow of the
+   * household; a line without an amount, or without a rate, is left out and listed.
+   * Returns { months: { "YYYY-MM": { bought, sold, inc } (texts) }, lines: [{ day, kind, value, ccy, native, ticker }], left: [{ day, why }] }.
+   */
+  function invest(ledger, convert, cur) {
+    const months = {};
+    const lines = [];
+    const left = [];
+    for (const l of Array.isArray(ledger) ? ledger : []) {
+      if (!l || typeof l !== "object") continue;
+      const kind = l.kind === "BUY" && !l.move ? "buy" : l.kind === "SELL" && !l.move ? "sell" : l.kind === "DIVIDEND" || l.kind === "INTEREST" ? "inc" : "";
+      if (!kind) continue;
+      const day = typeof l.date === "string" ? l.date.slice(0, 10) : "";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+        left.push({ day: "", why: "a line without a date" });
+        continue;
+      }
+      const g = l.gross === "" || l.gross === undefined || l.gross === null ? null : Dec.parse(String(l.gross));
+      if (g === null) {
+        left.push({ day, why: "a line without an amount (" + (l.ticker || l.kind) + ")" });
+        continue;
+      }
+      const fee = l.fee ? Dec.parse(String(l.fee)) || Z : Z;
+      const wht = l.withheld ? Dec.parse(String(l.withheld)) || Z : Z;
+      const native = kind === "buy" ? Dec.add(Dec.abs(g), Dec.abs(fee)) : kind === "sell" ? Dec.sub(Dec.abs(g), Dec.abs(fee)) : Dec.sub(g, Dec.abs(wht));
+      const ccy = l.ccy || "EUR";
+      const c = convert(native, ccy, cur, day);
+      if (!c || !c.ok) {
+        left.push({ day, why: "no " + ccy + " rate for " + day });
+        continue;
+      }
+      const v = Dec.round(c.value, DP);
+      const m = day.slice(0, 7);
+      const rec = months[m] || (months[m] = { bought: Z, sold: Z, inc: Z });
+      if (kind === "buy") rec.bought = Dec.add(rec.bought, v);
+      else if (kind === "sell") rec.sold = Dec.add(rec.sold, v);
+      else rec.inc = Dec.add(rec.inc, v);
+      lines.push({ day, kind, value: txt(v), ccy, native: txt(native), ticker: l.ticker || "" });
+    }
+    const out = {};
+    for (const m of Object.keys(months).sort()) out[m] = { bought: txt(months[m].bought), sold: txt(months[m].sold), inc: txt(months[m].inc) };
+    return { months: out, lines, left };
+  }
+
+  // ---------------------------------------------------------------- the months
+
+  /**
+   * input: { spend: [{ month, spent, earned }] (SpendView.build(...).monthly), spendSpan: { first, last } (the Spending book's first and last month,
+   * or nulls), poker: [{ month, table, extra, cost }] (PokerStats.rows(...).rows), invest: invest(...).months }.
+   * Returns { months: [row], has: { spend, poker, invest } (first and last month of each), first, last } with a row for every month from the
+   * first to the last month of any book: { month, s, p, i (has data from Spending, Poker, Investments), table, extra, cost, earned, invInc, spent,
+   * bought, sold, income, net, saved, invested, kept (texts) }.
+   */
+  function months(input) {
+    const map = new Map();
+    const get = (m) => {
+      if (!map.has(m)) map.set(m, { month: m, s: false, p: false, i: false, table: Z, extra: Z, cost: Z, earned: Z, invInc: Z, spent: Z, bought: Z, sold: Z });
+      return map.get(m);
+    };
+    const sp = input.spendSpan && input.spendSpan.first && input.spendSpan.last ? input.spendSpan : null;
+    const inSpend = (m) => !!sp && m >= sp.first && m <= sp.last;
+    for (const x of input.spend || []) {
+      if (!MONTH_RE.test(x.month) || !inSpend(x.month)) continue;
+      const r = get(x.month);
+      r.s = true;
+      r.spent = Dec.add(r.spent, P(x.spent));
+      r.earned = Dec.add(r.earned, P(x.earned));
+    }
+    if (sp) for (const m of monthsBetween(sp.first, sp.last)) get(m).s = true;
+    for (const x of input.poker || []) {
+      if (!MONTH_RE.test(x.month)) continue;
+      const r = get(x.month);
+      r.p = true;
+      r.table = Dec.add(r.table, P(x.table));
+      r.extra = Dec.add(r.extra, P(x.extra));
+      r.cost = Dec.add(r.cost, P(x.cost));
+    }
+    for (const [m, x] of Object.entries(input.invest || {})) {
+      if (!MONTH_RE.test(m)) continue;
+      const r = get(m);
+      r.i = true;
+      r.bought = Dec.add(r.bought, P(x.bought));
+      r.sold = Dec.add(r.sold, P(x.sold));
+      r.invInc = Dec.add(r.invInc, P(x.inc));
+    }
+    const keys = Array.from(map.keys()).sort();
+    const first = keys[0] || "";
+    const last = keys[keys.length - 1] || "";
+    const rows = first ? monthsBetween(first, last).map((m) => finish(map.get(m) || get(m))) : [];
+    const span = (flag) => {
+      const ms = rows.filter((r) => r[flag]).map((r) => r.month);
+      return ms.length ? { first: ms[0], last: ms[ms.length - 1], n: ms.length } : null;
+    };
+    return { version: VERSION, months: rows, has: { spend: span("s"), poker: span("p"), invest: span("i") }, first, last };
+  }
+
+  /** The derived figures of a month or a period (Dec in, texts out). */
+  function finish(r) {
+    const income = Dec.add(Dec.add(Dec.add(r.table, r.extra), r.earned), r.invInc);
+    const net = Dec.add(income, r.cost);
+    const saved = Dec.sub(net, r.spent);
+    const invested = Dec.sub(r.bought, r.sold);
+    const out = { month: r.month, s: r.s, p: r.p, i: r.i };
+    for (const f of FIELDS) out[f] = txt(r[f]);
+    out.income = txt(income);
+    out.net = txt(net);
+    out.saved = txt(saved);
+    out.invested = txt(invested);
+    out.kept = txt(Dec.sub(saved, invested));
+    out.rate = rateOf(saved, net);
+    return out;
+  }
+
+  /** saved ÷ net as a number, only when net is above zero; else null. */
+  function rateOf(saved, net) {
+    if (Dec.isNeg(net) || Dec.isZero(net)) return null;
+    return Number(Dec.str(Dec.divRound(saved, net, 12)));
+  }
+
+  /**
+   * The months of a period and their totals. opts: { from, to ("YYYY-MM", either may be empty: open), onlySpend (default true: only the months
+   * of the Spending book's span count) }. Returns { months: [row], totals: row (month ""), from, to, n }.
+   */
+  function period(model, opts) {
+    const o = opts || {};
+    const only = o.onlySpend !== false;
+    const rows = model.months.filter((r) => (!o.from || r.month >= o.from) && (!o.to || r.month <= o.to) && (!only || r.s));
+    const acc = { month: "", s: false, p: false, i: false };
+    for (const f of FIELDS) acc[f] = Z;
+    for (const r of rows) {
+      for (const f of FIELDS) acc[f] = Dec.add(acc[f], P(r[f]));
+      acc.s = acc.s || r.s;
+      acc.p = acc.p || r.p;
+      acc.i = acc.i || r.i;
+    }
+    return { months: rows, totals: finish(acc), from: rows.length ? rows[0].month : "", to: rows.length ? rows[rows.length - 1].month : "", n: rows.length };
+  }
+
+  /**
+   * The flows of a period for the picture (architecture 41.5). t: period(...).totals; cats: [{ cat, spent }] and incomeCats: [{ cat, earned }] of
+   * the same months (SpendView.build for the period). Every part is positive; the left side are the sources, the right side the uses, and both
+   * add up to `total`. { left: [part], right: [part], total (text), ok, why } with part = { id, name, kind, value (text) }; kind is one of
+   * "table", "extra", "earned", "invInc", "sold", "savings" (left) and "cost", "loss", "spent", "invested", "kept" (right). A part of zero is
+   * left out. ok is false (and nothing should be drawn) when the categories do not add up to the period's spending or income.
+   */
+  function parts(t, cats, incomeCats) {
+    const left = [];
+    const right = [];
+    const put = (id, name, kind, d, flipName, flipKind) => {
+      if (Dec.isZero(d)) return;
+      if (Dec.isNeg(d)) right.push({ id: id + ":neg", name: flipName, kind: flipKind, value: txt(Dec.neg(d)) });
+      else left.push({ id, name, kind, value: txt(d) });
+    };
+    put("table", "Table result", "table", P(t.table), "Lost at the tables", "loss");
+    put("extra", "Rakeback and promotions", "extra", P(t.extra), "Rakeback lines below zero", "cost");
+    let sumE = Z;
+    for (const c of incomeCats || []) {
+      const d = P(c.earned);
+      sumE = Dec.add(sumE, d);
+      put("earn:" + c.cat, c.cat, "earned", d, c.cat + " (below zero)", "cost");
+    }
+    put("invInc", "Interest and dividends", "invInc", P(t.invInc), "Interest and dividends below zero", "cost");
+    const cost = P(t.cost);
+    if (!Dec.isZero(cost)) {
+      if (Dec.isNeg(cost)) right.push({ id: "cost", name: "Poker costs", kind: "cost", value: txt(Dec.neg(cost)) });
+      else left.push({ id: "cost:pos", name: "Poker costs (credit)", kind: "extra", value: txt(cost) });
+    }
+    let sumS = Z;
+    for (const c of cats || []) {
+      const d = P(c.spent);
+      sumS = Dec.add(sumS, d);
+      if (Dec.isZero(d)) continue;
+      if (Dec.isNeg(d)) left.push({ id: "spent:" + c.cat + ":neg", name: c.cat + " (refunds)", kind: "earned", value: txt(Dec.neg(d)) });
+      else right.push({ id: "spent:" + c.cat, name: c.cat, kind: "spent", value: txt(d) });
+    }
+    const inv = Dec.sub(P(t.bought), P(t.sold));
+    if (!Dec.isZero(inv)) {
+      if (Dec.isNeg(inv)) left.push({ id: "sold", name: "Taken out of investments", kind: "sold", value: txt(Dec.neg(inv)) });
+      else right.push({ id: "invested", name: "Invested", kind: "invested", value: txt(inv) });
+    }
+    const L = left.reduce((a, x) => Dec.add(a, P(x.value)), Z);
+    const R = right.reduce((a, x) => Dec.add(a, P(x.value)), Z);
+    const diff = Dec.sub(L, R);
+    if (!Dec.isZero(diff)) {
+      if (Dec.isNeg(diff)) left.push({ id: "savings", name: "From savings", kind: "savings", value: txt(Dec.neg(diff)) });
+      else right.push({ id: "kept", name: "Kept", kind: "kept", value: txt(diff) });
+    }
+    const total = Dec.max(L, R);
+    const okS = Dec.cmp(Dec.round(sumS, DP), Dec.round(P(t.spent), DP)) === 0;
+    const okE = Dec.cmp(Dec.round(sumE, DP), Dec.round(P(t.earned), DP)) === 0;
+    return { left, right, total: txt(total), ok: okS && okE, why: okS && okE ? "" : !okS ? "the spending by category does not add up to the period's spending" : "the income by category does not add up to the period's income" };
+  }
+
+  /**
+   * Parts grouped for the picture: the spending categories of `keep` (a Set of category names, the ones with a colour of their own) stay, the rest
+   * become one part "Other (n)" (id "spent:other"). The order: left as made; right: the poker parts, the spending (largest first, Other last),
+   * then invested and kept. The total does not change.
+   */
+  function group(pp, keep) {
+    const spent = pp.right.filter((x) => x.kind === "spent");
+    const mine = spent.filter((x) => keep && keep.has(x.name)).sort((a, b) => Dec.cmp(P(b.value), P(a.value)) || (a.name < b.name ? -1 : 1));
+    const rest = spent.filter((x) => !(keep && keep.has(x.name)));
+    const head = pp.right.filter((x) => x.kind === "cost" || x.kind === "loss");
+    const tail = pp.right.filter((x) => x.kind === "invested" || x.kind === "kept");
+    const right = head.concat(mine);
+    if (rest.length === 1) right.push(rest[0]);
+    else if (rest.length > 1) right.push({ id: "spent:other", name: "Other (" + rest.length + ")", kind: "spent", value: txt(rest.reduce((a, x) => Dec.add(a, P(x.value)), Z)), members: rest.map((x) => x.name) });
+    return { left: pp.left.slice(), right: right.concat(tail), total: pp.total, ok: pp.ok, why: pp.why };
+  }
+
+  /**
+   * The demo's investments (made up, the same every time): a monthly purchase of an invented fund in euro, a sale now and then, a few dividends
+   * and a yearly bank interest, in the shape of the Investments ledger lines. Nothing in it is real.
+   */
+  function demoLedger() {
+    let seed = 41;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+    const out = [];
+    for (const m of monthsBetween("2024-01", "2026-10")) {
+      const qty = 5 + Math.floor(rnd() * 12);
+      const price = (90 + rnd() * 30).toFixed(2);
+      out.push({ kind: "BUY", move: false, date: m + "-0" + (3 + Math.floor(rnd() * 5)), ticker: "XXDEMO1", ccy: "EUR", qty: String(qty), price, fee: "1.50", gross: Dec.str(Dec.mul(Dec.parse(String(qty)), Dec.parse(price))), withheld: "" });
+      if (/-(03|06|09|12)$/.test(m)) out.push({ kind: "DIVIDEND", move: false, date: m + "-20", ticker: "XXDEMO2", ccy: "USD", qty: "", price: "", fee: "", gross: (40 + rnd() * 60).toFixed(2), withheld: (6 + rnd() * 9).toFixed(2) });
+      if (m === "2025-06" || m === "2026-02") out.push({ kind: "SELL", move: false, date: m + "-14", ticker: "XXDEMO1", ccy: "EUR", qty: "40", price: "118.20", fee: "2.00", gross: "4728.00", withheld: "" });
+      if (m.endsWith("-12")) out.push({ kind: "INTEREST", move: false, date: m + "-31", ticker: "", ccy: "EUR", qty: "", price: "", fee: "", gross: (120 + rnd() * 80).toFixed(2), withheld: "" });
+    }
+    return out;
+  }
+
+  return { VERSION, DP, monthsBetween, invest, demoLedger, months, period, parts, group, rateOf: (s, n) => rateOf(P(s), P(n)) };
+});
+
+/* ---- src/cash/sankey.js ---- */
+/*
+ * CashSankey: the layout of the cash-flow picture (architecture section 41.5): sources on the left, one node in the middle, uses on the right.
+ *
+ * layout({ left: [{ id, value }], right: [{ id, value }], width, slot, gap, nodeW, pad }) places every node and band:
+ *   - one scale k (pixels per unit) for every node and band, so a band is as thick as its value on both of its ends;
+ *   - each node gets a slot of at least `slot` pixels (room for its label), its bar centred in it; a column is its slots plus the gaps;
+ *   - the middle node is the total; the bands from the left enter it one under the other from its top, the bands to the right leave it the same way;
+ *   - k is the largest scale at which the taller column fits the height, found by a few rounds (a node smaller than its slot needs no more room).
+ * The height grows with the number of nodes. Values are numbers (a picture, not a tax figure); the sides must add up to the same total
+ * (within a millionth of it), else { ok: false }.
+ *
+ * Returns { ok, width, height, k, total, left: [node], right: [node], mid: node, links: [{ id, side, path, y0, y1, a0, a1 }] }
+ * with node = { id, value, x0, x1, y0, y1, slot0, slot1 } and a link band from (x of its source edge, y0..y1) to (x of its target edge, a0..a1).
+ *
+ * spread(ys, minSep, lo, hi): moves label centres apart to at least minSep, inside lo..hi, keeping their order (pure).
+ * Pure functions, no DOM. Runs in Node (tests) and in the page.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.CashSankey = factory();
+})(typeof self !== "undefined" ? self : this, function () {
+  "use strict";
+
+  const VERSION = "sankey-0.1.0";
+
+  function band(x0, y0, y1, x1, a0, a1) {
+    const xm = (x0 + x1) / 2;
+    const f = (n) => Math.round(n * 100) / 100;
+    return "M" + f(x0) + "," + f(y0) + "C" + f(xm) + "," + f(y0) + " " + f(xm) + "," + f(a0) + " " + f(x1) + "," + f(a0) + "L" + f(x1) + "," + f(a1) + "C" + f(xm) + "," + f(a1) + " " + f(xm) + "," + f(y1) + " " + f(x0) + "," + f(y1) + "Z";
+  }
+
+  /** The room a column takes at scale k. */
+  const room = (vals, k, slot, gap) => vals.reduce((a, v) => a + Math.max(v * k, slot), 0) + gap * Math.max(0, vals.length - 1);
+
+  function layout(o) {
+    const L = (o.left || []).filter((x) => x.value > 0);
+    const R = (o.right || []).filter((x) => x.value > 0);
+    const W = o.width || 600;
+    const slot = o.slot === undefined ? 34 : o.slot;
+    const gap = o.gap === undefined ? 8 : o.gap;
+    const nodeW = o.nodeW || 12;
+    const pad = o.pad === undefined ? 10 : o.pad;
+    const sumL = L.reduce((a, x) => a + x.value, 0);
+    const sumR = R.reduce((a, x) => a + x.value, 0);
+    const total = Math.max(sumL, sumR);
+    if (!L.length || !R.length || !(total > 0) || Math.abs(sumL - sumR) > total * 1e-6) return { ok: false, total, why: !L.length || !R.length ? "nothing to draw" : "the two sides do not add up" };
+    const n = Math.max(L.length, R.length);
+    // the height: enough for the slots of the taller column, and never flatter than a pleasant minimum
+    const inner = Math.max(o.minInner || 220, n * (slot + gap) + 40);
+    let k = (inner - gap * (n - 1)) / total;
+    for (let it = 0; it < 30; it++) {
+      const over = Math.max(room(L.map((x) => x.value), k, slot, gap), room(R.map((x) => x.value), k, slot, gap));
+      if (over <= inner + 1e-9) break;
+      // shrink k in proportion to the part of the room that scales with it
+      const big = (vals) => vals.filter((v) => v * k > slot).reduce((a, v) => a + v, 0);
+      const fixed = (vals) => vals.filter((v) => v * k <= slot).length * slot + gap * Math.max(0, vals.length - 1);
+      const kl = big(L.map((x) => x.value)) > 0 ? (inner - fixed(L.map((x) => x.value))) / big(L.map((x) => x.value)) : k;
+      const kr = big(R.map((x) => x.value)) > 0 ? (inner - fixed(R.map((x) => x.value))) / big(R.map((x) => x.value)) : k;
+      k = Math.min(k * 0.999, kl, kr);
+    }
+    const H = inner + pad * 2;
+    const xL0 = 0;
+    const xM0 = Math.round(W * 0.42 - nodeW / 2);
+    const xR0 = W - nodeW;
+    function column(list, x0) {
+      const r = room(list.map((x) => x.value), k, slot, gap);
+      let y = pad + (inner - r) / 2;
+      return list.map((x) => {
+        const s = Math.max(x.value * k, slot);
+        const h = x.value * k;
+        const node = { id: x.id, value: x.value, x0, x1: x0 + nodeW, slot0: y, slot1: y + s, y0: y + (s - h) / 2, y1: y + (s + h) / 2 };
+        y += s + gap;
+        return node;
+      });
+    }
+    const left = column(L, xL0);
+    const right = column(R, xR0);
+    const mh = total * k;
+    const mid = { id: "mid", value: total, x0: xM0, x1: xM0 + nodeW, y0: pad + (inner - mh) / 2, y1: pad + (inner + mh) / 2, slot0: pad, slot1: pad + inner };
+    const links = [];
+    let at = mid.y0;
+    for (const nd of left) {
+      const h = nd.value * k;
+      links.push({ id: nd.id, side: "left", y0: nd.y0, y1: nd.y1, a0: at, a1: at + h, path: band(nd.x1, nd.y0, nd.y1, mid.x0, at, at + h) });
+      at += h;
+    }
+    at = mid.y0;
+    for (const nd of right) {
+      const h = nd.value * k;
+      links.push({ id: nd.id, side: "right", y0: at, y1: at + h, a0: nd.y0, a1: nd.y1, path: band(mid.x1, at, at + h, nd.x0, nd.y0, nd.y1) });
+      at += h;
+    }
+    return { ok: true, version: VERSION, width: W, height: H, k, total, left, right, mid, links };
+  }
+
+  /** Label centres at least minSep apart, in order, inside lo..hi (a push down, then a push up from the bottom). */
+  function spread(ys, minSep, lo, hi) {
+    const out = ys.slice();
+    for (let i = 0; i < out.length; i++) {
+      if (out[i] < lo) out[i] = lo;
+      if (i && out[i] < out[i - 1] + minSep) out[i] = out[i - 1] + minSep;
+    }
+    for (let i = out.length - 1; i >= 0; i--) {
+      if (out[i] > hi) out[i] = hi;
+      if (i < out.length - 1 && out[i] > out[i + 1] - minSep) out[i] = out[i + 1] - minSep;
+    }
+    return out;
+  }
+
+  return { VERSION, layout, spread, band };
 });
 
 /* ---- src/export/xlsx.js ---- */
@@ -30379,6 +30977,7 @@ const PokerUI = (function () {
     const st = {
       cur: "USD",
       period: "all",
+      site: "", // the site of "One site, month by month" (architecture 40.13)
       basis: "income", // the monthly bars and the downswings: poker income or the table result
       pending: null, // { items: [{ name, res }], sites: { name: cur }, confirm }
       msg: { import: null, backup: null, sites: null },
@@ -30517,6 +31116,7 @@ const PokerUI = (function () {
         const nw = p.rows.filter((r) => r.state === "new");
         const sm = p.rows.filter((r) => r.state === "same");
         const rp = p.rows.filter((r) => r.state === "replaced");
+        const cl = p.rows.filter((r) => r.state === "cleared");
         const lines = [];
         const runs = (list) => (list.length === 1 ? monthName(list[0].month) : monthName(list[0].month) + " to " + monthName(list[list.length - 1].month));
         if (nw.length) lines.push(listItem("info", plural(nw.length, "new month") + ": " + runs(nw) + "."));
@@ -30525,6 +31125,7 @@ const PokerUI = (function () {
           const fig = (x) => (p.part === "bal" ? plural(x.sites, "site") + ", your total " + money(x.total || "0", "USD") : "table result " + money(x.table, "USD") + ", " + plural(x.lines, "line") + ", " + hrs(x.hours));
           lines.push(listItem(r.changes ? "warn" : "info", monthName(r.month) + " is replaced: stored " + fig(r.before) + "; from the file " + fig(r.after) + "."));
         }
+        for (const r of cl) lines.push(listItem("warn", monthName(r.month) + " is not filled in yet in this file: what is stored for it is taken out until it is filled in."));
         if (p.kept.length) lines.push(listItem("info", plural(p.kept.length, "stored month") + " of these years " + (p.kept.length === 1 ? "is" : "are") + " not in this file and stay" + (p.kept.length === 1 ? "s" : "") + " as " + (p.kept.length === 1 ? "it is" : "they are") + ": " + p.kept.map(monthName).join(", ") + "."));
         for (const s of it.res.sheets) for (const x of s.skipped || []) lines.push(listItem("info", "Sheet " + s.name + ": " + x + "."));
         for (const x of it.res.problems) lines.push(listItem("bad", "Sheet " + x.sheet + " was not used: " + x.text + "."));
@@ -30824,6 +31425,86 @@ const PokerUI = (function () {
       ]);
     }
 
+    /**
+     * The colour of a site in "Balances per site": fixed by the site, never by the period or the currency (dataviz rule): the sites are ranked once by
+     * their average balance over the whole book in dollars; the seven largest have a colour each, the rest share the neutral of "Other".
+     */
+    let siteSlot = { book: null, map: new Map() };
+    function siteSlots() {
+      const b = book();
+      if (siteSlot.book !== b) {
+        const bal = S.siteBalances(S.rows(b, "USD").rows);
+        const order = bal.sites.slice().sort((x, y) => y.avg - x.avg || (x.name < y.name ? -1 : 1)).map((x) => x.name);
+        siteSlot = { book: b, map: new Map(order.slice(0, 7).map((n, k) => [n, k])) };
+      }
+      return siteSlot.map;
+    }
+
+    function balancesCard(v) {
+      const B = v.balances;
+      if (!B || B.months.length < 2 || !B.sites.length) return null;
+      const cur = v.cur;
+      const slot = siteSlots();
+      const top = B.sites.filter((x) => slot.has(x.name)).sort((a, b) => slot.get(a.name) - slot.get(b.name));
+      const rest = B.sites.filter((x) => !slot.has(x.name));
+      // more than three years: the last month of each quarter (and the period's last month), so the bars stay readable on a phone
+      const idx = B.months.length > 36 ? B.months.map((m, k) => k).filter((k) => /-(03|06|09|12)$/.test(B.months[k]) || k === B.months.length - 1) : B.months.map((m, k) => k);
+      const series = top.map((x) => ({ id: "s" + slot.get(x.name), name: x.name, color: "var(--c-sec-" + (slot.get(x.name) + 1) + ")", values: idx.map((k) => x.series[k]), texts: idx.map((k) => fm(x.series[k], cur)) }));
+      if (rest.length) {
+        const vals = idx.map((k) => rest.reduce((a, x) => a + x.series[k], 0));
+        series.push({ id: "other", name: "Other (" + rest.length + ")", color: "var(--c-pie-other)", values: vals, texts: vals.map((x) => fm(x, cur)) });
+      }
+      const chosen = B.sites.find((x) => x.name === st.site) || B.sites[0];
+      const ck = B.months.map((m, k) => k).filter((k) => B.months[k] >= chosen.first);
+      const rowOf = (m) => v.rows.find((r) => r.month === m);
+      const siteRow = (m) => {
+        const r = rowOf(m);
+        return r ? r.sites.find((x) => x.name === chosen.name) : null;
+      };
+      const now = B.now;
+      const head = top.slice(0, 3).map((x) => x.name + " " + money(x.nowShown, cur)).join(" · ");
+      return fcard({ key: "poker-site-bal", title: "Balances per site", sub: "how much sits where", glance: now ? "End of " + monthName(now.month) + ": " + head : "" }, () => [
+        C.bars({
+          categories: idx.map((k) => monthName(B.months[k])),
+          tickLabels: idx.map((k, j) => tick(B.months[k], j, idx.length)),
+          series,
+          mode: "stacked",
+          legend: true,
+          toggle: true,
+          key: "poker-site-bal",
+          skipZero: true,
+          totalTexts: idx.map((k) => fm(B.total[k], cur)),
+          format: compact(cur),
+          height: 240,
+          ariaLabel: "The money on each site at the end of " + (idx.length < B.months.length ? "each quarter" : "each month") + ", stacked, in " + cur,
+        }),
+        note((idx.length < B.months.length ? "The end of each quarter (and the last month), so the bars stay readable. " : "The end of each month. ") + "Each colour is one site; the bar is the money on all sites. A press on a name in the legend hides or shows it."),
+        table(["Site", "Now", "Share", "Average", "Lowest", "Highest", "Worst month", "Swing a month", "Covers worst month"], B.sites.map((x) => ({
+          cells: [x.name, cell(money(x.nowShown, cur) + (x.cur !== cur ? " (" + money(x.now, x.cur) + ")" : ""), "r num"), cell(x.share === null ? "–" : pct(x.share, 0), "r num"), cell(fm(x.avg, cur), "r num"), cell(fm(x.min, cur) + " · " + monthName(x.minMonth), "r num"), cell(fm(x.max, cur) + " · " + monthName(x.maxMonth), "r num"), cell(x.worst === null ? "–" : fm(x.worst, cur) + " · " + monthName(x.worstMonth), "r num"), cell(x.sd === null ? "–" : "± " + fm(x.sd, cur), "r num"), cell(x.cover === null ? "–" : "× " + x.cover.toFixed(1), "r num")],
+          tip: tip(x.name, [["Now (end of " + monthName(now.month) + ")", money(x.nowShown, cur)], ["In " + x.cur, money(x.now, x.cur)], ["Average since " + monthName(x.first), fm(x.avg, cur)], ["Worst month at play", x.worst === null ? "none lost" : fm(x.worst, cur)], ["Swing of a month (1 σ)", x.sd === null ? "–" : fm(x.sd, cur)]], "Average, lowest and highest: the end-of-month balances from the site's first month in the period on (a month it is not in counts as nothing on it). Worst month: its most negative net at play. Swing: the standard deviation of its monthly nets."),
+        })), "Balance of each site: now, share, average, lowest, highest, worst month, swing, cover", "lrrrrrrrr", "poker-site-bal-table"),
+        note("“Covers worst month” is the balance now divided by the loss of that site's worst month: × 2.0 means it could take that month twice. A help to plan withdrawals, not advice: the page does not tell you what to take out."),
+        el("h3", { class: "sub-head", text: "One site, month by month" }),
+        el("div", { class: "spendbar" }, el("label", { class: "pick" }, el("span", { text: "Site " }), el("select", { "aria-label": "Site to show", "data-key": "poker-site-pick", onchange: (e) => { st.site = e.target.value; host.render(); } }, B.sites.map((x) => el("option", { value: x.name, text: x.name, selected: x.name === chosen.name }))))),
+        C.timeLines({
+          days: ck.map((k) => B.months[k] + "-01"),
+          series: [{ name: chosen.name + " (" + chosen.cur + ")", color: "var(--c-austria)", values: ck.map((k) => num(chosen.own[k] === null ? "0" : chosen.own[k])), texts: ck.map((k) => money(chosen.own[k] === null ? "0" : chosen.own[k], chosen.cur)), area: true }],
+          format: compact(chosen.cur),
+          zero: true,
+          dateText: (d) => monthName(d.slice(0, 7)),
+          key: "poker-site-one",
+          rows: (i) => {
+            const x = siteRow(B.months[ck[i]]);
+            if (!x) return [["Not on this site that month", ""]];
+            const t = num(x.xfer);
+            return [["At play", money(x.net, chosen.cur, { plus: true }), tone(num(x.net))], [t < 0 ? "Taken out" : "Put in", money(String(Math.abs(t).toFixed(2)), chosen.cur)], ["Bonuses", money(x.bonus, chosen.cur)]];
+          },
+          ariaLabel: "The balance of " + chosen.name + " at the end of each month, in its own currency " + chosen.cur,
+          height: 180,
+        }),
+      ]);
+    }
+
     function yearsCard(v) {
       if (!v.years.length) return null;
       const cur = v.cur;
@@ -30917,7 +31598,7 @@ const PokerUI = (function () {
       const v = figures();
       const at = root.childNodes.length;
       root.appendChild(el("section", { class: "card", "data-k": "poker-top" }, el("div", { class: "card-head" }, el("h2", { text: "Your poker results" }), el("span", { class: "sub", text: isDemo() ? "invented demo data" : "from your poker workbooks" })), controls(v), missingBanner(v), v.rows.length ? tiles(v) : note("No month in this period.")));
-      if (v.rows.length) for (const c of [cumCard(v), monthsCard(v), hourlyCard(v), varianceCard(v), downCard(v), extrasCard(v), sitesCard(v), bankrollCard(v), yearsCard(v)]) if (c) root.appendChild(c);
+      if (v.rows.length) for (const c of [cumCard(v), monthsCard(v), hourlyCard(v), varianceCard(v), downCard(v), extrasCard(v), sitesCard(v), bankrollCard(v), balancesCard(v), yearsCard(v)]) if (c) root.appendChild(c);
       root.appendChild(checksCard());
       root.appendChild(importCard());
       root.appendChild(backupCard());
@@ -30926,6 +31607,483 @@ const PokerUI = (function () {
     }
 
     return { render, state: st };
+  }
+
+  return { create };
+})();
+
+/* ---- src/app/ui-cash.js ---- */
+/*
+ * The Cash flow area (browser only; architecture section 41): where the household's money came from and where it went, made from the other
+ * books and never stored. The flow picture (sources → income → uses) with the savings rate, the tiles, month by month, the savings rate over
+ * time, the running totals, the income by source, year by year, the investments' money in and out, and what is counted.
+ *
+ * This file only draws. The figures come from CashFlow (src/cash/flow.js) and the layout of the picture from CashSankey (src/cash/sankey.js);
+ * the books are read through the host and never written. Text always goes in with textContent.
+ *
+ * host: { mode(), spendBook(), spendFx(), pokerBook(), ledger() (the Investments ledger lines, or []), render(), goArea(a), folds }
+ */
+const CashUI = (function () {
+  "use strict";
+
+  const { el, card, listItem } = Dom;
+  const C = Charts;
+  const money = (t, cur, o) => SpendUI.money(t, cur, o);
+  const compact = (cur) => SpendUI.compact(cur);
+  const CURRENCIES = ["EUR", "USD", "HUF"];
+  const MAX_SLOTS = 8; // as the Spending area: the categories with a colour of their own
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const MONTHS_L = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const monthName = (m) => MONTHS[+m.slice(5, 7) - 1] + " " + m.slice(0, 4);
+  const monthLong = (m) => MONTHS_L[+m.slice(5, 7) - 1] + " " + m.slice(0, 4);
+  const num = (t) => Number(t) || 0;
+  const plural = (n, one, many) => n + " " + (n === 1 ? one : many || one + "s");
+  const pct = (x, dp) => (x === null || x === undefined || !Number.isFinite(x) ? "–" : (x * 100).toFixed(dp === undefined ? 1 : dp).replace(/^-/, "−") + " %");
+  const fm = (v, cur, o) => (v === null || v === undefined || !Number.isFinite(v) ? "–" : money(v.toFixed(6), cur, o));
+  const tone = (v) => (v > 0 ? "pos" : v < 0 ? "neg" : "");
+  const tip = (t, rows, n) => Tip.attr({ t, r: rows, n }) || false;
+  const note = (text, k) => el("p", { class: "note", "data-k": k || false, text });
+  const big = (t, cur, o) => (Math.abs(num(t)) >= 10000 ? money(Dec.str(Dec.round(Dec.parse(t), 0)), cur, o).replace(/\.00(?=\D*$)/, "") : money(t, cur, o));
+  function tick(m, k, n) {
+    if (n <= 24) return k === 0 || m.slice(5) === "01" ? MONTHS[+m.slice(5, 7) - 1] + "\n" + m.slice(0, 4) : m.slice(5) === "07" ? MONTHS[6] : "";
+    if (m.slice(5) !== "01") return "";
+    return n > 60 && +m.slice(0, 4) % 2 ? "" : m.slice(0, 4);
+  }
+
+  function seg(name, options, value, onchange) {
+    return el("div", { class: "seg", role: "radiogroup", "aria-label": name }, options.map((o) => el("label", {}, el("input", { type: "radio", name, value: o[0], checked: value === o[0], "data-key": name + ":" + o[0], onchange: () => onchange(o[0]) }), el("span", { text: o[1] }))));
+  }
+  function btn(text, onclick, cls, key) {
+    return el("button", { type: "button", class: "btn " + (cls || ""), onclick, "data-key": key || false, text });
+  }
+  function banner(kind, title, ...body) {
+    return el("div", { class: "banner " + kind, role: kind === "bad" ? "alert" : false }, el("strong", { text: title }), body);
+  }
+  function table(cols, rows, caption, align, key) {
+    const cls = (i) => ({ l: "", d: "nowrap", r: "r num" }[align[i]] || "");
+    return el("div", { class: "tbl-wrap", "data-k": key || false },
+      el("table", { class: "tbl" },
+        caption ? el("caption", { class: "sr-only", text: caption }) : null,
+        el("thead", {}, el("tr", {}, cols.map((c, i) => el("th", { scope: "col", class: align[i] === "r" ? "r" : "", text: c })))),
+        el("tbody", {}, rows.map((r) => {
+          const cells = Array.isArray(r) ? r : r.cells;
+          const o = Array.isArray(r) ? {} : { class: r.cls || false, "data-tip": r.tip || false, tabindex: r.tip ? "0" : false };
+          return el("tr", o, cells.map((c, i) => el(i ? "td" : "th", Object.assign({ class: (c && c.cls) || cls(i) || false }, i ? {} : { scope: "row" }), c && c.text !== undefined ? c.text : String(c))));
+        }))));
+  }
+  const cell = (text, cls) => ({ text, cls });
+
+  /** The colour of a part of the picture: sources in greens and teal, the spending in the Spending area's own colours (they follow the category). */
+  const KIND_COLOR = { table: "var(--c-gain)", extra: "var(--ok)", earned: "var(--c-bm-4)", invInc: "var(--c-pie-5)", sold: "var(--c-austria)", savings: "var(--c-pie-other)", cost: "var(--c-real)", loss: "var(--c-more)", invested: "var(--c-bm-1)", kept: "var(--c-gain)" };
+
+  // ---------------------------------------------------------------- the area
+
+  function create(host) {
+    const folds = host.folds || Folds.create({ storage: null, key: "att-cash-folds-v1" });
+    const seen = new Map();
+    function fcard(o, body) {
+      const open = folds.isOpen(o.key, o.dflt === true);
+      seen.set(o.key, open);
+      return Dom.foldCard({ key: o.key, title: o.title, sub: o.sub, glance: o.glance, open, onToggle: (want) => { folds.set(o.key, want); host.render(); } }, body);
+    }
+    function foldBar() {
+      const keys = Array.from(seen.keys());
+      const open = keys.filter((k) => seen.get(k));
+      const all = (want) => () => { folds.setAll(keys, want); host.render(); };
+      return el("div", { class: "fold-bar", "data-k": "cash-fold-bar" },
+        el("span", { class: "fold-count", "data-k": "cash-fold-count", text: open.length + " of " + keys.length + " cards open" }),
+        el("button", { type: "button", class: "btn small", "data-key": "cash-fold-expand", disabled: open.length === keys.length, onclick: all(true), text: "Expand all" }),
+        el("button", { type: "button", class: "btn small", "data-key": "cash-fold-collapse", disabled: open.length === 0, onclick: all(false), text: "Collapse all" }));
+    }
+
+    const st = { cur: "EUR", period: "12m", only: true };
+    let memo = { key: null, m: null };
+
+    /** Everything that does not depend on the period: the books read once per currency. */
+    function model() {
+      const sb = host.spendBook() || SpendBook.empty();
+      const fx = host.spendFx();
+      const pb = host.pokerBook() || PokerBook.empty();
+      const led = host.ledger() || [];
+      const key = [sb, fx, pb, led, st.cur];
+      if (memo.key && memo.key.every((x, i) => x === key[i])) return memo.m;
+      const sv = Object.keys(sb.wallets || {}).length ? SpendView.build(sb, fx, { cur: st.cur }) : null;
+      const pk = PokerStats.rows(pb, st.cur);
+      const inv = CashFlow.invest(led, fx.convert, st.cur);
+      const m = CashFlow.months({ spend: sv ? sv.monthly : [], spendSpan: sv ? sv.span : null, poker: pk.rows, invest: inv.months });
+      m.sv = sv;
+      m.pokerMissing = pk.missing;
+      m.inv = inv;
+      m.spendMissing = sv ? sv.missing : { n: 0, ccys: [], days: [], reasons: [] };
+      memo = { key, m };
+      return m;
+    }
+
+    /** The category colours of the Spending area (ranked once over the whole Spending book in euro): category -> slot. */
+    let slotMemo = { b: null, fx: null, map: new Map() };
+    function slotMap() {
+      const b = host.spendBook() || SpendBook.empty();
+      const fx = host.spendFx();
+      if (slotMemo.b !== b || slotMemo.fx !== fx) {
+        const all = Object.keys(b.wallets || {}).length ? SpendView.build(b, fx, { cur: "EUR" }).cats.map((c) => c.cat) : [];
+        const n = all.length > MAX_SLOTS ? MAX_SLOTS - 1 : MAX_SLOTS;
+        slotMemo = { b, fx, map: new Map(all.slice(0, n).map((c, k) => [c, k])) };
+      }
+      return slotMemo.map;
+    }
+
+    function counted(m) {
+      return m.months.filter((r) => !(st.only && m.has.spend) || r.s);
+    }
+
+    function range(m) {
+      const ms = counted(m);
+      if (!ms.length) return { from: "", to: "" };
+      const last = ms[ms.length - 1].month;
+      if (st.period === "all") return { from: "", to: "" };
+      if (st.period.indexOf("year:") === 0) {
+        const y = st.period.slice(5);
+        return { from: y + "-01", to: y + "-12" };
+      }
+      if (st.period.indexOf("month:") === 0) {
+        const x = st.period.slice(6);
+        return { from: x, to: x };
+      }
+      const y = +last.slice(0, 4);
+      const mo = +last.slice(5, 7);
+      return { from: mo === 12 ? y + "-01" : y - 1 + "-" + String(mo + 1).padStart(2, "0"), to: last };
+    }
+
+    function figures() {
+      const m = model();
+      const r = range(m);
+      const p = CashFlow.period(m, { from: r.from, to: r.to, onlySpend: st.only && !!m.has.spend });
+      let pv = null;
+      if (m.sv && p.n) pv = SpendView.build(host.spendBook(), host.spendFx(), { cur: st.cur, from: p.from, to: p.to });
+      const pp = CashFlow.parts(p.totals, pv ? pv.cats : [], pv ? pv.incomeCats : []);
+      const g = CashFlow.group(pp, new Set(slotMap().keys()));
+      return { m, p, pv, parts: g, cur: st.cur };
+    }
+
+    // ---------------------------------------------------------------- the strip
+
+    function controls(v) {
+      const ms = counted(v.m);
+      const years = [...new Set(ms.map((r) => r.month.slice(0, 4)))].sort().reverse();
+      const months = ms.map((r) => r.month).reverse().slice(0, 36);
+      const opts = [["12m", "Last 12 months"], ["all", "All months"]].concat(years.map((y) => ["year:" + y, "Year " + y])).concat(months.map((x) => ["month:" + x, monthLong(x)]));
+      if (!opts.some((o) => o[0] === st.period)) st.period = "12m";
+      return el("div", { class: "spendbar cashbar", "data-k": "cashbar" },
+        el("label", { class: "pick" }, el("span", { text: "Period " }), el("select", { "aria-label": "Period", "data-key": "cash-period", onchange: (e) => { st.period = e.target.value; host.render(); } }, opts.map((o) => el("option", { value: o[0], text: o[1], selected: o[0] === st.period })))),
+        seg("cash-cur", CURRENCIES.map((c) => [c, c]), st.cur, (x) => { st.cur = x; host.render(); }),
+        v.m.has.spend ? seg("cash-only", [["spend", "Months with spending"], ["every", "Every month"]], st.only ? "spend" : "every", (x) => { st.only = x === "spend"; host.render(); }) : null,
+        el("span", { class: "sub", "data-k": "cash-span", text: v.p.n ? (v.p.n === 1 ? monthLong(v.p.from) : monthName(v.p.from) + " to " + monthName(v.p.to)) + " · " + plural(v.p.n, "month") : "no months" }));
+    }
+
+    function missingBanners(v) {
+      const out = [];
+      const sm = v.m.spendMissing;
+      if (sm && sm.n) out.push(banner("bad", plural(sm.n, "spending entry", "spending entries") + " could not be shown in " + v.cur, el("span", { "data-k": "cash-miss-spend", text: "No rate for " + sm.ccys.join(", ") + ". They are left out, as in the Spending area." })));
+      const pm = v.m.pokerMissing || [];
+      if (pm.length) out.push(banner("bad", plural(pm.length, "poker month") + " could not be shown in " + v.cur, el("span", { "data-k": "cash-miss-poker", text: pm.slice(0, 3).map((x) => monthName(x.month)).join(", ") + (pm.length > 3 ? " and " + (pm.length - 3) + " more" : "") + ": " + pm[0].why + ". They are left out, as in the Poker area." })));
+      const il = v.m.inv.left;
+      if (il.length) out.push(banner("warn", plural(il.length, "investment line") + " left out", el("span", { "data-k": "cash-miss-inv", text: il.slice(0, 2).map((x) => (x.day ? x.day + ": " : "") + x.why).join("; ") + (il.length > 2 ? "; …" : "") + ". The card “Investments” lists them." })));
+      return out;
+    }
+
+    // ---------------------------------------------------------------- the flow picture
+
+    function colorOf(part) {
+      if (part.kind === "spent") {
+        if (part.id === "spent:other") return "var(--c-pie-other)";
+        const s = slotMap().get(part.name);
+        return s === undefined ? "var(--c-pie-other)" : "var(--c-sec-" + (s + 1) + ")";
+      }
+      return KIND_COLOR[part.kind] || "var(--c-pie-other)";
+    }
+
+    const SVGNS = "http://www.w3.org/2000/svg";
+    function s(tag, attrs, parent) {
+      const n = document.createElementNS(SVGNS, tag);
+      for (const [k, val] of Object.entries(attrs || {})) if (val !== false && val !== null && val !== undefined) n.setAttribute(k, String(val));
+      if (parent) parent.appendChild(n);
+      return n;
+    }
+
+    /** Text width in pixels, roughly (the device's own fonts; a label is cut with an ellipsis when it would not fit). */
+    const widthOf = (t, px, mono) => t.length * px * (mono ? 0.62 : 0.56);
+    function fit(t, room, px) {
+      if (widthOf(t, px) <= room) return t;
+      let n = Math.max(3, Math.floor(room / (px * 0.56)) - 1);
+      return t.slice(0, n).replace(/\s+$/, "") + "…";
+    }
+
+    function sankey(v) {
+      const pp = v.parts;
+      const cur = v.cur;
+      const tot = num(pp.total);
+      const wrap = el("div", { class: "chart-wrap sankey-wrap", "data-k": "cash-sankey-wrap" });
+      const fig = el("figure", { class: "chart sankey", "data-k": "cash-sankey", role: "img", "aria-label": "Where the money came from and where it went in the period, in " + cur + ": " + pp.left.map((x) => x.name + " " + money(x.value, cur)).join(", ") + "; to " + pp.right.map((x) => x.name + " " + money(x.value, cur)).join(", ") }, wrap);
+      const share = (x) => (tot > 0 ? pct(num(x) / tot, 1) : "–");
+      const draw = (W) => {
+        while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
+        const narrow = W < 520;
+        const L = CashSankey.layout({ left: pp.left.map((x) => ({ id: x.id, value: num(x.value) })), right: pp.right.map((x) => ({ id: x.id, value: num(x.value) })), width: W, slot: narrow ? 38 : 34, gap: 8, nodeW: narrow ? 10 : 12 });
+        if (!L.ok) {
+          wrap.appendChild(el("p", { class: "note", text: "Nothing to draw for this period." }));
+          return;
+        }
+        const svg = s("svg", { width: W, height: L.height, viewBox: "0 0 " + W + " " + L.height, class: "sankey-svg", "data-total": pp.total });
+        const defs = s("defs", {}, svg);
+        const byId = new Map(pp.left.concat(pp.right).map((x) => [x.id, x]));
+        const gLinks = s("g", { class: "sk-links" }, svg);
+        L.links.forEach((ln, k) => {
+          const part = byId.get(ln.id);
+          const gid = "skg-" + k;
+          const grad = s("linearGradient", { id: gid, x1: "0", x2: "1", y1: "0", y2: "0" }, defs);
+          const a = ln.side === "left" ? colorOf(part) : KIND_COLOR.table;
+          const b = ln.side === "left" ? KIND_COLOR.table : colorOf(part);
+          s("stop", { offset: "0%", "stop-color": a, "stop-opacity": "0.55" }, grad);
+          s("stop", { offset: "100%", "stop-color": b, "stop-opacity": "0.42" }, grad);
+          s("path", { d: ln.path, fill: "url(#" + gid + ")", class: "sk-link", "data-id": ln.id, tabindex: "0", "data-tip": tip(part.name, [["Amount", money(part.value, cur)], ["Share of the flow", share(part.value)]], ln.side === "left" ? "Money that came in." : "Where the money went.") }, gLinks);
+        });
+        const gNodes = s("g", { class: "sk-nodes" }, svg);
+        const nodeRect = (nd, color, part) => s("rect", { x: nd.x0, y: nd.y0, width: nd.x1 - nd.x0, height: Math.max(1.5, nd.y1 - nd.y0), rx: 3, fill: color, class: "sk-node", "data-id": nd.id, "data-v": part ? part.value : pp.total }, gNodes);
+        L.left.forEach((nd) => nodeRect(nd, colorOf(byId.get(nd.id)), byId.get(nd.id)));
+        L.right.forEach((nd) => nodeRect(nd, colorOf(byId.get(nd.id)), byId.get(nd.id)));
+        nodeRect(L.mid, KIND_COLOR.table, null);
+        // labels: a pill with the name and the amount, beside its node (two lines on a phone), pushed apart where nodes are close
+        const gLab = s("g", { class: "sk-labels" }, svg);
+        const px = narrow ? 11 : 12.5;
+        const lineH = px + 3;
+        const pill = (x, yc, anchor, name, amount, room, id) => {
+          const nm = fit(name, room - 16, px);
+          const two = narrow || widthOf(nm + "  " + amount, px) + 18 > room;
+          const w = Math.min(room, Math.max(widthOf(nm, px), two ? widthOf(amount, px, true) : 0) + (two ? 0 : widthOf("  " + amount, px, true)) + 16);
+          const h = two ? lineH * 2 + 8 : lineH + 10;
+          const x0 = anchor === "start" ? x : anchor === "end" ? x - w : x - w / 2;
+          const g = s("g", { class: "sk-pill", "data-id": id }, gLab);
+          s("rect", { x: x0, y: yc - h / 2, width: w, height: h, rx: 7, class: "sk-pill-bg" }, g);
+          const t1 = s("text", { x: x0 + 8, y: two ? yc - lineH / 2 + px * 0.35 : yc + px * 0.35, class: "sk-name", "font-size": px }, g);
+          t1.textContent = nm;
+          if (two) {
+            const t2 = s("text", { x: x0 + 8, y: yc + lineH / 2 + px * 0.35, class: "sk-amt num", "font-size": px }, g);
+            t2.textContent = amount;
+          } else {
+            const t2 = s("tspan", { class: "sk-amt num", dx: "6" }, t1);
+            t2.textContent = amount;
+          }
+        };
+        const roomL = L.mid.x0 - L.left[0].x1 - 14;
+        const roomR = L.right[0].x0 - L.mid.x1 - 14;
+        const ysL = CashSankey.spread(L.left.map((n) => (n.y0 + n.y1) / 2), narrow ? 2 * lineH + 12 : lineH + 14, 14, L.height - 14);
+        const ysR = CashSankey.spread(L.right.map((n) => (n.y0 + n.y1) / 2), narrow ? 2 * lineH + 12 : lineH + 14, 14, L.height - 14);
+        L.left.forEach((nd, i) => pill(nd.x1 + 6, ysL[i], "start", byId.get(nd.id).name, money(byId.get(nd.id).value, cur), roomL, nd.id));
+        L.right.forEach((nd, i) => pill(nd.x0 - 6, ysR[i], "end", byId.get(nd.id).name, money(byId.get(nd.id).value, cur), roomR, nd.id));
+        pill((L.mid.x0 + L.mid.x1) / 2, (L.mid.y0 + L.mid.y1) / 2, "middle", "Income", money(pp.total, cur), Math.min(roomL, roomR) + 20, "mid");
+        wrap.appendChild(svg);
+      };
+      let last = -1;
+      const go = () => {
+        const w = Math.floor(wrap.clientWidth);
+        if (w < 40 || w === last) return;
+        last = w;
+        draw(w);
+      };
+      if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => (typeof requestAnimationFrame === "function" ? requestAnimationFrame(go) : go())).observe(wrap);
+      else window.addEventListener("resize", go);
+      setTimeout(go, 0);
+      return fig;
+    }
+
+    function flowCard(v) {
+      const t = v.p.totals;
+      const cur = v.cur;
+      const pp = v.parts;
+      const tot = num(pp.total);
+      const rate = t.rate;
+      const kpi = (label, value, sub, tipObj, cls) => el("div", { class: "kpi", tabindex: "0", "data-tip": tipObj, "data-k": "ckpi:" + label }, el("span", { class: "label", text: label }), el("span", { class: "value " + (cls || ""), "data-k": "ckv:" + label, text: value }), sub ? el("span", { class: "subline", text: sub }) : null);
+      const pokerShare = num(t.income) > 0 && t.p ? (num(t.table) + num(t.extra)) / num(t.income) : null;
+      return fcard({ key: "cash-flow", title: "Where the money went", sub: v.p.n ? (v.p.n === 1 ? monthLong(v.p.from) : monthName(v.p.from) + " to " + monthName(v.p.to)) : "", glance: "Savings rate " + pct(rate, 1) + " · saved " + money(t.saved, cur, { plus: true }), dflt: true }, () => [
+        el("div", { class: "rate-badge", "data-k": "cash-rate", tabindex: "0", "data-tip": tip("Savings rate", [["Net income", money(t.net, cur)], ["Spent", money(t.spent, cur)], ["Saved", money(t.saved, cur, { plus: true })], ["Savings rate", pct(rate, 2)]], "Saved ÷ net income. Net income = the table result + rakeback and promotions + your Spendee income + interest and dividends − the poker costs. Saved = net income − what you spent. Not shown when the net income is not above zero.") },
+          el("span", { class: "label", text: "Savings rate" }), el("span", { class: "value num " + (rate === null ? "" : rate < 0 ? "neg" : ""), "data-k": "cash-rate-v", text: pct(rate, 2) })),
+        pp.ok ? sankey(v) : banner("bad", "The picture is not drawn", el("span", { text: "Because " + pp.why + ". The tiles below are right; tell us about it." })),
+        el("div", { class: "kpis spend-kpis cash-kpis", "data-k": "cash-kpis" },
+          kpi("Income", big(t.income, cur), t.p ? "poker, Spendee, interest" : "Spendee and interest", tip("Income", [["Table result", money(t.table, cur, { plus: true })], ["Rakeback and promotions", money(t.extra, cur, { plus: true })], ["Spendee income", money(t.earned, cur, { plus: true })], ["Interest and dividends", money(t.invInc, cur, { plus: true })], ["Income", money(t.income, cur, { plus: true })]], "Each part as its own area shows it, in the currency chosen.")),
+          kpi("Spent", big(t.spent, cur), "your Spendee expenses", tip("Spent", [["Spent", money(t.spent, cur)], ["Poker costs (apart)", money(t.cost, cur)]], "Every expense of the Spending book in these months, converted as the Spending area does it.")),
+          kpi("Saved", big(t.saved, cur, { plus: true }), "net income − spent", tip("Saved", [["Net income", money(t.net, cur)], ["Spent", money(t.spent, cur)], ["Saved", money(t.saved, cur, { plus: true })]], "Net income = income − the poker costs."), tone(num(t.saved))),
+          kpi("Savings rate", pct(rate, 1), "saved ÷ net income", tip("Savings rate", [["Savings rate", pct(rate, 2)]], "Not shown when the net income is not above zero."), rate !== null && rate < 0 ? "neg" : rate > 0 ? "pos" : ""),
+          kpi("Invested", big(t.invested, cur, { plus: true }), "bought − sold", tip("Invested", [["Bought (with fees)", money(t.bought, cur)], ["Sold (after fees)", money(t.sold, cur)], ["Invested, net", money(t.invested, cur, { plus: true })]], "From the ledger of your Investments (the Transactions tab), each line at the ECB rate of its day. Moves between your own accounts are not money in or out.")),
+          kpi("Kept", big(t.kept, cur, { plus: true }), "saved − invested", tip("Kept", [["Saved", money(t.saved, cur, { plus: true })], ["Invested", money(t.invested, cur, { plus: true })], ["Kept", money(t.kept, cur, { plus: true })]], "What stayed as cash (in the bank or on the poker sites). Below zero: savings of earlier months went into these months' spending or investments."), tone(num(t.kept))),
+          t.p ? kpi("Poker share", pct(pokerShare, 0), "of the income", tip("Poker share", [["Table + extra", money(Dec.str(Dec.add(Dec.parse(t.table), Dec.parse(t.extra))), cur, { plus: true })], ["Income", money(t.income, cur, { plus: true })]], "The table result and the rakeback and promotions as a share of the income.")) : null),
+        note("The table result and the rakeback count as income in the month your poker sheets give them, whether or not you took the money off the sites; the poker costs are the expense share of your income sheet. " + (v.m.has.spend ? "" : "There is no Spending book yet, so nothing is spent here.")),
+        el("details", { class: "fold", "data-k": "cash-flow-fold" }, el("summary", { text: "Every flow in the picture" }),
+          table(["From / to", "Amount", "Share"], pp.left.map((x) => ["In: " + x.name, cell(money(x.value, cur), "r num"), cell(tot > 0 ? pct(num(x.value) / tot, 1) : "–", "r num")]).concat(pp.right.map((x) => ["Out: " + x.name + (x.members ? " (" + x.members.join(", ") + ")" : ""), cell(money(x.value, cur), "r num"), cell(tot > 0 ? pct(num(x.value) / tot, 1) : "–", "r num")])), "Every flow of the picture", "lrr", "cash-flow-table")),
+      ]);
+    }
+
+    // ---------------------------------------------------------------- month by month
+
+    function monthsCard(v) {
+      const rs = v.p.months;
+      if (rs.length < 2) return null;
+      const cur = v.cur;
+      const yearly = rs.length > 36;
+      const groups = yearly ? [...new Set(rs.map((r) => r.month.slice(0, 4)))] : rs.map((r) => r.month);
+      const sumOf = (f) => groups.map((g) => rs.reduce((a, r) => a + (r.month.startsWith(g) ? num(r[f]) : 0), 0));
+      const net = sumOf("net");
+      const spent = sumOf("spent");
+      const saved = sumOf("saved");
+      const cats = yearly ? groups : groups.map(monthName);
+      const ticks = yearly ? null : rs.map((r, k) => tick(r.month, k, rs.length));
+      return fcard({ key: "cash-months", title: "Month by month", sub: yearly ? "per year (more than three years)" : "net income and spending", glance: "Saved in " + saved.filter((x) => x > 0).length + " of " + groups.length + (yearly ? " years" : " months") }, () => [
+        C.bars({ categories: cats, tickLabels: ticks, series: [{ id: "net", name: "Net income", color: "var(--c-gain)", values: net, texts: net.map((x) => fm(x, cur, { plus: true })) }, { id: "spent", name: "Spent", color: "var(--c-real)", values: spent, texts: spent.map((x) => fm(x, cur)) }], mode: "grouped", legend: true, toggle: true, key: "cash-months", format: compact(cur), height: 220, ariaLabel: "Net income and spending of each " + (yearly ? "year" : "month") + ", in " + cur }),
+        C.bars({ categories: cats, tickLabels: ticks, series: [{ id: "saved", name: "Saved", values: saved, texts: saved.map((x) => fm(x, cur, { plus: true })) }], mode: "split", colorPos: "var(--c-gain)", colorNeg: "var(--c-more)", splitLegend: [{ name: "Saved", color: "var(--c-gain)" }, { name: "Spent more than earned", color: "var(--c-more)" }], format: compact(cur), height: 170, ariaLabel: "What was saved in each " + (yearly ? "year" : "month") + ", in " + cur }),
+        note("Spending is orange, not red: red means only a loss, here a " + (yearly ? "year" : "month") + " that spent more than it earned."),
+        el("details", { class: "fold" }, el("summary", { text: "The figures" }), table(["Month", "Income", "Poker costs", "Spent", "Saved", "Rate", "Invested", "Kept"], rs.slice().reverse().map((r) => [monthName(r.month), cell(money(r.income, cur, { plus: true }), "r num"), cell(money(r.cost, cur), "r num"), cell(money(r.spent, cur), "r num"), cell(money(r.saved, cur, { plus: true }), "r num " + tone(num(r.saved))), cell(pct(r.rate, 0), "r num"), cell(money(r.invested, cur, { plus: true }), "r num"), cell(money(r.kept, cur, { plus: true }), "r num")]), "Every month", "drrrrrrr", "cash-months-table")),
+      ]);
+    }
+
+    function rateCard(v) {
+      const rs = v.p.months;
+      if (rs.length < 3) return null;
+      // the rolling twelve months: the sums of the last twelve months (fewer at the start), so a single month cannot swing it
+      const roll = rs.map((r, k) => {
+        const w = rs.slice(Math.max(0, k - 11), k + 1);
+        const net = w.reduce((a, x) => a + num(x.net), 0);
+        const saved = w.reduce((a, x) => a + num(x.saved), 0);
+        return net > 0 ? saved / net : null;
+      });
+      const vals = rs.map((r) => (r.rate === null ? 0 : r.rate * 100));
+      return fcard({ key: "cash-rate-card", title: "Savings rate", sub: "each month and the last 12 months", glance: "Last 12 months: " + pct(roll[roll.length - 1], 1) }, () => [
+        C.timeLines({ days: rs.map((r) => r.month + "-01"), series: [{ name: "Savings rate, last 12 months", color: "var(--c-gain)", values: roll.map((x) => (x === null ? NaN : x * 100)), texts: roll.map((x) => pct(x, 1)) }], format: (x) => Math.round(x) + " %", zero: true, dateText: (d) => monthName(d.slice(0, 7)), key: "cash-roll", rows: (i) => [["This month", pct(rs[i].rate, 1)], ["Saved this month", money(rs[i].saved, v.cur, { plus: true }), tone(num(rs[i].saved))]], ariaLabel: "The savings rate of the last twelve months, month by month", height: 190 }),
+        C.bars({ categories: rs.map((r) => monthName(r.month)), tickLabels: rs.map((r, k) => tick(r.month, k, rs.length)), series: [{ id: "rate", name: "Savings rate", values: vals, texts: rs.map((r) => pct(r.rate, 1)) }], mode: "split", colorPos: "var(--c-gain)", colorNeg: "var(--c-more)", splitLegend: [{ name: "Saved", color: "var(--c-gain)" }, { name: "Spent more than earned", color: "var(--c-more)" }], format: (x) => Math.round(x) + " %", height: 170, ariaLabel: "The savings rate of each month" }),
+        note("A month with a net income of zero or below has no savings rate (drawn at zero). The line adds up the last twelve months before dividing, so one big month does not swing it."),
+      ]);
+    }
+
+    function cumCard(v) {
+      const rs = v.p.months;
+      if (rs.length < 2) return null;
+      const cur = v.cur;
+      let a = 0;
+      let b = 0;
+      let c = 0;
+      const inc = [];
+      const sp = [];
+      const sv = [];
+      for (const r of rs) {
+        a += num(r.net);
+        b += num(r.spent);
+        c += num(r.saved);
+        inc.push(a);
+        sp.push(b);
+        sv.push(c);
+      }
+      const k = rs.length - 1;
+      return fcard({ key: "cash-cum", title: "Added up", sub: "since the start of the period", glance: "Net income " + fm(inc[k], cur) + " · spent " + fm(sp[k], cur) + " · saved " + fm(sv[k], cur, { plus: true }) }, () => [
+        C.timeLines({ days: rs.map((r) => r.month + "-01"), series: [{ name: "Net income", color: "var(--c-gain)", values: inc, texts: inc.map((x) => fm(x, cur)) }, { name: "Spent", color: "var(--c-real-line)", values: sp, texts: sp.map((x) => fm(x, cur)) }, { name: "Saved", color: "var(--c-put)", values: sv, texts: sv.map((x) => fm(x, cur, { plus: true })), width: 1.6 }], format: compact(cur), zero: true, dateText: (d) => monthName(d.slice(0, 7)), key: "cash-cum", ariaLabel: "Net income, spending and savings added up month by month, in " + cur, height: 230 }),
+        note("The white line is the gap between the green and the orange: what you kept or invested."),
+      ]);
+    }
+
+    function sourcesCard(v) {
+      const rs = v.p.months;
+      if (!rs.length) return null;
+      const cur = v.cur;
+      const yearly = rs.length > 36;
+      const groups = yearly ? [...new Set(rs.map((r) => r.month.slice(0, 4)))] : rs.map((r) => r.month);
+      const sumOf = (f) => groups.map((g) => rs.reduce((a, r) => a + (r.month.startsWith(g) ? num(r[f]) : 0), 0));
+      const parts = [["table", "Table result", "var(--c-gain)"], ["extra", "Rakeback and promotions", "var(--ok)"], ["earned", "Spendee income", "var(--c-bm-4)"], ["invInc", "Interest and dividends", "var(--c-pie-5)"]];
+      const raw = parts.map((p) => sumOf(p[0]));
+      // the stack holds the parts above zero; a part below zero (a losing table month) is named in the hover box and is in the income below
+      const series = parts.map((p, j) => ({ id: p[0], name: p[1], color: p[2], values: raw[j].map((x) => Math.max(0, x)), texts: raw[j].map((x) => fm(x, cur, { plus: true })) })).filter((x, j) => raw[j].some((y) => y !== 0));
+      if (!series.length) return null;
+      const totals = sumOf("income");
+      const details = groups.map((g, i) => parts.map((p, j) => (raw[j][i] < 0 ? [p[1] + " (below zero)", fm(raw[j][i], cur), "neg"] : null)).filter(Boolean).concat([["Income", fm(totals[i], cur, { plus: true }), tone(totals[i])]]));
+      const cats = yearly ? groups : groups.map(monthName);
+      const ticks = yearly ? null : rs.map((r, k) => tick(r.month, k, rs.length));
+      const below = raw.some((xs) => xs.some((x) => x < 0));
+      return fcard({ key: "cash-sources", title: "Income by source", sub: yearly ? "per year" : "per month", glance: series.map((x, j) => x.name + " " + fm(raw[parts.findIndex((p) => p[0] === x.id)].reduce((a, b) => a + b, 0), cur, { plus: true })).slice(0, 3).join(" · ") }, () => [
+        C.bars({ categories: cats, tickLabels: ticks, series, mode: "stacked", legend: true, toggle: true, key: "cash-sources", skipZero: true, details, format: compact(cur), height: 220, ariaLabel: "The income of each " + (yearly ? "year" : "month") + " by source, the parts above zero stacked, in " + cur }),
+        below ? C.bars({ categories: cats, tickLabels: ticks, series: [{ id: "inc", name: "Income", values: totals, texts: totals.map((x) => fm(x, cur, { plus: true })) }], mode: "split", colorPos: "var(--c-gain)", colorNeg: "var(--c-more)", splitLegend: [{ name: "Income", color: "var(--c-gain)" }, { name: "Below zero", color: "var(--c-more)" }], format: compact(cur), height: 150, ariaLabel: "The income of each " + (yearly ? "year" : "month") + " with every part, in " + cur }) : null,
+        note(below ? "The stack shows the parts above zero. A part below zero (a losing table month) is named in its hover box; the bars under the stack are the income with every part, a loss in red." : "Every part of the income, stacked."),
+      ]);
+    }
+
+    function yearsCard(v) {
+      const rs = v.p.months;
+      const ys = [...new Set(rs.map((r) => r.month.slice(0, 4)))].sort().reverse();
+      if (!ys.length) return null;
+      const cur = v.cur;
+      const rows = ys.map((y) => {
+        const p = CashFlow.period({ months: rs }, { from: y + "-01", to: y + "-12", onlySpend: false });
+        return { y, n: p.n, t: p.totals };
+      });
+      return fcard({ key: "cash-years", title: "Year by year", sub: plural(ys.length, "year"), glance: rows.slice(0, 3).map((r) => r.y + " " + pct(r.t.rate, 0)).join(" · ") }, () => [
+        table(["Year", "Months", "Table", "Extra", "Spendee income", "Interest", "Poker costs", "Net income", "Spent", "Saved", "Rate", "Invested", "Kept"], rows.map((r) => [r.y, String(r.n), cell(money(r.t.table, cur, { plus: true }), "r num"), cell(money(r.t.extra, cur, { plus: true }), "r num"), cell(money(r.t.earned, cur), "r num"), cell(money(r.t.invInc, cur), "r num"), cell(money(r.t.cost, cur), "r num"), cell(money(r.t.net, cur), "r num"), cell(money(r.t.spent, cur), "r num"), cell(money(r.t.saved, cur, { plus: true }), "r num " + tone(num(r.t.saved))), cell(pct(r.t.rate, 1), "r num"), cell(money(r.t.invested, cur, { plus: true }), "r num"), cell(money(r.t.kept, cur, { plus: true }), "r num")]), "Every year of the period", "drrrrrrrrrrrr", "cash-years-table"),
+        el("p", { class: "note only-narrow", text: "Slide sideways to see every column." }),
+      ]);
+    }
+
+    function investCard(v) {
+      const inv = v.m.inv;
+      if (!inv.lines.length && !inv.left.length) return null;
+      const cur = v.cur;
+      const from = v.p.from;
+      const to = v.p.to;
+      const lines = inv.lines.filter((l) => (!from || l.day.slice(0, 7) >= from) && (!to || l.day.slice(0, 7) <= to));
+      const ys = [...new Set(lines.map((l) => l.day.slice(0, 4)))].sort();
+      const by = (kind) => ys.map((y) => lines.filter((l) => l.kind === kind && l.day.startsWith(y)).reduce((a, l) => a + num(l.value), 0));
+      const t = v.p.totals;
+      return fcard({ key: "cash-invest", title: "Investments", sub: "money in and out", glance: "Bought " + money(t.bought, cur) + " · sold " + money(t.sold, cur) + " · interest and dividends " + money(t.invInc, cur) }, () => [
+        ys.length ? C.bars({ categories: ys, series: [{ id: "buy", name: "Bought", color: "var(--c-bm-1)", values: by("buy"), texts: by("buy").map((x) => fm(x, cur)) }, { id: "sell", name: "Sold", color: "var(--c-austria)", values: by("sell"), texts: by("sell").map((x) => fm(x, cur)) }, { id: "inc", name: "Interest and dividends", color: "var(--c-pie-5)", values: by("inc"), texts: by("inc").map((x) => fm(x, cur)) }], mode: "grouped", legend: true, toggle: true, key: "cash-invest", format: compact(cur), height: 200, ariaLabel: "Bought, sold and interest and dividends of each year, in " + cur }) : note("No purchase, sale or income of your investments in this period."),
+        note("From the ledger of your Investments as the Transactions tab shows it: a purchase with its fee, a sale after its fee, dividends and interest after the tax withheld abroad, each at the ECB rate of its day (at most 7 days back). Moves between your own accounts are left out. Not a tax figure."),
+        inv.left.length ? el("details", { class: "fold", "data-k": "cash-inv-left" }, el("summary", { text: plural(inv.left.length, "line") + " left out" }), el("ul", { class: "list" }, inv.left.slice(0, 40).map((x) => listItem("warn", (x.day ? x.day + ": " : "") + x.why)))) : null,
+      ]);
+    }
+
+    function coverCard(v) {
+      const m = v.m;
+      const ys = [...new Set(m.months.map((r) => r.month.slice(0, 4)))].sort().reverse();
+      if (!ys.length) return null;
+      const by = new Map(m.months.map((r) => [r.month, r]));
+      const span = (h, name) => (h ? name + ": " + monthName(h.first) + " to " + monthName(h.last) : name + ": none");
+      return fcard({ key: "cash-cover", title: "What is counted", sub: "which book has which month", glance: [span(m.has.spend, "Spending"), span(m.has.poker, "Poker"), span(m.has.invest, "Investments")].join(" · ") }, () => [
+        el("div", { class: "heat-wrap" }, el("table", { class: "heat cover", "data-k": "cash-cover-grid" }, el("caption", { class: "sr-only", text: "Which book has data in which month: S Spending, P Poker, I Investments" }),
+          el("thead", {}, el("tr", {}, el("th", { scope: "col", text: "Year" }), MONTHS.map((n) => el("th", { scope: "col", text: n })))),
+          el("tbody", {}, ys.map((y) => el("tr", {}, el("th", { scope: "row", text: y }), MONTHS.map((n, k) => {
+            const r = by.get(y + "-" + String(k + 1).padStart(2, "0"));
+            const t = r ? (r.s ? "S" : "") + (r.p ? "P" : "") + (r.i ? "I" : "") : "";
+            const inP = r && (!(st.only && m.has.spend) || r.s);
+            return el("td", {}, el("span", { class: "hc cv " + (t ? (inP ? "cv-on" : "cv-off") : "hm-void"), text: t, "aria-label": n + " " + y + ": " + (t || "nothing") + (t && !inP ? ", not counted" : "") }));
+          })))))),
+        note("S = Spending, P = Poker, I = Investments (a purchase, sale, dividend or interest that month). " + (st.only && m.has.spend ? "Greyed months are not counted: “Months with spending” counts only the months from your first to your last Spendee month, because a savings rate needs the spending." : "Every month any book has is counted.")),
+      ]);
+    }
+
+    // ---------------------------------------------------------------- draw
+
+    function render(root) {
+      seen.clear();
+      const m = model();
+      if (!m.months.length) {
+        root.appendChild(card("Cash flow", "made from your other parts", note("Cash flow has no data of its own: it shows where the money came from and where it went, from your Spending book, your Poker book and the money put into or taken out of your investments. Import your Spendee wallets in Spending or your poker workbooks in Poker first."),
+          el("div", { class: "btn-row" }, btn("Open Spending", () => host.goArea("spend"), "", "cash-go-spend"), btn("Open Poker", () => host.goArea("poker"), "", "cash-go-poker"))));
+        return;
+      }
+      const v = figures();
+      const at = root.childNodes.length;
+      root.appendChild(el("section", { class: "card", "data-k": "cash-top" }, el("div", { class: "card-head" }, el("h2", { text: "Your cash flow" }), el("span", { class: "sub", text: host.mode() === "demo" ? "invented demo data" : "read from your other parts, never stored" })), controls(v), missingBanners(v)));
+      if (v.p.n) {
+        for (const c of [flowCard(v), monthsCard(v), rateCard(v), cumCard(v), sourcesCard(v), yearsCard(v), investCard(v)]) if (c) root.appendChild(c);
+      } else root.appendChild(card("No months in this choice", null, note("Choose another period, or “Every month”.")));
+      const cv = coverCard(v);
+      if (cv) root.appendChild(cv);
+      root.insertBefore(foldBar(), root.childNodes[at + 1] || null);
+    }
+
+    return { render, state: st, figures };
   }
 
   return { create };
@@ -32612,7 +33770,21 @@ const PackUI = (function () {
     render();
   }
 
-  /** Cash flow: its place in the page, until it is built (architecture 38.6). */
+  // ---------------------------------------------------------------- the Cash flow area (architecture 41): it only reads the other books
+
+  let cashDemoLedger = null; // the demo's made-up investments for Cash flow (the demo of Investments keeps no ledger)
+  const cashUI = CashUI.create({
+    mode: () => ui.mode,
+    spendBook,
+    spendFx,
+    pokerBook,
+    ledger: () => (ui.mode === "demo" ? cashDemoLedger || (cashDemoLedger = CashFlow.demoLedger()) : conv && conv.tables && Array.isArray(conv.tables.ledger) ? conv.tables.ledger : []),
+    render: () => render(),
+    goArea: (a) => goArea(a),
+    folds: Folds.create({ storage: foldStorage, key: "att-cash-folds-v1" }), // which Cash flow cards are open, apart from the other parts'
+  });
+
+  /** A part that has no screen of its own yet (none since Cash flow was built, architecture 41). */
   function renderLater(root) {
     if (ui.area === "poker")
       root.appendChild(card("Poker results", "next after the tax adviser pack", el("p", { class: "note", text: "Your poker results get a book of their own here, with its own backup file, apart from the tax engine. It is built once you attach your prototype, so that its data and its features can be read first." })));
@@ -32620,11 +33792,36 @@ const PackUI = (function () {
       root.appendChild(card("Cash flow", "after Poker", el("p", { class: "note", text: "The cash flow has no data of its own: month by month it will show what came in and went out from the Spending book, the poker results and the money put into or taken out of your investments, with the savings rate, in euro, dollars or forints. It only reads the other parts." })));
   }
 
+  /** The icon of a part in the floating bar: a few strokes drawn here (nothing is loaded; architecture 41.7). */
+  const AREA_ICONS = {
+    invest: ["M3 17l5.5-5.5 4 4L20 8", "M14.5 8H20v5.5"],
+    spend: ["M3.5 7.5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z", "M3.5 10h17", "M15.5 14.5h2"],
+    poker: ["M7 3.5h10a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5z", "M12 8.5l2.6 3.5-2.6 3.5-2.6-3.5z"],
+    cash: ["M4 8h14", "M15 5l3 3-3 3", "M20 16H6", "M9 13l-3 3 3 3"],
+  };
+  function areaIcon(a) {
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    for (const d of AREA_ICONS[a] || []) {
+      const p = document.createElementNS(NS, "path");
+      p.setAttribute("d", d);
+      svg.appendChild(p);
+    }
+    return svg;
+  }
+
   function paintAreas() {
     const bar = $("#areas");
     if (!bar) return;
     Dom.paint(bar, (tmp) => {
-      for (const a of AREAS) tmp.appendChild(el("button", { type: "button", class: "part-btn", "aria-pressed": String(ui.area === a[0]), "data-key": "area:" + a[0], "data-k": "area:" + a[0], text: a[1], onclick: () => goArea(a[0]) }));
+      for (const a of AREAS) {
+        const b = el("button", { type: "button", class: "part-btn", "aria-pressed": String(ui.area === a[0]), "aria-label": a[1], "data-key": "area:" + a[0], "data-k": "area:" + a[0], onclick: () => goArea(a[0]) });
+        b.appendChild(areaIcon(a[0]));
+        b.appendChild(el("span", { class: "pb-l", text: a[1] }));
+        tmp.appendChild(b);
+      }
     });
     const tabs = $("#tabs");
     if (tabs) tabs.hidden = ui.area !== "invest";
@@ -32721,11 +33918,11 @@ const PackUI = (function () {
       });
     }
     const lede = $("#lede");
-    if (lede && ui.area !== "invest") lede.textContent = (ui.area === "spend" ? "Where the household's money goes, from your Spendee wallets: kept apart from your investments and your tax figures." : ui.area === "poker" ? "Your poker results from your two workbooks: kept apart from your investments, your spending and your tax figures." : "Everything that comes in and goes out, month by month.") + (ui.mode === "demo" ? " This is invented demo data." : "");
+    if (lede && ui.area !== "invest") lede.textContent = (ui.area === "spend" ? "Where the household's money goes, from your Spendee wallets: kept apart from your investments and your tax figures." : ui.area === "poker" ? "Your poker results from your two workbooks: kept apart from your investments, your spending and your tax figures." : "Where the money came from and where it went: read from Spending, Poker and your investments, never stored.") + (ui.mode === "demo" ? " This is invented demo data." : "");
     else if (lede) lede.textContent = "Moving-average cost in euro, KESt per year, and what changes under each reading of the rules." + (ui.mode === "demo" ? " This is invented demo data." : "");
     const status = $("#status");
     if (status) {
-      const s = ui.area === "spend" ? spendSaveText() : ui.area === "poker" ? pokerSaveText() : saveText();
+      const s = ui.area === "spend" ? spendSaveText() : ui.area === "poker" ? pokerSaveText() : ui.area === "cash" ? { kind: "neutral", text: "Reads the other parts · nothing is saved here" } : saveText();
       Dom.paint(status, (tmp) => {
         tmp.appendChild(el("span", { class: "chip " + s.kind, "data-k": "save", text: s.text }));
         tmp.appendChild(ui.mode === "demo" ? btn("Back to my data", () => { ui.mode = "mine"; rebuild(); render(true); }, "small", "mode-mine") : btn("Demo data", () => { ui.mode = "demo"; rebuild(); render(true); }, "small quiet", "mode-demo"));
@@ -32751,6 +33948,10 @@ const PackUI = (function () {
       if (ui.mode === "mine" && !poker.loaded) return root.appendChild(card("Loading your poker results …", null, el("p", { class: "note", text: "Reading what this browser has saved." })));
       if (ui.mode === "mine" && poker.problem) root.appendChild(card("The Poker book could not be read", null, el("ul", { class: "list" }, listItem("bad", poker.problem)), el("p", { class: "note", text: "Nothing was changed. Restore the Poker book from its backup file below, or delete it there and import your workbooks again." })));
       return pokerUI.render(root);
+    }
+    if (ui.area === "cash") {
+      if (ui.mode === "mine" && (!spend.loaded || !poker.loaded || !ui.loaded)) return root.appendChild(card("Loading your cash flow …", null, el("p", { class: "note", text: "Reading what this browser has saved." })));
+      return cashUI.render(root);
     }
     if (ui.area !== "invest") return renderLater(root);
     if (!ui.loaded) {
