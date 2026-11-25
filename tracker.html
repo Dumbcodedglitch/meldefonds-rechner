@@ -548,6 +548,8 @@ details.step:not([open]) > .step-body { display: none; }
 
 .secs { display: grid; gap: 10px; }
 .sec { background: var(--surface-2); border-radius: 10px; padding: 12px; display: grid; gap: 8px; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sec > .sub-head { margin: 0; }
 .sec-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
 .sec .rc-title { overflow-wrap: anywhere; }
 .closure-wrap { display: grid; gap: 10px; }
@@ -22111,39 +22113,160 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
 })(typeof self !== "undefined" ? self : this, function (Zip) {
   "use strict";
 
-  const VERSION = "xlsx-0.1.0";
+  const VERSION = "xlsx-0.2.0";
   const MAX_CELL = 32767;
   const MAX_ROWS = 1048576;
   const MAX_COLS = 16384;
   const NUM_RE = /^-?\d+(\.\d+)?$/;
+  const HEX6 = /^[0-9A-F]{6}$/;
+  const REF_RANGE = /^([A-Z]{1,3})(\d{1,7}):([A-Z]{1,3})(\d{1,7})$/;
   const NS_MAIN = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
   const NS_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
   const NS_PKG_REL = "http://schemas.openxmlformats.org/package/2006/relationships";
   const NS_CT = "http://schemas.openxmlformats.org/package/2006/content-types";
   const XML_HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
 
-  /** The style of a cell: an index into cellXfs of styles.xml (see STYLES_XML). */
-  const STYLE = Object.freeze({ text: 0, bold: 1, money: 2, moneyBold: 3, wrap: 4, boldWrap: 5, int: 6, title: 7 });
+  // ---------------------------------------------------------------- styles (architecture 42.3)
 
-  const STYLES_XML =
-    XML_HEAD +
-    '<styleSheet xmlns="' + NS_MAIN + '">' +
-    '<fonts count="3"><font><sz val="11"/><name val="Calibri"/><family val="2"/></font><font><b/><sz val="11"/><name val="Calibri"/><family val="2"/></font><font><b/><sz val="13"/><name val="Calibri"/><family val="2"/></font></fonts>' +
-    '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>' +
-    '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
-    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
-    '<cellXfs count="8">' +
-    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' + // 0 text
-    '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>' + // 1 bold
-    '<xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' + // 2 money #,##0.00
-    '<xf numFmtId="4" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/>' + // 3 money bold
-    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf>' + // 4 wrap
-    '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf>' + // 5 bold wrap
-    '<xf numFmtId="3" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' + // 6 int #,##0
-    '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>' + // 7 title
-    "</cellXfs>" +
-    '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
-    "</styleSheet>";
+  /**
+   * The colours of a workbook: light and printable. Red is only for a loss (his rule for the whole project), warnings are amber, the
+   * German header rows are white on navy and the English ones navy on a light blue, table rows alternate with a very light blue.
+   */
+  const COLOR = Object.freeze({
+    navy: "1F3A5F", grey: "595959", soft: "7F7F7F", white: "FFFFFF", line: "D3DCE6",
+    headEn: "DCE6F1", zebra: "F3F6FA", total: "E4EDF6", kpi: "EEF3F9",
+    gain: "1E7B34", loss: "C00000", okBg: "E3F1DF", warnBg: "FFF0C2", warn: "7A5A00",
+  });
+  const EURO_FMT = 164; // #,##0.00 "€"
+  const NUM_FMTS = [[EURO_FMT, '#,##0.00 "€"']];
+
+  const LINE = ["thin", COLOR.line];
+  const NAVY_LINE = ["thin", COLOR.navy];
+  const TOP = { v: "top" };
+  const FIG = { h: "right", v: "top", indent: 1 }; // a figure: right-aligned, one step of room before the next column
+  const TOP_WRAP = { v: "top", wrap: 1 };
+  const CELL = { border: { bottom: LINE } };
+  const with_ = (a, b) => Object.assign({}, a, b);
+
+  /**
+   * Every style a cell can name, in a fixed order: the order is the index in cellXfs, so the same names always give the same bytes.
+   * font: { b, i, sz, color, name }; fill: a colour; border: { top, bottom, left, right: [style, colour] }; align: { h, v, wrap, indent };
+   * num: a built-in (3 #,##0 and 4 #,##0.00) or EURO_FMT. A name starting with "cell" also gets a twin with "Z" at the end: the same
+   * look on the light blue of every second table row (unless the style has a fill of its own).
+   */
+  const DEFS = [
+    ["text", {}],
+    ["bold", { font: { b: 1 } }],
+    ["money", { num: 4, align: FIG }],
+    ["moneyBold", { num: 4, font: { b: 1 }, align: FIG }],
+    ["wrap", { align: TOP_WRAP }],
+    ["boldWrap", { font: { b: 1 }, align: TOP_WRAP }],
+    ["int", { num: 3, align: FIG }],
+    ["title", { font: { b: 1, sz: 16, color: COLOR.navy } }],
+    ["subtitle", { font: { i: 1, color: COLOR.grey } }],
+    ["band", { font: { b: 1, color: COLOR.white }, fill: COLOR.navy, align: { v: "center" } }],
+    ["bandR", { font: { b: 1, color: COLOR.white }, fill: COLOR.navy, align: { h: "right", v: "center", indent: 1 } }],
+    ["head", { font: { b: 1, color: COLOR.white }, fill: COLOR.navy, align: { v: "center", wrap: 1 } }],
+    ["headR", { font: { b: 1, color: COLOR.white }, fill: COLOR.navy, align: { h: "right", v: "center", wrap: 1, indent: 1 } }],
+    ["headEn", { font: { i: 1, sz: 10, color: COLOR.navy }, fill: COLOR.headEn, border: { bottom: NAVY_LINE }, align: TOP_WRAP }],
+    ["headEnR", { font: { i: 1, sz: 10, color: COLOR.navy }, fill: COLOR.headEn, border: { bottom: NAVY_LINE }, align: { h: "right", v: "top", wrap: 1, indent: 1 } }],
+    ["note", { font: { i: 1, sz: 10, color: COLOR.grey }, align: TOP_WRAP }],
+    ["small", { font: { sz: 9, color: COLOR.soft }, align: TOP }],
+    ["smallMono", { font: { sz: 9, color: COLOR.soft, name: "Consolas" }, align: TOP }],
+    ["label", { font: { color: COLOR.grey }, align: TOP_WRAP }],
+    ["labelEn", { font: { i: 1, color: COLOR.soft }, align: TOP_WRAP }],
+    ["value", { font: { b: 1 }, align: TOP }],
+    ["kpiLabel", { font: { b: 1, sz: 12, color: COLOR.navy }, align: { v: "center", wrap: 1 } }],
+    ["kpiLabelEn", { font: { i: 1, color: COLOR.soft }, align: { v: "center", wrap: 1 } }],
+    ["kpi", { num: EURO_FMT, font: { b: 1, sz: 14, color: COLOR.navy }, fill: COLOR.kpi, border: { top: LINE, bottom: LINE, left: LINE, right: LINE }, align: { h: "right", v: "center", indent: 1 } }],
+    ["kpiGain", { num: EURO_FMT, font: { b: 1, sz: 14, color: COLOR.gain }, fill: COLOR.kpi, border: { top: LINE, bottom: LINE, left: LINE, right: LINE }, align: { h: "right", v: "center", indent: 1 } }],
+    ["kpiLoss", { num: EURO_FMT, font: { b: 1, sz: 14, color: COLOR.loss }, fill: COLOR.kpi, border: { top: LINE, bottom: LINE, left: LINE, right: LINE }, align: { h: "right", v: "center", indent: 1 } }],
+    ["chipOk", { font: { b: 1, color: COLOR.gain }, fill: COLOR.okBg, align: { h: "center", v: "center", wrap: 1 } }],
+    ["chipWarn", { font: { b: 1, color: COLOR.warn }, fill: COLOR.warnBg, align: { h: "center", v: "center", wrap: 1 } }],
+    ["chipInfo", { font: { b: 1, color: COLOR.navy }, fill: COLOR.headEn, align: { h: "center", v: "center", wrap: 1 } }],
+    ["kz", { font: { b: 1, color: COLOR.navy }, fill: COLOR.headEn, border: { bottom: LINE }, align: { h: "center", v: "top" } }],
+    ["cell", with_(CELL, { align: TOP })],
+    ["cellWrap", with_(CELL, { align: TOP_WRAP })],
+    ["cellEn", with_(CELL, { font: { i: 1, color: COLOR.grey }, align: TOP_WRAP })],
+    ["cellNum", with_(CELL, { align: FIG })],
+    ["cellDate", with_(CELL, { align: { h: "center", v: "top" } })],
+    ["cellMono", with_(CELL, { font: { sz: 10, name: "Consolas" }, align: TOP })],
+    ["cellSmall", with_(CELL, { font: { sz: 9, color: COLOR.grey }, align: TOP_WRAP })],
+    ["cellMoney", with_(CELL, { num: 4, align: FIG })],
+    ["cellStrong", with_(CELL, { num: 4, font: { b: 1 }, align: FIG })],
+    ["cellGain", with_(CELL, { num: 4, font: { b: 1, color: COLOR.gain }, align: FIG })],
+    ["cellLoss", with_(CELL, { num: 4, font: { b: 1, color: COLOR.loss }, align: FIG })],
+    ["cellInt", with_(CELL, { num: 3, align: FIG })],
+    ["cellOk", with_(CELL, { font: { b: 1, color: COLOR.gain }, align: { h: "center", v: "top" } })],
+    ["cellWarn", { font: { b: 1, color: COLOR.warn }, fill: COLOR.warnBg, border: { bottom: LINE }, align: TOP_WRAP }],
+    ["cellInfo", { font: { b: 1, color: COLOR.navy }, fill: COLOR.headEn, border: { bottom: LINE }, align: { h: "center", v: "top" } }],
+    ["cellPoint", with_(CELL, { font: { color: COLOR.grey }, align: { h: "center", v: "top" } })],
+    ["total", { font: { b: 1, color: COLOR.navy }, fill: COLOR.total, border: { top: NAVY_LINE }, align: TOP_WRAP }],
+    ["totalEn", { font: { i: 1, color: COLOR.grey }, fill: COLOR.total, border: { bottom: NAVY_LINE }, align: TOP_WRAP }],
+    ["totalEnTop", { font: { i: 1, color: COLOR.grey }, fill: COLOR.total, border: { top: NAVY_LINE }, align: TOP_WRAP }],
+    ["totalMoney", { num: 4, font: { b: 1, color: COLOR.navy }, fill: COLOR.total, border: { top: NAVY_LINE }, align: FIG }],
+    ["totalGain", { num: 4, font: { b: 1, color: COLOR.gain }, fill: COLOR.total, border: { top: NAVY_LINE }, align: FIG }],
+    ["totalLoss", { num: 4, font: { b: 1, color: COLOR.loss }, fill: COLOR.total, border: { top: NAVY_LINE }, align: FIG }],
+  ];
+
+  /** The defs with the zebra twins, in their fixed order. */
+  const ALL_DEFS = (function () {
+    const out = DEFS.slice();
+    for (const [name, d] of DEFS) if (name.indexOf("cell") === 0) out.push([name + "Z", d.fill ? d : Object.assign({}, d, { fill: COLOR.zebra })]);
+    return out;
+  })();
+
+  /** The style of a cell: its name and its index into cellXfs of styles.xml. */
+  const STYLE = Object.freeze(ALL_DEFS.reduce((o, d, i) => ((o[d[0]] = i), o), {}));
+  const DEF = Object.freeze(ALL_DEFS.reduce((o, d) => ((o[d[0]] = d[1]), o), {}));
+
+  const STYLES_XML = (function () {
+    const fonts = [];
+    const fills = ['<fill><patternFill patternType="none"/></fill>', '<fill><patternFill patternType="gray125"/></fill>'];
+    const borders = [];
+    const index = (list, xml) => {
+      const i = list.indexOf(xml);
+      if (i >= 0) return i;
+      list.push(xml);
+      return list.length - 1;
+    };
+    const fontXml = (f) => {
+      const o = f || {};
+      return "<font>" + (o.b ? "<b/>" : "") + (o.i ? "<i/>" : "") + '<sz val="' + (o.sz || 11) + '"/>' + (o.color ? '<color rgb="FF' + o.color + '"/>' : "") + '<name val="' + (o.name || "Calibri") + '"/><family val="' + (o.name === "Consolas" ? 3 : 2) + '"/></font>';
+    };
+    const side = (tag, s) => (s ? "<" + tag + ' style="' + s[0] + '"><color rgb="FF' + s[1] + '"/></' + tag + ">" : "<" + tag + "/>");
+    const borderXml = (b) => {
+      const o = b || {};
+      return "<border>" + side("left", o.left) + side("right", o.right) + side("top", o.top) + side("bottom", o.bottom) + "<diagonal/></border>";
+    };
+    index(fonts, fontXml(null));
+    index(borders, borderXml(null));
+    const xfs = ALL_DEFS.map(([, d]) => {
+      const fontId = index(fonts, fontXml(d.font));
+      const fillId = d.fill ? index(fills, '<fill><patternFill patternType="solid"><fgColor rgb="FF' + d.fill + '"/><bgColor indexed="64"/></patternFill></fill>') : 0;
+      const borderId = index(borders, borderXml(d.border));
+      const num = d.num || 0;
+      const a = d.align || null;
+      const alignXml = a ? "<alignment" + (a.h ? ' horizontal="' + a.h + '"' : "") + (a.v ? ' vertical="' + a.v + '"' : "") + (a.wrap ? ' wrapText="1"' : "") + (a.indent ? ' indent="' + a.indent + '"' : "") + "/>" : "";
+      return (
+        '<xf numFmtId="' + num + '" fontId="' + fontId + '" fillId="' + fillId + '" borderId="' + borderId + '" xfId="0"' +
+        (num ? ' applyNumberFormat="1"' : "") + (fontId ? ' applyFont="1"' : "") + (fillId ? ' applyFill="1"' : "") + (borderId ? ' applyBorder="1"' : "") + (a ? ' applyAlignment="1"' : "") +
+        (alignXml ? ">" + alignXml + "</xf>" : "/>")
+      );
+    });
+    return (
+      XML_HEAD +
+      '<styleSheet xmlns="' + NS_MAIN + '">' +
+      '<numFmts count="' + NUM_FMTS.length + '">' + NUM_FMTS.map((f) => '<numFmt numFmtId="' + f[0] + '" formatCode="' + f[1].replace(/&/g, "&amp;").replace(/"/g, "&quot;") + '"/>').join("") + "</numFmts>" +
+      '<fonts count="' + fonts.length + '">' + fonts.join("") + "</fonts>" +
+      '<fills count="' + fills.length + '">' + fills.join("") + "</fills>" +
+      '<borders count="' + borders.length + '">' + borders.join("") + "</borders>" +
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+      '<cellXfs count="' + xfs.length + '">' + xfs.join("") + "</cellXfs>" +
+      '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+      "</styleSheet>"
+    );
+  })();
 
   // ---------------------------------------------------------------- text
 
@@ -22216,9 +22339,17 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
 
   // ---------------------------------------------------------------- cells and sheets
 
+  /** The style name of a cell (a number cell defaults to money, a text cell to plain text), or null for no cell at all. */
+  function styleName(cell) {
+    if (cell === null || cell === undefined || cell === "" || typeof cell === "string") return typeof cell === "string" && cell !== "" ? "text" : null;
+    if (typeof cell !== "object") return null;
+    return cell.style === undefined ? (cell.t === "n" ? "money" : "text") : cell.style;
+  }
+
   /**
-   * One cell as XML, or "" for an empty cell. cell: null | text | { t: "s", v, style } | { t: "n", v: "decimal text", style }.
-   * style is a name of STYLE; a number cell defaults to money, a text cell to plain text. problems gets a line for anything refused.
+   * One cell as XML, or "" for an empty cell. cell: null | text | { t: "s", v, style } | { t: "n", v: "decimal text", style } | { style }.
+   * style is a name of STYLE; a number cell defaults to money, a text cell to plain text. A cell with a style and no value is written as an
+   * empty cell that carries the style (a band or a table row keeps its colour). problems gets a line for anything refused.
    */
   function cellXml(ref, cell, problems, notes) {
     if (cell === null || cell === undefined || cell === "") return "";
@@ -22228,12 +22359,14 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       problems.push("Cell " + ref + " is neither a text nor a cell object.");
       return "";
     }
-    const style = c.style === undefined ? (c.t === "n" ? "money" : "text") : c.style;
+    const style = styleName(c);
     if (!Object.prototype.hasOwnProperty.call(STYLE, style)) {
       problems.push("Cell " + ref + " has an unknown style '" + String(style).slice(0, 20) + "'.");
       return "";
     }
     const s = STYLE[style] ? ' s="' + STYLE[style] + '"' : "";
+    const styledEmpty = c.style !== undefined && STYLE[style] ? '<c r="' + ref + '"' + s + "></c>" : "";
+    if (c.t === undefined && (c.v === undefined || c.v === null || c.v === "")) return styledEmpty;
     if (c.t === "n") {
       const v = String(c.v);
       if (!NUM_RE.test(v)) {
@@ -22251,24 +22384,130 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       text = text.slice(0, MAX_CELL);
       notes.push("Cell " + ref + " was longer than " + MAX_CELL + " characters and was cut.");
     }
-    if (!text.length) return "";
+    if (!text.length) return styledEmpty;
     return '<c r="' + ref + '" t="inlineStr"' + s + '><is><t xml:space="preserve">' + esc(text) + "</t></is></c>";
   }
 
+  /** The index of a column from its letters ("A" 0, "AA" 26). */
+  function colIndex(letters) {
+    let n = 0;
+    for (const ch of letters) n = n * 26 + (ch.charCodeAt(0) - 64);
+    return n - 1;
+  }
+
+  /**
+   * How many lines a text needs in a box of a given width (in Excel's character units), by a greedy word wrap. The factor is on the
+   * safe side (a line holds fewer characters than it could), so a row is rather a little too tall than cut.
+   */
+  function linesFor(text, width, font) {
+    const sz = (font && font.sz) || 11;
+    const per = Math.max(1, Math.floor((width * 1.02 * 11) / sz / (font && font.b ? 1.08 : 1)));
+    let lines = 0;
+    for (const para of String(text).split("\n")) {
+      let len = 0;
+      let n = 1;
+      for (const word of para.split(" ")) {
+        const w = word.length;
+        if (len === 0) len = w;
+        else if (len + 1 + w <= per) len += 1 + w;
+        else {
+          n++;
+          len = w;
+        }
+        while (len > per) {
+          n++;
+          len -= per;
+        }
+      }
+      lines += n;
+    }
+    return lines;
+  }
+  const lineHeight = (sz) => Math.ceil((sz || 11) * 1.36);
+
+  /**
+   * The height of a row, in points, from its cells: the tallest wrapped text (in its column, or in its merged range) and the largest font.
+   * 0 when the default height fits.
+   */
+  function autoHeight(row, ri, widths, mergeAt) {
+    let need = 0;
+    row.forEach((cell, ci) => {
+      const name = styleName(cell);
+      if (!name || !Object.prototype.hasOwnProperty.call(STYLE, name)) return;
+      const d = DEF[name];
+      const font = d.font || null;
+      const sz = (font && font.sz) || 11;
+      const text = typeof cell === "string" ? cell : cell.t === "s" ? String(cell.v === null || cell.v === undefined ? "" : cell.v) : cell.t === "n" ? String(cell.v) : "";
+      let h = sz > 11 ? lineHeight(sz) + 5 : 0;
+      if (text && d.align && d.align.wrap) {
+        const span = mergeAt.get(ri + ":" + ci);
+        let width = 0;
+        for (let k = ci; k <= (span === undefined ? ci : span); k++) width += widths[k] > 0 ? widths[k] : 9;
+        const lines = linesFor(text, Math.max(1, width - 1), font);
+        if (lines > 1) h = Math.max(h, lines * lineHeight(sz) + 3);
+      }
+      if (h > need) need = h;
+    });
+    return need > 15 ? Math.min(409, need) : 0;
+  }
+
+  /** Why a merged range cannot be used, or "". */
+  function mergeProblem(ref, seen) {
+    const m = REF_RANGE.exec(String(ref));
+    if (!m) return "The merged range '" + String(ref).slice(0, 20) + "' is not of the form A1:B2.";
+    const c1 = colIndex(m[1]);
+    const c2 = colIndex(m[3]);
+    const r1 = +m[2];
+    const r2 = +m[4];
+    if (r1 < 1 || c2 < c1 || r2 < r1 || (c1 === c2 && r1 === r2)) return "The merged range '" + ref + "' is empty or backwards.";
+    for (const o of seen) if (!(c2 < o.c1 || c1 > o.c2 || r2 < o.r1 || r1 > o.r2)) return "The merged ranges '" + o.ref + "' and '" + ref + "' overlap.";
+    seen.push({ ref, c1, c2, r1, r2 });
+    return "";
+  }
+
+  /** A text for the page footer: the ampersand doubled (it starts a code there) and XML-escaped. */
+  const footerText = (t) => esc(cleanText(String(t)).replace(/&/g, "&&").slice(0, 120));
+
+  /**
+   * sheet: { name, rows: [[cell]], widths: [number], freeze: rows to keep in view, heights: { rowIndex: points }, autoHeight: true,
+   *          merges: ["A10:F10"], tab: "1F3A5F", grid: false, textNumbers: true (no green corner for digits kept as text),
+   *          print: { landscape: true, fitWidth: true or the number of pages wide, repeatRows: n, footer: text } }
+   */
   function sheetXml(sheet, problems, notes) {
     const rows = Array.isArray(sheet.rows) ? sheet.rows : [];
     if (rows.length > MAX_ROWS) problems.push("The sheet '" + sheet.name + "' has more rows than Excel allows.");
     let width = 0;
     for (const r of rows) if (Array.isArray(r) && r.length > width) width = r.length;
     if (width > MAX_COLS) problems.push("The sheet '" + sheet.name + "' has more columns than Excel allows.");
+    const widths = Array.isArray(sheet.widths) ? sheet.widths : [];
+    const merges = Array.isArray(sheet.merges) ? sheet.merges : [];
+    const seen = [];
+    const mergeAt = new Map();
+    for (const ref of merges) {
+      const p = mergeProblem(ref, seen);
+      if (p) problems.push("Sheet '" + sheet.name + "': " + p);
+      else {
+        const o = seen[seen.length - 1];
+        for (let r = o.r1; r <= o.r2; r++) mergeAt.set(r - 1 + ":" + o.c1, o.c2);
+      }
+    }
+    if (sheet.tab !== undefined && !HEX6.test(String(sheet.tab))) problems.push("Sheet '" + sheet.name + "': the tab colour '" + String(sheet.tab).slice(0, 10) + "' is not six hex digits.");
+    const heights = sheet.heights && typeof sheet.heights === "object" ? sheet.heights : {};
+    for (const k of Object.keys(heights)) {
+      const h = heights[k];
+      if (!/^\d+$/.test(k) || typeof h !== "number" || !(h > 0 && h <= 409)) problems.push("Sheet '" + sheet.name + "': the height of row " + k + " is not a number of points from 1 to 409.");
+    }
+    const print = sheet.print && typeof sheet.print === "object" ? sheet.print : null;
     let x = XML_HEAD + '<worksheet xmlns="' + NS_MAIN + '" xmlns:r="' + NS_REL + '">';
+    const fit = !!(print && print.fitWidth);
+    const pagesWide = fit && Number.isInteger(print.fitWidth) && print.fitWidth > 1 ? print.fitWidth : 1;
+    if (sheet.tab !== undefined || fit) x += "<sheetPr>" + (sheet.tab !== undefined ? '<tabColor rgb="FF' + sheet.tab + '"/>' : "") + (fit ? '<pageSetUpPr fitToPage="1"/>' : "") + "</sheetPr>";
     const freeze = Number.isInteger(sheet.freeze) && sheet.freeze > 0 && sheet.freeze < rows.length ? sheet.freeze : 0;
     if (rows.length && width) x += '<dimension ref="A1:' + colName(Math.max(0, width - 1)) + rows.length + '"/>';
-    x += '<sheetViews><sheetView workbookViewId="0"' + (sheet.first ? ' tabSelected="1"' : "") + ">";
+    x += '<sheetViews><sheetView workbookViewId="0"' + (sheet.grid === false ? ' showGridLines="0"' : "") + (sheet.first ? ' tabSelected="1"' : "") + ">";
     if (freeze) x += '<pane ySplit="' + freeze + '" topLeftCell="A' + (freeze + 1) + '" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A' + (freeze + 1) + '" sqref="A' + (freeze + 1) + '"/>';
     x += "</sheetView></sheetViews>";
     x += '<sheetFormatPr defaultRowHeight="15"/>';
-    const widths = Array.isArray(sheet.widths) ? sheet.widths : [];
     const cols = [];
     widths.forEach((w, i) => {
       if (typeof w === "number" && w > 0 && w <= 255) cols.push('<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>');
@@ -22284,9 +22523,19 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       r.forEach((cell, ci) => {
         cells += cellXml(colName(ci) + (ri + 1), cell, problems, notes);
       });
-      x += cells ? '<row r="' + (ri + 1) + '">' + cells + "</row>" : "";
+      if (!cells) return;
+      const h = Object.prototype.hasOwnProperty.call(heights, String(ri)) ? heights[ri] : sheet.autoHeight ? autoHeight(r, ri, widths, mergeAt) : 0;
+      x += '<row r="' + (ri + 1) + '"' + (h ? ' ht="' + h + '" customHeight="1"' : "") + ">" + cells + "</row>";
     });
-    x += "</sheetData></worksheet>";
+    x += "</sheetData>";
+    if (seen.length) x += '<mergeCells count="' + seen.length + '">' + seen.map((o) => '<mergeCell ref="' + o.ref + '"/>').join("") + "</mergeCells>";
+    if (print) {
+      x += '<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.6" header="0.3" footer="0.3"/>';
+      x += '<pageSetup paperSize="9" orientation="' + (print.landscape ? "landscape" : "portrait") + '"' + (fit ? ' fitToWidth="' + pagesWide + '" fitToHeight="0"' : "") + "/>";
+      if (print.footer) x += "<headerFooter><oddFooter>&amp;L&amp;8" + footerText(print.footer) + "&amp;R&amp;8&amp;P / &amp;N</oddFooter></headerFooter>";
+    }
+    if (sheet.textNumbers && rows.length && width) x += '<ignoredErrors><ignoredError sqref="A1:' + colName(width - 1) + rows.length + '" numberStoredAsText="1"/></ignoredErrors>';
+    x += "</worksheet>";
     return x;
   }
 
@@ -22328,7 +22577,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
   // ---------------------------------------------------------------- the workbook
 
   /**
-   * book: { sheets: [{ name, rows: [[cell]], widths: [number], freeze: rows to keep in view }] }
+   * book: { sheets: [sheet] } (sheet: see sheetXml)
    * Returns { ok, bytes (Uint8Array), problems: [], notes: [] }; ok is false (and bytes null) when anything was refused.
    */
   function write(book) {
@@ -22347,6 +22596,12 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     const sheetParts = sheets.map((sh, i) => sheetXml(Object.assign({}, sh, { first: i === 0 }), problems, notes));
     if (problems.length) return { ok: false, bytes: null, problems, notes };
 
+    // the rows printed on every page (Excel's Print_Titles): the sheet name quoted, an apostrophe in it doubled
+    const titles = [];
+    sheets.forEach((sh, i) => {
+      const n = sh.print && Number.isInteger(sh.print.repeatRows) && sh.print.repeatRows > 0 ? sh.print.repeatRows : 0;
+      if (n) titles.push('<definedName name="_xlnm.Print_Titles" localSheetId="' + i + '">' + esc("'" + sh.name.replace(/'/g, "''") + "'!$1:$" + n) + "</definedName>");
+    });
     const ct =
       XML_HEAD +
       '<Types xmlns="' + NS_CT + '">' +
@@ -22361,7 +22616,9 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       XML_HEAD +
       '<workbook xmlns="' + NS_MAIN + '" xmlns:r="' + NS_REL + '"><bookViews><workbookView activeTab="0"/></bookViews><sheets>' +
       sheets.map((sh, i) => '<sheet name="' + esc(sh.name) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>').join("") +
-      "</sheets></workbook>";
+      "</sheets>" +
+      (titles.length ? "<definedNames>" + titles.join("") + "</definedNames>" : "") +
+      "</workbook>";
     const wbRels =
       XML_HEAD +
       '<Relationships xmlns="' + NS_PKG_REL + '">' +
@@ -22417,7 +22674,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     return out;
   }
 
-  return { VERSION, STYLE, MAX_CELL, write, colName, sheetNameProblem, cleanText, utf8, toBase64, fromBase64 };
+  return { VERSION, STYLE, COLOR, MAX_CELL, write, colName, sheetNameProblem, cleanText, utf8, toBase64, fromBase64, linesFor };
 });
 
 /* ---- src/export/sha256.js ---- */
@@ -23141,26 +23398,108 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
 })(typeof self !== "undefined" ? self : this, function (T, Xlsx) {
   "use strict";
 
-  const VERSION = "packsheets-0.1.0";
+  const VERSION = "packsheets-0.2.0";
   const HEAD_ROWS = 5; // title de, title en, empty, header de, header en
 
-  const n = (v) => (v === null || v === undefined || v === "" ? null : { t: "n", v: String(v) });
-  const nb = (v) => (v === null || v === undefined || v === "" ? null : { t: "n", v: String(v), style: "moneyBold" });
-  const s = (v) => (v === null || v === undefined ? "" : String(v));
-  const b = (v) => ({ t: "s", v: String(v), style: "bold" });
-  const w = (v) => ({ t: "s", v: String(v), style: "wrap" });
-  const bw = (v) => ({ t: "s", v: String(v), style: "boldWrap" });
-  const title = (v) => ({ t: "s", v: String(v), style: "title" });
+  // The look (architecture 42): German first in plain type, English under it or beside it in grey italics; amounts right-aligned with
+  // thousands separators; a gain in green and a loss in red (red means a loss and nothing else); warnings amber; every second table row
+  // light blue; totals on a blue band; notes in grey italics across the whole table. Colours never carry a figure on their own.
+  const TAB = { overview: "1F3A5F", lines: "2E75B6", foreign: "C55A11", stock: "548235", ref: "7F7F7F" };
 
-  /** A table sheet: titles, the two header rows, the rows. cols: [[de, en, width]]. */
-  function table(name, titleDe, titleEn, cols, rows, tail) {
-    const out = [[title(titleDe)], [title(titleEn)], [], cols.map((c) => bw(c[0])), cols.map((c) => w(c[1]))];
-    for (const r of rows) out.push(r);
-    if (tail && tail.length) {
-      out.push([]);
-      for (const r of tail) out.push(r);
+  const isNeg = (v) => /^-/.test(String(v)) && /[1-9]/.test(String(v));
+  const isPos = (v) => !/^-/.test(String(v)) && /[1-9]/.test(String(v));
+  const has = (v) => v !== null && v !== undefined && v !== "";
+  const num = (v, style) => (has(v) ? { t: "n", v: String(v), style } : null);
+  const txt = (v, style) => ({ t: "s", v: has(v) ? String(v) : "", style });
+  const n = (v) => num(v, "money");
+  const s = (v) => (v === null || v === undefined ? "" : String(v));
+  const title = (v) => txt(v, "title");
+  const sub = (v) => txt(v, "subtitle");
+  /** A gain in green, a loss in red, nothing else: by the sign of the exact text. */
+  const signed = (v, base) => num(v, isNeg(v) ? base + "Loss" : isPos(v) ? base + "Gain" : base === "cell" ? "cellMoney" : base === "kpi" ? "kpi" : "totalMoney");
+
+  /** A band over the given number of columns: the words in the first cell, the colour in all of them. */
+  function band(width, de, en, extra) {
+    const row = [txt(de + (en ? "  ·  " + en : ""), "band")];
+    for (let i = 1; i < width; i++) row.push(extra && extra[i] ? txt(extra[i], "bandR") : { style: "band" });
+    return row;
+  }
+
+  /** The print and look settings every sheet shares. */
+  function finish(sheet, p, tab, repeat) {
+    const wide = (sheet.widths || []).reduce((a, w) => a + w, 0) > 260 ? 2 : true; // only the widest table (the sales) prints on two pages across
+    return Object.assign(sheet, {
+      tab,
+      grid: false,
+      autoHeight: true,
+      textNumbers: true,
+      print: { landscape: true, fitWidth: wide, repeatRows: repeat, footer: "Steuerpaket " + p.year + " · " + sheet.name },
+    });
+  }
+
+  /**
+   * A table sheet: titles, the two header rows, the rows, then the totals and the notes. cols: [[de, en, width, kind]], kind one of
+   * text, wrap, en, date, num (digits kept as text, right-aligned), mono, small, money, strong, gain, int, kz, status, level.
+   * rows: arrays of plain values (text, a decimal text for a number column, or null); every second row is light blue.
+   * totals: [{ de, en, at: column, value, look }] (look "sign": green or red by the sign; "loss": an amount of losses, red when above zero);
+   * a total without a value is left out. notes: [[de, en]], each line across the whole table.
+   */
+  function table(p, name, titleDe, titleEn, cols, rows, totals, notes, tab) {
+    const width = cols.length;
+    const right = (k) => ["num", "money", "strong", "gain", "int"].indexOf(k) >= 0;
+    const out = [[title(titleDe)], [sub(titleEn)], [], cols.map((c) => txt(c[0], right(c[3]) ? "headR" : "head")), cols.map((c) => txt(c[1], right(c[3]) ? "headEnR" : "headEn"))];
+    // a column is at least as wide as the longest word of its German header in bold, so no word is broken in two
+    const widths = cols.map((c) => Math.max(c[2], Math.min(30, Math.ceil(Math.max(...String(c[0]).split(/[\s/]+/).map((w) => w.length)) * 1.12) + 2)));
+    const merges = [];
+    rows.forEach((r, ri) => {
+      const z = ri % 2 === 1 ? "Z" : "";
+      out.push(cols.map((c, ci) => {
+        const v = r[ci];
+        const k = c[3] || "text";
+        if (k === "money" || k === "strong" || k === "int") return has(v) ? num(v, (k === "money" ? "cellMoney" : k === "strong" ? "cellStrong" : "cellInt") + z) : { style: "cell" + z };
+        if (k === "gain") return has(v) ? num(v, (isNeg(v) ? "cellLoss" : isPos(v) ? "cellGain" : "cellMoney") + z) : { style: "cell" + z };
+        if (k === "kz") return has(v) && v !== "–" ? txt(v, "cellInfo" + z) : txt(v, "cellPoint" + z);
+        if (k === "status") return txt(v, v === "ok" ? "cellOk" + z : "cellWarn" + z);
+        if (k === "level") return txt(v, v === "info" ? "cellInfo" + z : v === "–" ? "cellPoint" + z : "cellWarn" + z);
+        const style = { text: "cell", wrap: "cellWrap", en: "cellEn", date: "cellDate", num: "cellNum", mono: "cellMono", small: "cellSmall" }[k] || "cell";
+        return txt(v, style + z);
+      }));
+    });
+    // under the rows: one empty row (the cross-checks expect nothing in column A right after the last row), then the line that says the
+    // table is empty, the totals, and the notes, each group after an empty row
+    const sums = (totals || []).filter((t) => has(t.value));
+    // a line across the table: on a very wide table only across the columns that print on the first page, so the words wrap there
+    let lastCol = 0;
+    for (let i = 0, sum = 0; i < width; i++) {
+      sum += widths[i];
+      if (i === 0 || sum <= 190) lastCol = i;
     }
-    return { name, rows: out, widths: cols.map((c) => c[2]), freeze: HEAD_ROWS };
+    const across = (r) => merges.push("A" + r + ":" + Xlsx.colName(Math.max(1, lastCol)) + r);
+    if (!rows.length) {
+      out.push([], [txt("In " + p.year + " keine Einträge.", "label")], [txt("No entries in " + p.year + ".", "labelEn")]);
+      across(out.length - 1);
+      across(out.length);
+    }
+    if (sums.length) out.push([]);
+    for (const t of sums) {
+      const a = [];
+      const b = [];
+      for (let i = 0; i < width; i++) {
+        a.push(i === 0 ? txt(t.de, "total") : i === t.at ? (t.look === "sign" ? signed(t.value, "total") : num(t.value, t.look === "loss" && isPos(t.value) ? "totalLoss" : "totalMoney")) : { style: "total" });
+        b.push(i === 0 ? txt(t.en, "totalEn") : { style: "totalEn" });
+      }
+      out.push(a, b);
+      if (t.at > 1) merges.push("A" + (out.length - 1) + ":" + Xlsx.colName(t.at - 1) + (out.length - 1));
+      across(out.length);
+    }
+    if ((notes || []).length) out.push([]);
+    for (const nt of notes || []) {
+      for (const t of nt) {
+        out.push([txt(t, "note")]);
+        across(out.length);
+      }
+    }
+    return finish({ name, rows: out, widths, freeze: HEAD_ROWS, merges }, p, tab || TAB.lines, HEAD_ROWS);
   }
 
   const kindText = (k, lang) => (T.KIND[k] ? T.KIND[k][lang] : k);
@@ -23169,37 +23508,100 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
   // ---------------------------------------------------------------- Übersicht
 
   function overview(p) {
+    const W = 7;
     const st = T.STATUS[statusOf(p)];
+    const merges = [];
     const rows = [
       [title("Steuerpaket " + p.year + ": Einkünfte aus Kapitalvermögen (Beilage E 1kv)")],
-      [title("Tax pack " + p.year + ": capital income (schedule E 1kv)")],
+      [sub("Tax pack " + p.year + ": capital income (schedule E 1kv)")],
       [],
-      [null, null, b("Erstellt am"), b("Made on"), s(p.made.day)],
-      [null, null, "Ansicht", "View", s(p.view.id === "FILED" ? "Wie eingereicht (As filed)" : p.view.label)],
     ];
-    for (const sw of p.view.switches) rows.push([null, null, w("Schalter: " + sw.label + " (" + (T.LEGAL[sw.legal] ? T.LEGAL[sw.legal].de : sw.legal) + ")"), w("Switch: " + sw.label + " (" + (T.LEGAL[sw.legal] ? T.LEGAL[sw.legal].en : sw.legal) + ")")]);
-    rows.push([null, null, "Status des Jahres", "Status of the year", st.de + " / " + st.en]);
-    for (const r of p.status.reasons) rows.push([null, null, null, w(r)]);
-    rows.push([null, null, "Formular", "Form", p.form.checked ? "E 1kv " + p.year + ", Fassung vom " + p.form.version + " (gelesen " + p.form.read + ")" : "E 1kv " + p.year + ": noch nicht veröffentlicht, keine Kennzahlen / not published yet, no Kennzahlen"]);
-    if (p.filedWay) rows.push([null, null, w("Eingereicht " + T.WAY[p.filedWay.way].de + (p.filedWay.assumed ? " (angenommen: keine KESt einbehalten)" : " (seine Angabe)")), w("Filed " + T.WAY[p.filedWay.way].en + (p.filedWay.assumed ? " (assumed: no KESt withheld)" : " (his answer)"))]);
-    if (!p.yearOver) rows.push([null, null, w("Das Jahr ist noch nicht vorbei: Stand der Daten von heute."), w("The year is not over yet: the state of today's data.")]);
+    const mergeRow = (from, to) => merges.push(Xlsx.colName(from) + rows.length + ":" + Xlsx.colName(to) + rows.length);
+
+    // ---- at a glance: the figures that matter most, large (no new figure: each is a line of the pack)
+    const saldo = p.e1kv.find((x) => x.key === "saldo");
+    const due = p.taxTab.find((r) => r.id === "due");
+    const credit = p.taxTab.find((r) => r.id === "credit");
+    const failed = p.checks.filter((c) => !c.ok).length;
+    rows.push(band(W, "Auf einen Blick", "At a glance", { 4: "EUR", 5: "bis EUR" }));
+    const kpi = (de, en, value, high, sign) => {
+      rows.push([null, null, txt(de, "kpiLabel"), txt(en, "kpiLabelEn"), sign ? signed(value, "kpi") : num(value, "kpi"), has(high) ? (sign ? signed(high, "kpi") : num(high, "kpi")) : null]);
+    };
+    if (saldo && saldo.ok) kpi("Saldo der Einkünfte, Punkt 1.3 der Beilage", "Balance of the income, point 1.3 of the schedule", saldo.amount, saldo.high, true);
+    if (credit) kpi("Ausländische Steuer, die angerechnet wird", "Foreign tax that is credited", credit.value, credit.high, false);
+    if (due) kpi("Steuer mit der Erklärung (Sondersteuersatz, Schätzung)", "Tax with the return (special rate, estimate)", due.value, due.high, false);
+    if (p.paid) kpi("Österreichische Steuer, wie eingereicht (Overview)", "Austrian tax, the way it was filed (Overview)", p.paid.austriaLowEur, p.paid.austriaHighEur !== p.paid.austriaLowEur ? p.paid.austriaHighEur : null, false);
+    rows.push([null, null, txt("Status des Jahres", "kpiLabel"), txt("Status of the year", "kpiLabelEn"), txt(st.de + " / " + st.en, statusOf(p) === "complete" ? "chipOk" : "chipWarn")]);
+    mergeRow(4, 5);
+    for (const r of p.status.reasons) rows.push([null, null, null, txt(r, "labelEn")]);
+    rows.push([null, null, txt("Prüfungen im Paket", "kpiLabel"), txt("Checks inside the pack", "kpiLabelEn"), txt(failed ? failed + " nicht ok / " + failed + " not ok" : "alle ok / all ok", failed ? "chipWarn" : "chipOk")]);
+    mergeRow(4, 5);
     rows.push([]);
-    rows.push([bw("Punkt"), bw("Kennzahl"), bw("Bezeichnung (Beilage E 1kv, Spalte ohne KESt-Abzug)"), bw("Description (schedule E 1kv, column without KESt deduction)"), bw("Betrag EUR"), bw("bis EUR"), bw("Quelle in der Berechnung")]);
-    rows.push([w("Point"), w("Kennzahl"), null, null, w("Amount EUR"), w("to EUR"), w("Source in the calculation")]);
-    for (const x of p.e1kv) rows.push([s(x.point), s(x.kz || "–"), w(x.de), w(x.en), x.ok ? n(x.amount) : "nicht aufgeteilt / not split", x.high ? n(x.high) : null, w(x.source)]);
+
+    // ---- about this pack
+    rows.push(band(W, "Angaben zum Paket", "About this pack"));
+    const meta = (de, en, value, style) => rows.push([null, null, txt(de, "label"), txt(en, "labelEn"), txt(value, style || "value")]);
+    meta("Erstellt am", "Made on", s(p.made.day));
+    meta("Ansicht", "View", s(p.view.id === "FILED" ? "Wie eingereicht (As filed)" : p.view.label));
+    for (const sw of p.view.switches) rows.push([null, null, txt("Schalter: " + sw.label + " (" + (T.LEGAL[sw.legal] ? T.LEGAL[sw.legal].de : sw.legal) + ")", "label"), txt("Switch: " + sw.label + " (" + (T.LEGAL[sw.legal] ? T.LEGAL[sw.legal].en : sw.legal) + ")", "labelEn")]);
+    meta("Formular", "Form", p.form.checked ? "E 1kv " + p.year + ", Fassung vom " + p.form.version + " (gelesen " + p.form.read + ")" : "E 1kv " + p.year + ": noch nicht veröffentlicht, keine Kennzahlen / not published yet, no Kennzahlen");
+    if (p.filedWay) rows.push([null, null, txt("Eingereicht " + T.WAY[p.filedWay.way].de + (p.filedWay.assumed ? " (angenommen: keine KESt einbehalten)" : " (seine Angabe)"), "label"), txt("Filed " + T.WAY[p.filedWay.way].en + (p.filedWay.assumed ? " (assumed: no KESt withheld)" : " (his answer)"), "labelEn")]);
+    if (!p.yearOver) rows.push([null, null, txt("Das Jahr ist noch nicht vorbei: Stand der Daten von heute.", "chipWarn"), txt("The year is not over yet: the state of today's data.", "labelEn")]);
     rows.push([]);
-    rows.push([null, null, bw("Zahlen des Tax-Tabs (Sondersteuersätze)"), bw("Figures of the Tax tab (special rates)"), bw("Betrag EUR"), bw("bis EUR")]);
-    for (const r of p.taxTab) rows.push([s(r.sign), null, r.strong ? bw(r.de) : w(r.de), r.strong ? bw(r.en) : w(r.en), r.strong ? nb(r.value) : n(r.value), r.high ? (r.strong ? nb(r.high) : n(r.high)) : null]);
+
+    // ---- the lines of the form (the cross-checks find this table by "Punkt" in column A: it stays where it was)
+    rows.push(band(W, "Die Zeilen der Beilage E 1kv", "The lines of schedule E 1kv"));
+    rows.push([txt("Punkt", "head"), txt("Kennzahl", "head"), txt("Bezeichnung (Beilage E 1kv, Spalte ohne KESt-Abzug)", "head"), txt("Description (schedule E 1kv, column without KESt deduction)", "head"), txt("Betrag EUR", "headR"), txt("bis EUR", "headR"), txt("Quelle in der Berechnung", "head")]);
+    rows.push([txt("Point", "headEn"), txt("Kennzahl", "headEn"), { style: "headEn" }, { style: "headEn" }, txt("Amount EUR", "headEnR"), txt("to EUR", "headEnR"), txt("Source in the calculation", "headEn")]);
+    p.e1kv.forEach((x, i) => {
+      const z = i % 2 === 1 ? "Z" : "";
+      const isSaldo = x.key === "saldo";
+      const amountStyle = (v) => (isSaldo ? (isNeg(v) ? "totalLoss" : isPos(v) ? "totalGain" : "totalMoney") : x.key === "892" && isPos(v) ? "cellLoss" + z : x.key === "994" && isPos(v) ? "cellGain" + z : "cellStrong" + z);
+      const plain = isSaldo ? "total" : null;
+      rows.push([
+        txt(s(x.point), plain || "cellPoint" + z),
+        txt(s(x.kz || "–"), plain || (x.kz ? "kz" : "cellPoint" + z)),
+        txt(x.de, plain || "cellWrap" + z),
+        txt(x.en, isSaldo ? "totalEnTop" : "cellEn" + z),
+        x.ok ? num(x.amount, amountStyle(x.amount)) : txt("nicht aufgeteilt / not split", "cellWarn"),
+        x.high ? num(x.high, amountStyle(x.high)) : { style: plain || "cell" + z },
+        txt(x.source, isSaldo ? "totalEnTop" : "cellSmall" + z),
+      ]);
+    });
+    rows.push([]);
+
+    // ---- the Tax tab's figures (the browser check finds each row by its English words in D: they stay as they were)
+    rows.push(band(W, "Zahlen des Tax-Tabs (Sondersteuersätze)", "Figures of the Tax tab (special rates)", { 4: "Betrag EUR", 5: "bis EUR" }));
+    p.taxTab.forEach((r, i) => {
+      const z = i % 2 === 1 ? "Z" : "";
+      const last = r.id === "due";
+      const style = last ? "total" : r.strong ? "cellStrong" + z : "cellMoney" + z;
+      rows.push([
+        txt(s(r.sign), last ? "total" : "cellPoint" + z),
+        { style: last ? "total" : "cell" + z },
+        txt(r.de, last ? "total" : r.strong ? "cellWrap" + z : "cellWrap" + z),
+        txt(r.en, last ? "totalEnTop" : "cellEn" + z),
+        num(r.value, last ? "totalMoney" : style),
+        r.high ? num(r.high, last ? "totalMoney" : style) : { style: last ? "total" : "cell" + z },
+        { style: last ? "total" : "cell" + z },
+      ]);
+    });
     if (p.paid) {
       rows.push([]);
-      rows.push([null, null, w("Österreichische Steuer auf diese Einkünfte in der gewählten Art (Overview)"), w("Austrian tax on this income in the way it was filed (Overview)"), n(p.paid.austriaLowEur), p.paid.austriaHighEur !== p.paid.austriaLowEur ? n(p.paid.austriaHighEur) : null]);
-      rows.push([null, null, "Davon im Ausland einbehalten", "Withheld abroad", n(p.paid.abroadEur)]);
+      rows.push(band(W, "Bezahlte Steuer", "Tax paid", { 4: "Betrag EUR", 5: "bis EUR" }));
+      rows.push([null, null, txt("Österreichische Steuer auf diese Einkünfte in der gewählten Art (Overview)", "cellWrap"), txt("Austrian tax on this income in the way it was filed (Overview)", "cellEn"), num(p.paid.austriaLowEur, "cellStrong"), p.paid.austriaHighEur !== p.paid.austriaLowEur ? num(p.paid.austriaHighEur, "cellStrong") : null]);
+      rows.push([null, null, txt("Davon im Ausland einbehalten", "cellWrapZ"), txt("Withheld abroad", "cellEnZ"), num(p.paid.abroadEur, "cellMoneyZ"), { style: "cellZ" }]);
     }
     if (p.regular) {
       const g = p.regular;
       rows.push([]);
-      rows.push([null, null, bw("Vergleich mit dem Normaltarif (seine Angaben auf dem Tax-Tab)"), bw("Comparison with the normal scale (his figures on the Tax tab)")]);
-      const kv = (de, en, a, h) => rows.push([null, null, w(de), w(en), n(a), h && h !== a ? n(h) : null]);
+      rows.push(band(W, "Vergleich mit dem Normaltarif (seine Angaben auf dem Tax-Tab)", "Comparison with the normal scale (his figures on the Tax tab)", { 4: "Betrag EUR", 5: "bis EUR" }));
+      let i = 0;
+      const kv = (de, en, a, h, how) => {
+        const z = i++ % 2 === 1 ? "Z" : "";
+        const st2 = how === "saving" ? (isPos(a) ? "cellGain" + z : "cellStrong" + z) : how === "strong" ? "cellStrong" + z : "cellMoney" + z;
+        rows.push([null, null, txt(de, "cellWrap" + z), txt(en, "cellEn" + z), num(a, st2), h && h !== a ? num(h, st2) : { style: "cell" + z }]);
+      };
       kv("Andere Einkünfte (eingegeben)", "Other income (typed)", g.otherEur);
       kv("Absetzbeträge (eingegeben)", "Tax credits (typed)", g.creditsEur);
       kv("Sonderausgaben und außergewöhnliche Belastungen (eingegeben)", "Deductions (typed)", g.deductionsEur);
@@ -23207,176 +23609,204 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       kv("Normaltarif: Einkommen", "Normal scale: taxable income", g.option.taxableIncomeEur);
       kv("Normaltarif: Einkommensteuer", "Normal scale: income tax", g.option.incomeTaxEur);
       kv("Normaltarif: Anrechnung ausländischer Steuer (Schätzung, offener Punkt 30)", "Normal scale: foreign-tax credit (estimate, open point 30)", g.option.foreignCreditLowEur, g.option.foreignCreditHighEur);
-      kv("Normaltarif: Steuer gesamt", "Normal scale: total tax", g.option.totalLowEur, g.option.totalHighEur);
-      kv("Sondersteuersätze: Steuer gesamt", "Special rates: total tax", g.special.totalLowEur, g.special.totalHighEur);
-      kv("Ersparnis mit dem Normaltarif", "Saving with the normal scale", g.savingLowEur, g.savingHighEur);
+      kv("Normaltarif: Steuer gesamt", "Normal scale: total tax", g.option.totalLowEur, g.option.totalHighEur, "strong");
+      kv("Sondersteuersätze: Steuer gesamt", "Special rates: total tax", g.special.totalLowEur, g.special.totalHighEur, "strong");
+      kv("Ersparnis mit dem Normaltarif", "Saving with the normal scale", g.savingLowEur, g.savingHighEur, "saving");
     }
     rows.push([]);
-    rows.push([null, null, bw("Prüfungen im Paket"), bw("Checks inside the pack")]);
-    for (const c of p.checks) rows.push([null, null, s(c.id), w(c.text), c.ok ? "ok" : "NICHT OK / NOT OK"]);
+    rows.push(band(W, "Prüfungen im Paket", "Checks inside the pack"));
+    p.checks.forEach((c, i) => {
+      const z = i % 2 === 1 ? "Z" : "";
+      rows.push([null, null, txt(s(c.id), "cellSmall" + z), txt(c.text, "cellWrap" + z), txt(c.ok ? "ok" : "NICHT OK / NOT OK", c.ok ? "cellOk" + z : "cellWarn")]);
+    });
     rows.push([]);
-    rows.push([null, null, bw("Prüfsummen und Versionen"), bw("Checksums and versions")]);
-    rows.push([null, null, "Paket (SHA-256 der Zahlen)", "Pack (SHA-256 of the figures)", s(p.hash)]);
-    rows.push([null, null, "Steuerjahr-Berechnung", "Tax-year summary", s(p.hashes.summary)]);
-    rows.push([null, null, "Ergebnis der Steuer-Engine", "Tax engine output", s(p.hashes.engineOutput)]);
-    rows.push([null, null, "Fingerabdruck der Daten", "Fingerprint of the data", s(p.hashes.doc)]);
-    rows.push([null, null, "Versionen", "Versions", s([p.versions.engine, p.versions.taxyear, p.versions.model, p.versions.pack, p.versions.text, VERSION, Xlsx.VERSION].join(", "))]);
-    return { name: "Übersicht", rows, widths: [8, 10, 62, 62, 16, 16, 40], freeze: 2 };
+    rows.push(band(W, "Prüfsummen und Versionen", "Checksums and versions"));
+    const small = (de, en, v) => rows.push([null, null, txt(de, "small"), txt(en, "small"), txt(v, "smallMono")]);
+    small("Paket (SHA-256 der Zahlen)", "Pack (SHA-256 of the figures)", s(p.hash));
+    small("Steuerjahr-Berechnung", "Tax-year summary", s(p.hashes.summary));
+    small("Ergebnis der Steuer-Engine", "Tax engine output", s(p.hashes.engineOutput));
+    small("Fingerabdruck der Daten", "Fingerprint of the data", s(p.hashes.doc));
+    small("Versionen", "Versions", s([p.versions.engine, p.versions.taxyear, p.versions.model, p.versions.pack, p.versions.text, VERSION, Xlsx.VERSION].join(", ")));
+    return finish({ name: "Übersicht", rows, widths: [8, 11, 56, 50, 17, 17, 36], freeze: 2, merges }, p, TAB.overview, 2);
   }
 
   // ---------------------------------------------------------------- the line sheets
 
   function sales(p) {
     const cols = [
-      ["Datum", "Date", 11], ["Art", "Kind", 22], ["Depot", "Depot", 24], ["Wertpapier", "Security", 30], ["ISIN", "ISIN", 14], ["Stück", "Units", 12],
-      ["Erlös EUR", "Proceeds EUR", 14], ["Anschaffungskosten EUR (gleitender Durchschnitt)", "Cost EUR (moving average)", 16], ["davon Käufe", "of which purchases", 14], ["davon Zuzug 28.01.2020", "of which step-up", 14], ["davon OeKB-Korrekturen", "of which OeKB corrections", 14],
-      ["Gewinn oder Verlust EUR", "Gain or loss EUR", 14], ["Spesen EUR (nicht abzugsfähig)", "Fee EUR (not deductible)", 12], ["Durchschnitt je Stück vorher", "Average per unit before", 14],
-      ["Währung", "Currency", 9], ["Betrag in Währung", "Amount in currency", 14], ["Kurs (Einheiten je EUR)", "Rate (units per EUR)", 12], ["Kurstag", "Rate day", 11], ["Quelle", "Source", 26], ["Status", "Status", 22],
+      ["Datum", "Date", 11, "date"], ["Art", "Kind", 20, "wrap"], ["Depot", "Depot", 22, "wrap"], ["Wertpapier", "Security", 30, "wrap"], ["ISIN", "ISIN", 15, "mono"], ["Stück", "Units", 12, "num"],
+      ["Erlös EUR", "Proceeds EUR", 14, "money"], ["Anschaffungskosten EUR (gleitender Durchschnitt)", "Cost EUR (moving average)", 16, "money"], ["davon Käufe", "of which purchases", 14, "money"], ["davon Zuzug 28.01.2020", "of which step-up", 14, "money"], ["davon OeKB-Korrekturen", "of which OeKB corrections", 14, "money"],
+      ["Gewinn oder Verlust EUR", "Gain or loss EUR", 15, "gain"], ["Spesen EUR (nicht abzugsfähig)", "Fee EUR (not deductible)", 12, "money"], ["Durchschnitt je Stück vorher", "Average per unit before", 14, "num"],
+      ["Währung", "Currency", 9, "date"], ["Betrag in Währung", "Amount in currency", 14, "num"], ["Kurs (Einheiten je EUR)", "Rate (units per EUR)", 12, "num"], ["Kurstag", "Rate day", 11, "date"], ["Quelle", "Source", 26, "small"], ["Status", "Status", 20, "status"],
     ];
     const rows = p.sales.map((x) => [
       x.date, kindText(x.kind, "de") + " / " + kindText(x.kind, "en"), x.depotLabel, x.name, x.isin, s(x.qty),
-      n(x.proceeds), x.cost ? n(x.cost.total) : null, x.cost ? n(x.cost.base) : null, x.cost ? n(x.cost.stepUp) : null, x.cost ? n(x.cost.akk) : null,
-      n(x.gain), n(x.fee), s(x.avgBefore),
+      x.proceeds, x.cost ? x.cost.total : null, x.cost ? x.cost.base : null, x.cost ? x.cost.stepUp : null, x.cost ? x.cost.akk : null,
+      x.gain, x.fee, s(x.avgBefore),
       x.input ? s(x.input.ccy) : "", x.input ? s(x.input.gross || x.input.price) : "", x.input ? s(x.input.rate) : "", x.input ? s(x.input.rateDate) : "", s(x.src || (x.via ? "Übertragung " + x.via : "")), x.blocked ? "gesperrt / blocked: " + x.blocked : "ok",
     ]);
     const k994 = p.e1kv.find((x) => x.key === "994");
     const k892 = p.e1kv.find((x) => x.key === "892");
-    const tail = [
-      [b("Summe der Gewinne (KZ 994)"), null, null, null, null, null, null, null, null, null, null, nb(k994 && k994.amount)],
-      [b("Total of the gains (KZ 994)")],
-      [b("Summe der Verluste (KZ 892, als Betrag)"), null, null, null, null, null, null, null, null, null, null, nb(k892 && k892.amount)],
-      [b("Total of the losses (KZ 892, as an amount)")],
-      [w("Gewinn = Erlös − Anschaffungskosten; die Kosten eines Verkaufs sind Gesamtkosten × verkaufte Stück ÷ Bestand (§ 27a Abs 4 Z 3 EStG), der letzte Verkauf nimmt den genauen Rest. Spesen sind weder Kosten noch abzugsfähig.")],
-      [w("Gain = proceeds − cost; the cost of a sale is total cost × units sold ÷ units held (§ 27a Abs 4 Z 3 EStG), the last sale takes the exact rest. Fees are neither cost nor deductible.")],
-    ];
-    return table("Veräußerungen", "Veräußerungen " + p.year + " (realisierte Wertsteigerungen)", "Sales " + p.year + " (realised increases in value)", cols, rows, tail);
+    return table(p, "Veräußerungen", "Veräußerungen " + p.year + " (realisierte Wertsteigerungen)", "Sales " + p.year + " (realised increases in value)", cols, rows,
+      [
+        { de: "Summe der Gewinne (KZ 994)", en: "Total of the gains (KZ 994)", at: 11, value: k994 && k994.amount, look: "sign" },
+        { de: "Summe der Verluste (KZ 892, als Betrag)", en: "Total of the losses (KZ 892, as an amount)", at: 11, value: k892 && k892.amount, look: "loss" },
+      ],
+      [[
+        "Gewinn = Erlös − Anschaffungskosten; die Kosten eines Verkaufs sind Gesamtkosten × verkaufte Stück ÷ Bestand (§ 27a Abs 4 Z 3 EStG), der letzte Verkauf nimmt den genauen Rest. Spesen sind weder Kosten noch abzugsfähig.",
+        "Gain = proceeds − cost; the cost of a sale is total cost × units sold ÷ units held (§ 27a Abs 4 Z 3 EStG), the last sale takes the exact rest. Fees are neither cost nor deductible.",
+      ]]);
   }
 
   function age(p) {
     const cols = [
-      ["Meldedatum (Zufluss)", "Report day (received)", 12], ["Fonds", "Fund", 30], ["ISIN", "ISIN", 14], ["Depot", "Depot", 24], ["Stück am Meldetag", "Units on the report day", 12],
-      ["agE je Stück", "agE per unit", 12], ["Korrekturbetrag je Stück", "Correction per unit", 12], ["Anrechenbare ausl. Steuer je Stück", "Creditable foreign tax per unit", 12],
-      ["Währung", "Currency", 9], ["Kurs (Einheiten je EUR)", "Rate (units per EUR)", 12], ["Kurstag", "Rate day", 11],
-      ["agE EUR", "agE EUR", 14], ["Korrektur der Anschaffungskosten EUR", "Cost correction EUR", 14], ["Anrechenbare ausl. Steuer EUR", "Creditable foreign tax EUR", 14], ["Quelle (OeKB-Meldung)", "Source (OeKB report)", 30],
+      ["Meldedatum (Zufluss)", "Report day (received)", 12, "date"], ["Fonds", "Fund", 30, "wrap"], ["ISIN", "ISIN", 15, "mono"], ["Depot", "Depot", 22, "wrap"], ["Stück am Meldetag", "Units on the report day", 12, "num"],
+      ["agE je Stück", "agE per unit", 12, "num"], ["Korrekturbetrag je Stück", "Correction per unit", 12, "num"], ["Anrechenbare ausl. Steuer je Stück", "Creditable foreign tax per unit", 12, "num"],
+      ["Währung", "Currency", 9, "date"], ["Kurs (Einheiten je EUR)", "Rate (units per EUR)", 12, "num"], ["Kurstag", "Rate day", 11, "date"],
+      ["agE EUR", "agE EUR", 14, "strong"], ["Korrektur der Anschaffungskosten EUR", "Cost correction EUR", 14, "money"], ["Anrechenbare ausl. Steuer EUR", "Creditable foreign tax EUR", 14, "money"], ["Quelle (OeKB-Meldung)", "Source (OeKB report)", 30, "small"],
     ];
-    const rows = p.age.map((x) => [x.date, x.name, x.isin, x.depotLabel, s(x.qty), s(x.perUnit.age), s(x.perUnit.akk), s(x.perUnit.qst), s(x.ccy), s(x.rate), s(x.rateDate), n(x.ageEur), n(x.akkEur), n(x.qstEur), s(x.sources.join("; ") || x.id)]);
+    const rows = p.age.map((x) => [x.date, x.name, x.isin, x.depotLabel, s(x.qty), s(x.perUnit.age), s(x.perUnit.akk), s(x.perUnit.qst), s(x.ccy), s(x.rate), s(x.rateDate), x.ageEur, x.akkEur, x.qstEur, s(x.sources.join("; ") || x.id)]);
     const k937 = p.e1kv.find((x) => x.key === "937");
-    const tail = [
-      [b("Summe agE (KZ 937)"), null, null, null, null, null, null, null, null, null, null, nb(k937 && k937.amount)],
-      [b("Total agE (KZ 937)")],
-      [w("agE EUR = Stück × agE je Stück ÷ Kurs, auf Cent gerundet; ebenso Korrektur und Steuer (§ 186 InvFG; InvFR 2018 Rz 232 bis 234). Die Korrektur in Euro ist der Betrag, um den die Berechnung die Anschaffungskosten erhöht hat.")],
-      [w("agE EUR = units × agE per unit ÷ rate, rounded to the cent; the same for the correction and the tax (§ 186 InvFG; InvFR 2018 Rz 232 to 234). The correction in euro is the amount by which the calculation raised the cost.")],
-    ];
-    return table("Ausschüttungsgleiche Erträge", "Ausschüttungsgleiche Erträge " + p.year + " (OeKB-Meldungen)", "Deemed distributed income " + p.year + " (OeKB reports)", cols, rows, tail);
+    return table(p, "Ausschüttungsgleiche Erträge", "Ausschüttungsgleiche Erträge " + p.year + " (OeKB-Meldungen)", "Deemed distributed income " + p.year + " (OeKB reports)", cols, rows,
+      [{ de: "Summe agE (KZ 937)", en: "Total agE (KZ 937)", at: 11, value: k937 && k937.amount }],
+      [[
+        "agE EUR = Stück × agE je Stück ÷ Kurs, auf Cent gerundet; ebenso Korrektur und Steuer (§ 186 InvFG; InvFR 2018 Rz 232 bis 234). Die Korrektur in Euro ist der Betrag, um den die Berechnung die Anschaffungskosten erhöht hat.",
+        "agE EUR = units × agE per unit ÷ rate, rounded to the cent; the same for the correction and the tax (§ 186 InvFG; InvFR 2018 Rz 232 to 234). The correction in euro is the amount by which the calculation raised the cost.",
+      ]]);
   }
 
   function income(p) {
     const cols = [
-      ["Datum", "Date", 11], ["Art", "Kind", 22], ["Kennzahl", "Kennzahl", 9], ["Wertpapier oder Konto", "Security or account", 30], ["ISIN", "ISIN", 14], ["Depot", "Depot", 24],
-      ["Brutto EUR", "Gross EUR", 14], ["Ausländische Steuer EUR", "Foreign tax EUR", 14], ["DBA-Satz", "Treaty rate", 9], ["Land", "Country", 8],
-      ["Währung", "Currency", 9], ["Betrag in Währung", "Amount in currency", 14], ["Kurs (Einheiten je EUR)", "Rate (units per EUR)", 12], ["Kurstag", "Rate day", 11], ["Quelle", "Source", 26],
+      ["Datum", "Date", 11, "date"], ["Art", "Kind", 22, "wrap"], ["Kennzahl", "Kennzahl", 10, "kz"], ["Wertpapier oder Konto", "Security or account", 30, "wrap"], ["ISIN", "ISIN", 15, "mono"], ["Depot", "Depot", 22, "wrap"],
+      ["Brutto EUR", "Gross EUR", 14, "strong"], ["Ausländische Steuer EUR", "Foreign tax EUR", 14, "money"], ["DBA-Satz", "Treaty rate", 9, "num"], ["Land", "Country", 8, "date"],
+      ["Währung", "Currency", 9, "date"], ["Betrag in Währung", "Amount in currency", 14, "num"], ["Kurs (Einheiten je EUR)", "Rate (units per EUR)", 12, "num"], ["Kurstag", "Rate day", 11, "date"], ["Quelle", "Source", 26, "small"],
     ];
     const labelled = p.form.checked && p.checks.find((c) => c.id === "lawRates").ok;
-    const rows = p.income.map((x) => [x.date, kindText(x.kind, "de") + " / " + kindText(x.kind, "en"), labelled ? s(x.kz || "–") : "–", x.name || (x.kind === "INTEREST_BANK" || x.kind === "INTEREST_OTHER" ? "Konto / account" : ""), s(x.isin), x.depotLabel, n(x.gross), n(x.foreignTax), s(x.treatyCapRate), s(x.country), x.input ? s(x.input.ccy) : "", x.input ? s(x.input.gross) : "", x.input ? s(x.input.rate) : "", x.input ? s(x.input.rateDate) : "", s(x.src)]);
-    return table("Zinsen und Dividenden", "Zinsen und Dividenden " + p.year, "Interest and dividends " + p.year, cols, rows, [
-      [w("Bankzinsen zu 25 % gehören zu KZ 861 (kein Verlustausgleich); Dividenden von Aktien, Anleihezinsen und sonstige Zinsen zu 27,5 % zu KZ 863; Ausschüttungen von Fonds zu KZ 898.")],
-      [w("Bank interest at 25 % goes to KZ 861 (no loss offset); dividends of shares, bond coupons and other interest at 27.5 % to KZ 863; distributions of funds to KZ 898.")],
-    ]);
+    const rows = p.income.map((x) => [x.date, kindText(x.kind, "de") + " / " + kindText(x.kind, "en"), labelled ? s(x.kz || "–") : "–", x.name || (x.kind === "INTEREST_BANK" || x.kind === "INTEREST_OTHER" ? "Konto / account" : ""), s(x.isin), x.depotLabel, x.gross, x.foreignTax, s(x.treatyCapRate), s(x.country), x.input ? s(x.input.ccy) : "", x.input ? s(x.input.gross) : "", x.input ? s(x.input.rate) : "", x.input ? s(x.input.rateDate) : "", s(x.src)]);
+    return table(p, "Zinsen und Dividenden", "Zinsen und Dividenden " + p.year, "Interest and dividends " + p.year, cols, rows, [], [[
+      "Bankzinsen zu 25 % gehören zu KZ 861 (kein Verlustausgleich); Dividenden von Aktien, Anleihezinsen und sonstige Zinsen zu 27,5 % zu KZ 863; Ausschüttungen von Fonds zu KZ 898.",
+      "Bank interest at 25 % goes to KZ 861 (no loss offset); dividends of shares, bond coupons and other interest at 27.5 % to KZ 863; distributions of funds to KZ 898.",
+    ]]);
   }
 
   function foreign(p) {
     const f = p.foreign;
-    const rows = [
-      [title("Ausländische Steuer " + p.year)], [title("Foreign tax " + p.year)], [],
-      [bw("Posten"), bw("Item"), bw("Betrag EUR"), bw("bis EUR")],
-      ["Im Ausland bezahlt (anrechenbare Teile der Zeilen)", "Paid abroad (creditable parts of the lines)", n(f.paid)],
-      [w("Anrechenbar vor dem Verlustausgleich (höchstens DBA-Satz und 27,5 % bzw. 25 % der Einkünfte)"), w("Creditable before the loss offset (at most the treaty rate and 27.5 % or 25 % of the income)"), n(f.before)],
-      [w("Angerechnet nach dem Verlustausgleich: Lesart B (verhältnismäßig) bis A (möglichst erhalten)"), w("Credited after the loss offset: reading B (proportional) to A (kept as far as possible)"), n(f.low), f.exact ? null : n(f.high)],
-      ["Nicht angerechnet", "Not credited", n(f.notCreditedLow), f.exact ? null : n(f.notCreditedHigh)],
-      [w("Über dem DBA-Satz einbehalten (nur im Quellenstaat rückforderbar)"), w("Withheld above the treaty rate (only reclaimable in the source state)"), n(f.treatyExcess)],
-      [w("Zeilen ohne DBA-Satz (keine Anrechnung gezählt; höchstens)"), w("Lines without a treaty rate (no credit counted; at most)"), n(f.unknownMax), s(f.unknownLines + " Zeile(n) / line(s)")],
-      [],
-      [bw("Aufteilung auf die Kennzahlen"), bw("Split into the Kennzahlen")],
-    ];
-    if (f.split.ok) {
-      rows.push([w("KZ 998: Einkünfte zu 27,5 %, nach dem Verlustausgleich"), w("KZ 998: income at 27.5 %, after the loss offset"), n(f.split.special.low), f.split.special.high !== f.split.special.low ? n(f.split.special.high) : null]);
-      rows.push([w("KZ 998 vor dem Verlustausgleich (zur Information)"), w("KZ 998 before the loss offset (for information)"), n(f.split.special.before)]);
-      rows.push([w("KZ 901: Einkünfte zu 25 % (kein Verlustausgleich)"), w("KZ 901: income at 25 % (no loss offset)"), n(f.split.bank)]);
-    } else rows.push([w("Die Aufteilung ergab nicht die Summen des Jahres; nur die Summen oben gelten."), w("The split did not give the year's totals; only the totals above count.")]);
+    const W = 4;
+    const merges = [];
+    const rows = [[title("Ausländische Steuer " + p.year)], [sub("Foreign tax " + p.year)], [], [txt("Posten", "head"), txt("Item", "head"), txt("Betrag EUR", "headR"), txt("bis EUR", "headR")]];
+    let i = 0;
+    const line = (de, en, a, h, strong) => {
+      const z = i++ % 2 === 1 ? "Z" : "";
+      const st2 = strong ? "cellStrong" + z : "cellMoney" + z;
+      rows.push([txt(de, "cellWrap" + z), txt(en, "cellEn" + z), num(a, st2) || { style: "cell" + z }, has(h) ? (/^-?\d+(\.\d+)?$/.test(String(h)) ? num(h, st2) : txt(h, "cellNum" + z)) : { style: "cell" + z }]);
+    };
+    line("Im Ausland bezahlt (anrechenbare Teile der Zeilen)", "Paid abroad (creditable parts of the lines)", f.paid);
+    line("Anrechenbar vor dem Verlustausgleich (höchstens DBA-Satz und 27,5 % bzw. 25 % der Einkünfte)", "Creditable before the loss offset (at most the treaty rate and 27.5 % or 25 % of the income)", f.before);
+    line("Angerechnet nach dem Verlustausgleich: Lesart B (verhältnismäßig) bis A (möglichst erhalten)", "Credited after the loss offset: reading B (proportional) to A (kept as far as possible)", f.low, f.exact ? null : f.high, true);
+    line("Nicht angerechnet", "Not credited", f.notCreditedLow, f.exact ? null : f.notCreditedHigh);
+    line("Über dem DBA-Satz einbehalten (nur im Quellenstaat rückforderbar)", "Withheld above the treaty rate (only reclaimable in the source state)", f.treatyExcess);
+    line("Zeilen ohne DBA-Satz (keine Anrechnung gezählt; höchstens)", "Lines without a treaty rate (no credit counted; at most)", f.unknownMax, f.unknownLines + " Zeile(n) / line(s)");
     rows.push([]);
-    rows.push([w("Formular " + (p.form.lossSentence ? p.year : "2025") + ": mit einem Verlustausgleich ist die anrechenbare Steuer ausschließlich von den verminderten Einkünften zu berechnen; Steuer auf verrechnete Einkünfte darf nicht eingetragen werden." + (p.form.lossSentence ? "" : " Die Formulare bis 2024 sagen es nicht ausdrücklich; die Begrenzung auf die inländische Steuer führt zum selben Betrag."))]);
-    rows.push([w("Form " + (p.form.lossSentence ? p.year : "2025") + ": with a loss offset the creditable tax is worked out from the reduced income only; tax on income that was offset may not be entered." + (p.form.lossSentence ? "" : " The forms up to 2024 do not say it in words; the cap by the Austrian tax leads to the same amount."))]);
-    return { name: "Ausländische Steuer", rows, widths: [62, 62, 16, 16], freeze: 2 };
+    rows.push(band(W, "Aufteilung auf die Kennzahlen", "Split into the Kennzahlen", { 2: "Betrag EUR", 3: "bis EUR" }));
+    i = 0;
+    if (f.split.ok) {
+      line("KZ 998: Einkünfte zu 27,5 %, nach dem Verlustausgleich", "KZ 998: income at 27.5 %, after the loss offset", f.split.special.low, f.split.special.high !== f.split.special.low ? f.split.special.high : null, true);
+      line("KZ 998 vor dem Verlustausgleich (zur Information)", "KZ 998 before the loss offset (for information)", f.split.special.before);
+      line("KZ 901: Einkünfte zu 25 % (kein Verlustausgleich)", "KZ 901: income at 25 % (no loss offset)", f.split.bank, null, true);
+    } else {
+      rows.push([txt("Die Aufteilung ergab nicht die Summen des Jahres; nur die Summen oben gelten.", "cellWarn"), txt("The split did not give the year's totals; only the totals above count.", "cellWarn")]);
+    }
+    rows.push([]);
+    for (const t of [
+      "Formular " + (p.form.lossSentence ? p.year : "2025") + ": mit einem Verlustausgleich ist die anrechenbare Steuer ausschließlich von den verminderten Einkünften zu berechnen; Steuer auf verrechnete Einkünfte darf nicht eingetragen werden." + (p.form.lossSentence ? "" : " Die Formulare bis 2024 sagen es nicht ausdrücklich; die Begrenzung auf die inländische Steuer führt zum selben Betrag."),
+      "Form " + (p.form.lossSentence ? p.year : "2025") + ": with a loss offset the creditable tax is worked out from the reduced income only; tax on income that was offset may not be entered." + (p.form.lossSentence ? "" : " The forms up to 2024 do not say it in words; the cap by the Austrian tax leads to the same amount."),
+    ]) {
+      rows.push([txt(t, "note")]);
+      merges.push("A" + rows.length + ":" + Xlsx.colName(W - 1) + rows.length);
+    }
+    return finish({ name: "Ausländische Steuer", rows, widths: [60, 56, 17, 17], freeze: 2, merges }, p, TAB.foreign, 2);
   }
 
   function losses(p) {
     const kindAgainst = (k) => (k === "FORFEITED" ? "verfallen / forfeited" : k === "GAIN" ? "Gewinn / gain" : kindText(k, "de") + " / " + kindText(k, "en"));
-    const cols = [["Verlust (Kennung)", "Loss (id)", 22], ["Datum", "Date", 11], ["Ausgeglichen gegen", "Set against", 30], ["Gegen (Kennung)", "Against (id)", 22], ["Datum", "Date", 11], ["Betrag EUR", "Amount EUR", 14]];
-    const rows = p.losses.pairs.map((x) => [s(x.lossId), s(x.lossDate), kindAgainst(x.againstKind), s(x.againstId), s(x.againstDate), n(x.amount)]);
-    return table("Verlustausgleich", "Verlustausgleich " + p.year + " (Darstellung: ältester Verlust gegen ältesten Ertrag)", "Loss offset " + p.year + " (display: oldest loss against the oldest income)", cols, rows, [
-      [b("Verfallen (kein Verlustvortrag)"), null, null, null, null, nb(p.losses.forfeited)],
-      [b("Forfeited (no carry-forward)")],
-      [w("Die Reihenfolge dient nur der Darstellung; sie ändert keine Summe (§ 27 Abs 8 EStG).")],
-      [w("The order is for display only; it changes no total (§ 27 Abs 8 EStG).")],
-    ]);
+    const cols = [["Verlust (Kennung)", "Loss (id)", 24, "mono"], ["Datum", "Date", 11, "date"], ["Ausgeglichen gegen", "Set against", 30, "wrap"], ["Gegen (Kennung)", "Against (id)", 24, "mono"], ["Datum", "Date", 11, "date"], ["Betrag EUR", "Amount EUR", 15, "strong"]];
+    const rows = p.losses.pairs.map((x) => [s(x.lossId), s(x.lossDate), kindAgainst(x.againstKind), s(x.againstId), s(x.againstDate), x.amount]);
+    return table(p, "Verlustausgleich", "Verlustausgleich " + p.year + " (Darstellung: ältester Verlust gegen ältesten Ertrag)", "Loss offset " + p.year + " (display: oldest loss against the oldest income)", cols, rows,
+      [{ de: "Verfallen (kein Verlustvortrag)", en: "Forfeited (no carry-forward)", at: 5, value: p.losses.forfeited }],
+      [["Die Reihenfolge dient nur der Darstellung; sie ändert keine Summe (§ 27 Abs 8 EStG).", "The order is for display only; it changes no total (§ 27 Abs 8 EStG)."]]);
   }
 
   function holdings(p) {
-    const cols = [["Depot", "Depot", 26], ["Wertpapier", "Security", 30], ["ISIN", "ISIN", 14], ["Stück", "Units", 12], ["Anschaffungskosten EUR", "Austrian cost EUR", 16], ["davon Käufe", "of which purchases", 14], ["davon Zuzug 28.01.2020", "of which step-up", 14], ["davon OeKB-Korrekturen", "of which OeKB corrections", 14]];
-    const rows = p.holdings.map((x) => [x.depotLabel, x.name, x.isin, s(x.qty), n(x.total), n(x.base), n(x.stepUp), n(x.akk)]);
-    return table("Bestände 31.12.", "Bestände am 31.12." + p.year + " (Stück und Anschaffungskosten, keine Kurswerte)", "Holdings on 31 Dec " + p.year + " (units and cost, no values)", cols, rows);
+    const cols = [["Depot", "Depot", 26, "wrap"], ["Wertpapier", "Security", 32, "wrap"], ["ISIN", "ISIN", 15, "mono"], ["Stück", "Units", 13, "num"], ["Anschaffungskosten EUR", "Austrian cost EUR", 17, "strong"], ["davon Käufe", "of which purchases", 15, "money"], ["davon Zuzug 28.01.2020", "of which step-up", 15, "money"], ["davon OeKB-Korrekturen", "of which OeKB corrections", 15, "money"]];
+    const rows = p.holdings.map((x) => [x.depotLabel, x.name, x.isin, s(x.qty), x.total, x.base, x.stepUp, x.akk]);
+    return table(p, "Bestände 31.12.", "Bestände am 31.12." + p.year + " (Stück und Anschaffungskosten, keine Kurswerte)", "Holdings on 31 Dec " + p.year + " (units and cost, no values)", cols, rows, [], [], TAB.stock);
   }
 
   function transfers(p) {
-    const cols = [["Datum", "Date", 11], ["Art", "Kind", 24], ["Von Depot", "From depot", 26], ["Nach Depot", "To depot", 26], ["Wertpapier", "Security", 30], ["ISIN", "ISIN", 14], ["Stück", "Units", 12], ["Behandlung", "Treatment", 34], ["Übertragene Kosten EUR", "Cost moved EUR", 14]];
-    const rows = p.transfers.map((x) => [x.date, kindText(x.kind, "de") + " / " + kindText(x.kind, "en"), x.fromLabel, x.toLabel, x.name, x.isin, s(x.qty), T.TREATMENT[x.treatment].de + " / " + T.TREATMENT[x.treatment].en, n(x.costMoved)]);
-    return table("Übertragungen", "Übertragungen " + p.year + " (wie in dieser Ansicht behandelt)", "Transfers " + p.year + " (as treated in this view)", cols, rows);
+    const cols = [["Datum", "Date", 11, "date"], ["Art", "Kind", 24, "wrap"], ["Von Depot", "From depot", 24, "wrap"], ["Nach Depot", "To depot", 24, "wrap"], ["Wertpapier", "Security", 30, "wrap"], ["ISIN", "ISIN", 15, "mono"], ["Stück", "Units", 12, "num"], ["Behandlung", "Treatment", 34, "wrap"], ["Übertragene Kosten EUR", "Cost moved EUR", 15, "strong"]];
+    const rows = p.transfers.map((x) => [x.date, kindText(x.kind, "de") + " / " + kindText(x.kind, "en"), x.fromLabel, x.toLabel, x.name, x.isin, s(x.qty), T.TREATMENT[x.treatment].de + " / " + T.TREATMENT[x.treatment].en, x.costMoved]);
+    return table(p, "Übertragungen", "Übertragungen " + p.year + " (wie in dieser Ansicht behandelt)", "Transfers " + p.year + " (as treated in this view)", cols, rows, [], []);
   }
 
   function stepUp(p) {
-    const cols = [["Depot", "Depot", 26], ["Wertpapier", "Security", 30], ["ISIN", "ISIN", 14], ["Stück", "Units", 12], ["Kosten nach dem Zuzug EUR (gemeiner Wert)", "Cost after the arrival EUR (market value)", 16], ["davon Aufwertung (Step-up)", "of which step-up", 14], ["Kurs je Stück", "Price per unit", 12], ["Kurs (Einheiten je EUR)", "Rate (units per EUR)", 12], ["Kurstag", "Price day", 11], ["Quelle", "Source", 24]];
-    const rows = p.stepUp.map((x) => [x.depotLabel, x.name, x.isin, s(x.qty), n(x.value), n(x.stepUp), s(x.price), s(x.rate), s(x.priceDate), s(x.source)]);
-    return table("Zuzug " + p.settings.relocationDate.split("-").reverse().join("."), "Zuzug am " + p.settings.relocationDate + ": gemeiner Wert als Anschaffungskosten (§ 27 Abs 6 Z 1 lit e EStG)", "Arrival on " + p.settings.relocationDate + ": market value as cost (§ 27 Abs 6 Z 1 lit e EStG)", cols, rows);
+    const cols = [["Depot", "Depot", 24, "wrap"], ["Wertpapier", "Security", 30, "wrap"], ["ISIN", "ISIN", 15, "mono"], ["Stück", "Units", 12, "num"], ["Kosten nach dem Zuzug EUR (gemeiner Wert)", "Cost after the arrival EUR (market value)", 17, "strong"], ["davon Aufwertung (Step-up)", "of which step-up", 15, "money"], ["Kurs je Stück", "Price per unit", 12, "num"], ["Kurs (Einheiten je EUR)", "Rate (units per EUR)", 12, "num"], ["Kurstag", "Price day", 11, "date"], ["Quelle", "Source", 24, "small"]];
+    const rows = p.stepUp.map((x) => [x.depotLabel, x.name, x.isin, s(x.qty), x.value, x.stepUp, s(x.price), s(x.rate), s(x.priceDate), s(x.source)]);
+    return table(p, "Zuzug " + p.settings.relocationDate.split("-").reverse().join("."), "Zuzug am " + p.settings.relocationDate + ": gemeiner Wert als Anschaffungskosten (§ 27 Abs 6 Z 1 lit e EStG)", "Arrival on " + p.settings.relocationDate + ": market value as cost (§ 27 Abs 6 Z 1 lit e EStG)", cols, rows, [], [], TAB.stock);
   }
 
   function ecb(p) {
-    const cols = [["Währung", "Currency", 9], ["Kurstag", "Rate day", 11], ["EZB-Kurs (Einheiten je EUR)", "ECB rate (units per EUR)", 14], ["Verwendet an (Tage)", "Used on (days)", 60], ["Anzahl Tage", "Number of days", 10]];
-    const rows = p.ecb.map((x) => [x.ccy, x.rateDate, s(x.rate), x.days.join(", "), { t: "n", v: String(x.days.length), style: "int" }]);
-    return table("EZB-Kurse", "EZB-Referenzkurse, die die Zahlen " + p.year + " verwenden (Verkäufe, Erträge, OeKB-Meldungen)", "ECB reference rates the figures of " + p.year + " use (sales, income, OeKB reports)", cols, rows, [
-      [w("Frühere Käufe stecken mit ihrem eigenen Kurs im gleitenden Durchschnitt; sie sind hier nicht einzeln gelistet.")],
-      [w("Earlier purchases are inside the moving average at their own rates; they are not listed here one by one.")],
-    ]);
+    const cols = [["Währung", "Currency", 9, "date"], ["Kurstag", "Rate day", 11, "date"], ["EZB-Kurs (Einheiten je EUR)", "ECB rate (units per EUR)", 14, "num"], ["Verwendet an (Tage)", "Used on (days)", 64, "small"], ["Anzahl Tage", "Number of days", 10, "int"]];
+    const rows = p.ecb.map((x) => [x.ccy, x.rateDate, s(x.rate), x.days.join(", "), String(x.days.length)]);
+    return table(p, "EZB-Kurse", "EZB-Referenzkurse, die die Zahlen " + p.year + " verwenden (Verkäufe, Erträge, OeKB-Meldungen)", "ECB reference rates the figures of " + p.year + " use (sales, income, OeKB reports)", cols, rows, [], [[
+      "Frühere Käufe stecken mit ihrem eigenen Kurs im gleitenden Durchschnitt; sie sind hier nicht einzeln gelistet.",
+      "Earlier purchases are inside the moving average at their own rates; they are not listed here one by one.",
+    ]], TAB.ref);
   }
 
   function assumptions(p) {
-    const rows = [[title("Annahmen, Regeln und offene Punkte " + p.year)], [title("Assumptions, rules and open points " + p.year)], [], [bw("Einstellung"), bw("Setting"), bw("Wert / Value")]];
+    const W = 4;
+    const rows = [[title("Annahmen, Regeln und offene Punkte " + p.year)], [sub("Assumptions, rules and open points " + p.year)], []];
+    const head = (cells) => rows.push(cells.map((c, i) => txt(c, i === cells.length - 1 && c === "Nr." ? "headR" : "head")));
+    head(["Einstellung", "Setting", "Wert / Value", ""]);
+    let i = 0;
     for (const k of ["relocationDate", "kestRate", "bankRate", "feesInTaxBasis", "oekbCutoff", "stepUpPolicy"]) {
+      const z = i++ % 2 === 1 ? "Z" : "";
       const v = p.settings[k];
       const vv = T.SETTING_VALUES[String(v)];
-      rows.push([w(T.SETTINGS[k].de), w(T.SETTINGS[k].en), vv ? vv.de + " / " + vv.en : s(v)]);
+      rows.push([txt(T.SETTINGS[k].de, "cellWrap" + z), txt(T.SETTINGS[k].en, "cellEn" + z), txt(vv ? vv.de + " / " + vv.en : s(v), "cellWrap" + z), { style: "cell" + z }]);
     }
     rows.push([]);
-    rows.push([bw("Regel"), bw("Rule"), bw("Fundstelle"), bw("Gelesen am / Read on")]);
+    head(["Regel", "Rule", "Fundstelle", "Gelesen am / Read on"]);
+    i = 0;
     for (const id of Object.keys(T.RULES)) {
+      const z = i++ % 2 === 1 ? "Z" : "";
       const r = T.RULES[id];
-      rows.push([w(r.de), w(r.en), w(r.cite), s(r.read)]);
+      rows.push([txt(r.de, "cellWrap" + z), txt(r.en, "cellEn" + z), txt(r.cite, "cellSmall" + z), txt(s(r.read), "cellSmall" + z)]);
     }
-    rows.push([w("Kennzahlen und Erläuterungen der Beilage E 1kv " + p.year + (p.form.checked ? ", Fassung vom " + p.form.version : ": noch nicht veröffentlicht")), w("Kennzahlen and explanations of schedule E 1kv " + p.year + (p.form.checked ? ", version of " + p.form.version : ": not published yet")), s(T.FORM_ADDRESS), s(p.form.read || "")]);
+    const z0 = i % 2 === 1 ? "Z" : "";
+    rows.push([txt("Kennzahlen und Erläuterungen der Beilage E 1kv " + p.year + (p.form.checked ? ", Fassung vom " + p.form.version : ": noch nicht veröffentlicht"), "cellWrap" + z0), txt("Kennzahlen and explanations of schedule E 1kv " + p.year + (p.form.checked ? ", version of " + p.form.version : ": not published yet"), "cellEn" + z0), txt(s(T.FORM_ADDRESS), "cellSmall" + z0), txt(s(p.form.read || ""), "cellSmall" + z0)]);
     rows.push([]);
-    rows.push([bw("Offene Punkte für den Steuerberater (Abschnitt 11)"), bw("Open points for the Steuerberater (section 11)"), bw("Nr.")]);
+    rows.push([txt("Offene Punkte für den Steuerberater (Abschnitt 11)", "head"), txt("Open points for the Steuerberater (section 11)", "head"), txt("Nr.", "headR"), { style: "head" }]);
+    i = 0;
     for (const k of p.openPoints) {
       const o = T.OPEN_POINTS[k];
-      if (o) rows.push([w(o.de), w(o.en), { t: "n", v: String(k), style: "int" }]);
+      if (!o) continue;
+      const z = i++ % 2 === 1 ? "Z" : "";
+      rows.push([txt(o.de, "cellWrap" + z), txt(o.en, "cellEn" + z), num(String(k), "cellInt" + z), { style: "cell" + z }]);
     }
     rows.push([]);
-    for (const x of T.NOT_INCLUDED) rows.push([w(x.de), w(x.en)]);
-    return { name: "Annahmen", rows, widths: [70, 70, 34, 18], freeze: 2 };
+    rows.push(band(W, "Nicht im Paket", "Not in the pack"));
+    T.NOT_INCLUDED.forEach((x, k) => {
+      const z = k % 2 === 1 ? "Z" : "";
+      rows.push([txt(x.de, "cellWrap" + z), txt(x.en, "cellEn" + z), { style: "cell" + z }, { style: "cell" + z }]);
+    });
+    return finish({ name: "Annahmen", rows, widths: [62, 58, 34, 22], freeze: 2 }, p, TAB.ref, 2);
   }
 
   function notes(p) {
-    const cols = [["Stufe", "Level", 9], ["Kennung", "Id", 26], ["Text (englisch, wie von der Berechnung geschrieben)", "Text (English, as the calculation wrote it)", 120]];
-    const rows = p.findings.map((x) => [s(x.level), s(x.id), w(x.text)]);
-    return table("Hinweise", "Hinweise der Berechnung " + p.year, "Notes of the calculation " + p.year, cols, rows.length ? rows : [["–", "–", "keine / none"]]);
+    const cols = [["Stufe", "Level", 10, "level"], ["Kennung", "Id", 26, "mono"], ["Text (englisch, wie von der Berechnung geschrieben)", "Text (English, as the calculation wrote it)", 120, "wrap"]];
+    const rows = p.findings.map((x) => [s(x.level), s(x.id), x.text]);
+    return table(p, "Hinweise", "Hinweise der Berechnung " + p.year, "Notes of the calculation " + p.year, cols, rows.length ? rows : [["–", "–", "keine / none"]], [], [], TAB.ref);
   }
 
   /** The sheets of the workbook for a pack. The arrival sheet only in its year; transfers and losses only when there are any. */
@@ -31535,10 +31965,37 @@ const PokerUI = (function () {
       ]);
     }
 
+    /**
+     * The tax note (architecture 40.7 and 40.14, read 25 Nov 2026). The page is public, so the text stays general: no adviser, letter or
+     * date of his own. His own review is in his private notes (docs/poker-tax-position.md, Project doc claude/poker-tax-position.md).
+     */
     function taxCard() {
-      return fcard({ key: "poker-tax", title: "Not in your tax figures", sub: "kept apart", glance: "Poker never enters the tax engine or the tax adviser pack" }, () => [
-        note("Your Steuerberater treats your poker winnings as tax-free. That matches the BMF's income-tax guidelines, which list winnings from games of chance among the receipts that are no income in the sense of the law (EStR 2000 Rz 101); the Glücksspielgesetz counts poker among the games of chance. The open line is § 23 EStG: when play becomes a business (independent, lasting, aimed at profit, taking part in general economic dealings). German courts have taxed online cash-game players as a business; no Austrian decision either way was found (read 24 Nov 2026)."),
-        note("Whether rakeback and promotions, which the sites pay and which are not winnings of a game, follow the winnings is a question for your Steuerberater. Nothing here changes your tax figures: the Poker book is never read by the tax engine or the pack."),
+      const sec = (k, title, items) => el("div", { class: "sec", "data-k": "poker-tax-" + k }, el("h3", { class: "sub-head", text: title }), el("ul", { class: "list" }, items.map((x) => listItem(x[0], x[1]))));
+      return fcard({ key: "poker-tax", title: "Not in your tax figures", sub: "kept apart · read 25 Nov 2026", glance: "Not taxed in Austria today · the line to watch is § 23 EStG · keep the sites' own records" }, () => [
+        el("p", { class: "chips", "data-k": "poker-tax-status" }, Dom.chip("Not taxed in Austria today", "ok"), " ", Dom.chip("No Austrian court decision", "info"), " ", Dom.chip("New gambling law from 2027", "warn")),
+        note("Winnings from games of chance are no income under § 2 Abs 3 EStG: the BMF's income-tax guidelines list them among the receipts that are not taxed (EStR 2000 Rz 101, in its wording of 2015, still current), and the Glücksspielgesetz names poker as a game of chance (§ 1 Abs 2 GSpG). Written opinions of Austrian tax advisers on poker rest on these two points.", "poker-tax-rule"),
+        el("div", { class: "secs" },
+          sec("risk", "Where the risk sits", [
+            ["warn", "§ 23 EStG, business income: independent, lasting, aimed at profit and taking part in general economic dealings. German courts found a business for tournament prizes (BFH X R 43/12, 2015) and online cash games (X R 8/21, 2023; X R 26/21, 2025), looking at planned play, the use of a market and the time and money put in. That is German law, but Austria's wording is close to it."],
+            ["warn", "The gambling law's label is a choice made to protect players: the Constitutional Court accepted it for that reason and noted the doubts about tournament poker (VfGH G 26/2013, 2013). The label applies \"im Sinne dieses Bundesgesetzes\"; an income-tax court is not bound by it in so many words."],
+            ["info", "Rakeback, promotions and leaderboard prizes are paid by the site, not won at the table. They most likely follow the winnings (a refund of a fee that is not deductible either), but no source says so. Coaching, selling action at a mark-up, affiliate money, sponsorship or streaming income would be taxable in any case."],
+            ["info", "A written opinion protects you against penalties only for the facts it describes. Check that yours names what you really play (online cash games, tournaments, live), how much and since when."],
+          ]),
+          sec("proof", "Keep as proof", [
+            ["warn", "Austria's top administrative court: saying that unexplained money came from regular gambling wins goes against everyday experience and must be proved; the player's own notes without documents were not enough (VwGH 84/14/0051, 1988; 96/14/0107, 2000). Your workbooks are your notes; the proof is the sites' records."],
+            ["ok", "Download every site's full cashier and transaction history (deposits, withdrawals, transfers, rakeback and bonus statements) once a year, and before any account is closed or blocked."],
+            ["ok", "Keep the e-wallet and bank statements that show the money arriving from the sites, the hand-history database, and a backup of this Poker book with them."],
+          ]),
+          sec("ask", "To ask your Steuerberater, in writing", [
+            ["info", "Do the German online-poker judgments of 2023 and 2025 change the Austrian view for someone who plays as you do?"],
+            ["info", "Rakeback, promotions and leaderboard prizes: not taxed, like the winnings?"],
+            ["info", "Changing dollar balances on the sites into euro: a currency gain or loss under the rule for foreign-currency accounts (EStR 2000 Rz 6201)?"],
+            ["info", "Should the activity be mentioned to the Finanzamt, and how?"],
+          ]),
+          sec("2027", "Coming in 2027", [
+            ["warn", "Austria's new Glücksspielgesetz (passed the Nationalrat's finance committee on 24 Nov 2026; the plenary vote is expected in December): online operators without an Austrian licence must stop serving Austria from 1 Jan 2027 to be allowed to apply; the new licences start on 1 Oct 2027, with deposit limits across all providers. Large poker sites may shut out players in Austria for that time. It changes no tax rule; if you think of playing from another country, check the tax side first."],
+          ])),
+        note("Nothing here changes your tax figures: the Poker book is never read by the tax engine or the tax adviser pack.", "poker-tax-apart"),
       ]);
     }
 
