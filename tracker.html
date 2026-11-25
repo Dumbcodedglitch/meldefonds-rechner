@@ -19101,7 +19101,9 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
  * The rates are those of the Investments book's ECB files, read only (the page hands in ledgerFor(currency), a ledger of src/fx/ecb.js).
  * An ECB rate is units of the currency per 1 EUR, so the rate of EUR is 1. A row is converted in ONE step:
  *     value = amount × rate(to, day) ÷ rate(from, day), rounded once to 6 decimals, half away from zero
- * and a value in the row's own currency is the amount itself (never converted back and forth).
+ * and a value in the row's own currency is the amount itself (never converted back and forth), rounded the same way to 6 decimals. Spendee writes
+ * amounts with 8 decimals (a payment logged in another currency's wallet), so without this a period's category totals and its month totals could
+ * differ by millionths and the Cash flow picture refused to draw (architecture 43.2).
  * The rate of a day is the ECB rate of that day or, on a day without one, the last one published before it, at most 7 days back. This is
  * the usual practice for household figures; it is NOT the tax side's stricter rule, which is untouched and keeps its own.
  *
@@ -19113,7 +19115,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
 })(typeof self !== "undefined" ? self : this, function (Dec, Ecb) {
   "use strict";
 
-  const VERSION = "spendfx-0.2.0";
+  const VERSION = "spendfx-0.3.0";
   const DP = 6;
   const MAX_LAG_DAYS = 7;
   const ONE = Dec.mk(1n, 0);
@@ -19155,7 +19157,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       return out;
     }
     function convert(amount, from, to, day) {
-      if (from === to) return { ok: true, value: amount };
+      if (from === to) return { ok: true, value: Dec.round(amount, DP) };
       const rf = rate(from, day);
       if (!rf.ok) return { ok: false, reason: rf.reason, ccy: from, day };
       const rt = rate(to, day);
@@ -21036,7 +21038,10 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
  * PokerStats: the figures of the Poker area (architecture section 40.5), from the Poker book alone.
  *
  * Money: his sheets count in USD. A figure is shown in USD, EUR or HUF at the rates of his own sheets for that month (the balances rate
- * table, units per euro; for a month that only the income workbook has, its "1 EUR =" line). An amount is converted in ONE step:
+ * table, units per euro; for a month that only the income workbook has, its "1 EUR =" line). Since 25 Nov 2026 (architecture 43.3) the
+ * ECB's rates of the month (PokerRates, from the Investments book's ECB files) fill a rate his sheets lack, or replace his sheets when he
+ * chooses so, his sheets then filling a month the ECB file lacks; every row says which source each currency came from. Without rate
+ * settings (the third argument of rows) the old rule holds: his sheets only. An amount is converted in ONE step:
  *     value = amount × rate(to) ÷ rate(from), rounded once to 6 decimals, half away from zero (decimal.js)
  * and an amount already in the currency shown is kept exactly. Each site's net, each rakeback or promotion line and each month's cost is
  * converted on its own, so that every total is the exact sum of the parts it is made of. A month without the rate a figure needs is left
@@ -21055,7 +21060,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
 })(typeof self !== "undefined" ? self : this, function (Dec) {
   "use strict";
 
-  const VERSION = "pokerstats-0.2.0";
+  const VERSION = "pokerstats-0.3.0";
   const DP = 6;
   const Z = Dec.mk(0n, 0);
   const ONE = Dec.mk(1n, 0);
@@ -21088,6 +21093,51 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     return Dec.divRound(Dec.mul(a, rt), rf, DP);
   }
 
+  /**
+   * The rate of a currency in a month with the rate settings R = { source: "sheet" | "ecb", kind: "end" | "avg", table } (architecture
+   * 43.3): the chosen source first, the other one when the first has none. `used` (a Map) records for each currency which source gave it
+   * ("sheet" or "ecb") and whether an ECB month was not over in the file. Without R: his sheets only (rateOf).
+   */
+  function rateIn(rec, m, cur, R, used) {
+    if (cur === "EUR") return ONE;
+    if (!R) {
+      const d = rateOf(rec, cur);
+      if (d) used.set(cur, "sheet");
+      return d;
+    }
+    const fromSheet = () => rateOf(rec, cur);
+    const fromEcb = () => {
+      const e = R.table && R.table[m] ? R.table[m][cur] : null;
+      if (!e) return null;
+      if (e.partial) used.set("partial", true);
+      return P(R.kind === "avg" ? e.avg : e.end);
+    };
+    const order = R.source === "ecb" ? [["ecb", fromEcb], ["sheet", fromSheet]] : [["sheet", fromSheet], ["ecb", fromEcb]];
+    for (const [src, get] of order) {
+      const d = get();
+      if (d) {
+        used.set(cur, src);
+        return d;
+      }
+    }
+    return null;
+  }
+
+  /** conv with the rate settings of rateIn. */
+  function convIn(rec, m, a, from, to, R, used) {
+    if (from === to) return a;
+    const rt = rateIn(rec, m, to, R, used);
+    const rf = rateIn(rec, m, from, R, used);
+    if (!rt || !rf) return null;
+    return Dec.divRound(Dec.mul(a, rt), rf, DP);
+  }
+
+  const rateList = (used) => {
+    const o = {};
+    for (const k of [...used.keys()].filter((x) => x !== "partial").sort()) o[k] = used.get(k);
+    return o;
+  };
+
   /** A site's net of a month: closing − bonuses − transfers − opening (exact, in the site's currency). */
   const netOf = (s) => Dec.sub(Dec.sub(Dec.sub(P(s.close), P(s.bonus)), P(s.xfer)), P(s.open));
 
@@ -21095,16 +21145,21 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
    * Every month of the book in the currency `cur`. { rows: [row], missing: [{ month, why }] }.
    * row = { month, table, extra, cost, income (texts), hours (text), hands (number or null), bankroll, moved (texts or null: the balances
    *         are missing), from: "bal" | "inc", items: [{ name, value }], sites: [{ name, cur, net, netShown, bonus, bonusShown, xfer, xferShown,
-   *         close, closeShown }] }
+   *         close, closeShown }], rates: { CCY: "sheet" | "ecb" } (every currency the month's figures used, EUR left out), filled: [CCY]
+   *         (taken from the second source of the settings), partial (an ECB month not over in the file) }
+   * R (optional): the rate settings of rateIn; without it his sheets only, as before 25 Nov 2026.
    */
-  function rows(book, cur) {
+  function rows(book, cur, R) {
     const out = [];
     const missing = [];
+    const RR = R && R.table ? { source: R.source === "ecb" ? "ecb" : "sheet", kind: R.kind === "avg" ? "avg" : "end", table: R.table } : null;
     for (const m of Object.keys(book.months).sort()) {
       const rec = book.months[m];
+      const used = new Map();
+      const conv = (rec0, a, from, to) => convIn(rec0, m, a, from, to, RR, used);
       const why = [];
       const need = (d, what) => {
-        if (d === null) why.push(what);
+        if (d === null) why.push(what + (RR ? " (in neither your sheets nor the ECB file)" : ""));
         return d;
       };
       let table = Z;
@@ -21164,6 +21219,9 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
         moved: moved === null ? null : txt(moved),
         items,
         sites,
+        rates: rateList(used),
+        filled: [...used.keys()].filter((k) => k !== "partial" && used.get(k) !== (RR ? RR.source : "sheet")).sort(),
+        partial: used.get("partial") === true,
       });
     }
     return { rows: out, missing };
@@ -21527,8 +21585,8 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
   }
 
   /** Everything of one period in one call (the screens use this). */
-  function view(book, cur, from, to) {
-    const all = rows(book, cur);
+  function view(book, cur, from, to, R) {
+    const all = rows(book, cur, R);
     const rs = period(all.rows, from, to);
     const t = totals(rs);
     const v = variance(rs);
@@ -21561,6 +21619,110 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
   }
 
   return { VERSION, DP, rateOf, conv, netOf, rows, period, checks, totals, byYear, variance, ruin, downswings, streaks, sites, siteBalances, extras, view, span, phi };
+});
+
+/* ---- src/poker/rates.js ---- */
+/*
+ * PokerRates: the ECB's rates of each month for the Poker area (architecture section 43.3).
+ *
+ * His poker sheets carry a rate table per month (units per euro). Some months have none (his oldest sheets) or no forint rate (most months
+ * before 2018), and those months used to drop out of the euro or forint figures. The ECB's daily reference rates of the Investments book's
+ * stored files (read only, the same files the Spending area uses) fill such a month, or replace the sheets altogether if he chooses:
+ *   - "end": the last rate the ECB published in the month (the rate of its last working day);
+ *   - "avg": the mean of every rate the ECB published in the month, rounded once to 6 decimals, half away from zero.
+ * A month that is not over in the file (the file ends before the month's last ECB day) is marked partial: its "end" is the latest rate so far
+ * and its "avg" the mean so far.
+ *
+ * Only the days the file itself holds are used (a day the ECB did not publish, or one the file lacks, adds nothing): each calendar day of the
+ * month is asked for with no days back (maxLagDays 0), so a weekend never repeats Friday's rate in the mean.
+ *
+ * Pure: no DOM, no clock. Runs in Node (tests) and in the page.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("../lib/decimal.js"));
+  else root.PokerRates = factory(root.Dec);
+})(typeof self !== "undefined" ? self : this, function (Dec) {
+  "use strict";
+
+  const VERSION = "pokerrates-0.1.0";
+  const DP = 6;
+  const Z = Dec.mk(0n, 0);
+  const KINDS = ["end", "avg"];
+  const SOURCES = ["sheet", "ecb"];
+  const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+  const pad = (n) => String(n).padStart(2, "0");
+
+  /** The number of days of a month "yyyy-mm". */
+  function daysIn(m) {
+    return new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7), 0)).getUTCDate();
+  }
+
+  /**
+   * One currency in one month from a ledger (src/fx/ecb.js's makeLedger, or anything with the same rateOn).
+   * Returns null when the file has no rate on any day of the month, else
+   * { avg, end (texts, units per euro), endDay, firstDay, n (days with a rate), partial (the month is not over in the file) }.
+   */
+  function monthOf(ledger, m) {
+    if (!ledger || typeof ledger.rateOn !== "function" || !MONTH_RE.test(m)) return null;
+    const last = daysIn(m);
+    const days = [];
+    const decs = [];
+    for (let d = 1; d <= last; d++) {
+      const day = m + "-" + pad(d);
+      const r = ledger.rateOn(day, { maxLagDays: 0 });
+      // only a rate published on that very day counts
+      if (!r || !r.ok || r.rateDate !== day) continue;
+      const v = Dec.parse(String(r.rate));
+      if (!v || Dec.isZero(v) || Dec.isNeg(v)) continue;
+      days.push(day);
+      decs.push(v);
+    }
+    if (!days.length) return null;
+    const sum = decs.reduce((a, b) => Dec.add(a, b), Z);
+    const avg = Dec.divRound(sum, Dec.mk(BigInt(days.length), 0), DP);
+    // complete when the rate of the month's last day can be taken from the file (no ECB day after the last rate is missing from it)
+    const endCheck = ledger.rateOn(m + "-" + pad(last), { maxLagDays: 7 });
+    return {
+      avg: Dec.str(avg),
+      end: Dec.str(decs[decs.length - 1]),
+      endDay: days[days.length - 1],
+      firstDay: days[0],
+      n: days.length,
+      partial: !(endCheck && endCheck.ok),
+    };
+  }
+
+  /**
+   * The table of every month and currency asked for: { "yyyy-mm": { CCY: monthOf(...) or null } }. ledgerFor(ccy) gives a ledger or null
+   * (SpendFx.ledgersFromFiles of the Investments book's ECB files, or the demo's invented one). EUR is never asked for (its rate is 1).
+   */
+  function table(ledgerFor, months, ccys) {
+    const out = {};
+    const list = [...new Set((ccys || []).filter((c) => /^[A-Z]{3}$/.test(c) && c !== "EUR"))].sort();
+    const ledgers = new Map(list.map((c) => [c, typeof ledgerFor === "function" ? ledgerFor(c) : null]));
+    for (const m of [...new Set(months || [])].filter((x) => MONTH_RE.test(x)).sort()) {
+      const row = {};
+      for (const c of list) row[c] = ledgers.get(c) ? monthOf(ledgers.get(c), m) : null;
+      out[m] = row;
+    }
+    return out;
+  }
+
+  /** The currencies the Poker book needs from the ECB: USD (its base), HUF and GBP (shown or in his rate tables) and every site's currency. */
+  function currencies(book) {
+    const s = new Set(["USD", "HUF", "GBP"]);
+    for (const n of Object.keys((book && book.sites) || {})) if (book.sites[n] && book.sites[n].cur) s.add(book.sites[n].cur);
+    s.delete("EUR");
+    return [...s].sort();
+  }
+
+  /** The rate settings, cleaned: { source: "sheet" | "ecb", kind: "end" | "avg" } (default: his sheets first, the month's last ECB rate). */
+  function settings(x) {
+    const o = x && typeof x === "object" ? x : {};
+    return { source: SOURCES.indexOf(o.source) >= 0 ? o.source : "sheet", kind: KINDS.indexOf(o.kind) >= 0 ? o.kind : "end" };
+  }
+
+  return { VERSION, DP, KINDS, SOURCES, daysIn, monthOf, table, currencies, settings };
 });
 
 /* ---- src/poker/demo.js ---- */
@@ -21619,6 +21781,8 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       usd = Math.min(1.25, Math.max(0.98, usd + gauss(r) * 0.012));
       huf = Math.min(420, Math.max(300, huf + gauss(r) * 3.5));
       const rates = { USD: usd.toFixed(4), HUF: huf.toFixed(2), GBP: (0.86 + gauss(r) * 0.01).toFixed(4) };
+      // the first year and a half has no forint rate in the sheet, as in his older workbooks: the ECB fills it (architecture 43.3)
+      if (month < "2020-07") delete rates.HUF;
       const hours = Math.max(0, 70 + gauss(r) * 14);
       const played = SITES.filter((s, i) => i !== 5 || y < 2023);
       // the table result of the month in dollars: an hourly of about +14 with a deviation of about 900 per hour
@@ -21709,7 +21873,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
 })(typeof self !== "undefined" ? self : this, function (Dec) {
   "use strict";
 
-  const VERSION = "cashflow-0.1.0";
+  const VERSION = "cashflow-0.2.0";
   const DP = 6;
   const Z = Dec.mk(0n, DP);
   const P = (t) => (t === "" || t === null || t === undefined ? Z : Dec.parse(String(t)));
@@ -21931,7 +22095,9 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     const total = Dec.max(L, R);
     const okS = Dec.cmp(Dec.round(sumS, DP), Dec.round(P(t.spent), DP)) === 0;
     const okE = Dec.cmp(Dec.round(sumE, DP), Dec.round(P(t.earned), DP)) === 0;
-    return { left, right, total: txt(total), ok: okS && okE, why: okS && okE ? "" : !okS ? "the spending by category does not add up to the period's spending" : "the income by category does not add up to the period's income" };
+    // gap: by how much the categories miss the period's figure (text, 6 decimals), so that a refused picture says how far off it is (43.2)
+    const gap = !okS ? txt(Dec.sub(sumS, P(t.spent))) : !okE ? txt(Dec.sub(sumE, P(t.earned))) : "";
+    return { left, right, total: txt(total), ok: okS && okE, why: okS && okE ? "" : !okS ? "the spending by category does not add up to the period's spending" : "the income by category does not add up to the period's income", gap };
   }
 
   /**
@@ -31319,7 +31485,8 @@ const SpendUI = (function () {
  * store (key "poker"): the page hands in host.book() and host.save(book). The tax engine never sees it.
  *
  * host: { mode(), book(), today(), now(), save(book) -> Promise<{ ok, durable, text }>, download(name, text) -> Promise<{ ok, text }>,
- *         render(), folds (a Folds store: which cards are open, kept in the browser) }
+ *         render(), folds (a Folds store: which cards are open, kept in the browser), rates() (the rate settings with the ECB table, 43.3),
+ *         setRates({ source, kind }), goInvestData() }
  */
 const PokerUI = (function () {
   "use strict";
@@ -31437,12 +31604,14 @@ const PokerUI = (function () {
       const b = book();
       const sp = S.span(b);
       const r = range(sp);
+      const rates = host.rates ? host.rates() : undefined;
       const key = st.cur + "|" + r.from + "|" + r.to;
-      if (memo.v && memo.book === b && memo.key === key) return memo.v;
-      const v = S.view(b, st.cur, r.from, r.to);
+      if (memo.v && memo.book === b && memo.key === key && memo.rates === rates) return memo.v;
+      const v = S.view(b, st.cur, r.from, r.to, rates);
+      v.rateSet = rates || null;
       v.from = r.from || sp.first;
       v.to = r.to || sp.last;
-      memo = { book: b, key, v };
+      memo = { book: b, key, v, rates };
       return v;
     }
 
@@ -31602,11 +31771,62 @@ const PokerUI = (function () {
         seg("poker-period", [["all", "All"], ["year", "Calendar year"], ["12m", "Last 12 months"]], st.period.indexOf("year:") === 0 ? "year" : st.period, (x) => { st.period = x === "year" ? "year:" + (yearVal || years[0]) : x; host.render(); }),
         st.period.indexOf("year:") === 0 ? el("select", { "aria-label": "Year", "data-key": "poker-year", onchange: (e) => { st.period = "year:" + e.target.value; host.render(); } }, years.map((y) => el("option", { value: y, text: y, selected: y === yearVal }))) : null,
         seg("poker-cur", CURRENCIES.map((c) => [c, c]), st.cur, (x) => { st.cur = x; host.render(); }),
+        rateSelect(v),
         el("span", { class: "sub", "data-k": "poker-span", text: v.rows.length ? monthName(v.rows[0].month) + " to " + monthName(v.rows[v.rows.length - 1].month) + " · " + plural(v.rows.length, "month") : "" }));
+    }
+
+    /** The rates of the figures (architecture 43.3): his sheets first or the ECB first, the month's last ECB rate or its mean. */
+    const RATE_CHOICES = [
+      ["sheet|end", "Rates: your sheets (gaps: ECB month-end)"],
+      ["sheet|avg", "Rates: your sheets (gaps: ECB monthly average)"],
+      ["ecb|end", "Rates: ECB, last day of the month"],
+      ["ecb|avg", "Rates: ECB, monthly average"],
+    ];
+    function rateSelect(v) {
+      if (!host.rates || !host.setRates) return null;
+      const r = v.rateSet || host.rates();
+      const val = r.source + "|" + r.kind;
+      return el("select", { "aria-label": "Exchange rates", "data-key": "poker-rates", class: "rate-sel", onchange: (e) => { const [source, kind] = e.target.value.split("|"); host.setRates({ source, kind }); } },
+        RATE_CHOICES.map((o) => el("option", { value: o[0], text: o[1], selected: o[0] === val })));
+    }
+
+    /** Which months took a rate from the second source, and which ECB months are not over in the file; nothing when every month used the first. */
+    function ratesNote(v) {
+      const r = v.rateSet;
+      if (!r) return null;
+      const filled = v.rows.filter((x) => x.filled && x.filled.length);
+      const partial = v.rows.filter((x) => x.partial);
+      const kindText = r.kind === "avg" ? "monthly average" : "month-end rate";
+      const names = (rs) => {
+        const ms = rs.map((x) => monthName(x.month));
+        return ms.length > 4 ? ms.slice(0, 3).join(", ") + " and " + (ms.length - 3) + " more" : ms.join(", ");
+      };
+      const parts = [];
+      if (r.source === "ecb") parts.push("Every month is converted at the ECB's " + kindText + " from the rate file of Investments (Data tab).");
+      if (filled.length)
+        parts.push(r.source === "ecb"
+          ? plural(filled.length, "month") + (filled.length === 1 ? " uses" : " use") + " your sheets' rate because the ECB file has none for them: " + names(filled) + "."
+          : plural(filled.length, "month") + (filled.length === 1 ? " uses" : " use") + " the ECB's " + kindText + " because your sheets have no rate for them (" + [...new Set(filled.flatMap((x) => x.filled))].join(", ") + "): " + names(filled) + ".");
+      if (partial.length) {
+        const last = partial[partial.length - 1].month;
+        const t = r.table && r.table[last] ? Object.values(r.table[last]).filter(Boolean) : [];
+        const upTo = t.length ? t[0].endDay : "";
+        parts.push(names(partial) + (partial.length === 1 ? " is" : " are") + " not complete in the ECB file" + (upTo ? " (rates up to " + upTo + ")" : "") + ", so the rate is the latest so far.");
+      }
+      if (!parts.length) return null;
+      const tipRows = filled.slice(0, 24).map((x) => [monthName(x.month), Object.entries(x.rates).map(([c, src]) => c + " " + (src === "ecb" ? "ECB" : "your sheet")).join(", ")]);
+      return el("div", { class: "banner info rates-note", "data-k": "poker-rates-note", tabindex: tipRows.length ? "0" : false, "data-tip": tipRows.length ? tip("Where each month's rates came from", tipRows, filled.length > 24 ? "and " + (filled.length - 24) + " more months" : "") : false },
+        el("strong", { text: r.source === "ecb" ? "ECB rates" : "ECB rates fill the gaps" }), el("span", { text: parts.join(" ") }));
     }
 
     function missingBanner(v) {
       if (!v.missing.length) return null;
+      if (v.rateSet) {
+        const ms2 = v.missing.map((x) => monthName(x.month));
+        const fileWord = v.rateSet.hasFile ? "nor in the ECB rate file of Investments: load a newer or longer ECB file on its Data tab (step 4)" : "and no ECB rate file is stored yet: add one on the Data tab of Investments (step 4) and these months come back";
+        return banner("bad", plural(v.missing.length, "month") + " could not be shown in " + v.cur, el("span", { "data-k": "poker-missing", text: (ms2.length > 4 ? ms2.slice(0, 3).join(", ") + " and " + (ms2.length - 3) + " more" : ms2.join(", ")) + ": a rate is neither in your sheets " + fileWord + ". They are left out, so the totals below are incomplete." }),
+          !v.rateSet.hasFile && host.goInvestData ? btn("Open the Data tab", () => host.goInvestData(), "", "poker-go-ecb") : null);
+      }
       const ms = v.missing.map((x) => monthName(x.month));
       return banner("bad", plural(v.missing.length, "month") + " could not be shown in " + v.cur, el("span", { "data-k": "poker-missing", text: (ms.length > 4 ? ms.slice(0, 3).join(", ") + " and " + (ms.length - 3) + " more" : ms.join(", ")) + ": " + v.missing[0].why + ". They are left out, so the totals below are incomplete. The rates come from your own sheets (the balances rate table, else the income sheet's “1 EUR =”); a month with only the income sheet has no forint rate." }));
     }
@@ -32054,7 +32274,7 @@ const PokerUI = (function () {
       }
       const v = figures();
       const at = root.childNodes.length;
-      root.appendChild(el("section", { class: "card", "data-k": "poker-top" }, el("div", { class: "card-head" }, el("h2", { text: "Your poker results" }), el("span", { class: "sub", text: isDemo() ? "invented demo data" : "from your poker workbooks" })), controls(v), missingBanner(v), v.rows.length ? tiles(v) : note("No month in this period.")));
+      root.appendChild(el("section", { class: "card", "data-k": "poker-top" }, el("div", { class: "card-head" }, el("h2", { text: "Your poker results" }), el("span", { class: "sub", text: isDemo() ? "invented demo data" : "from your poker workbooks" })), controls(v), missingBanner(v), ratesNote(v), v.rows.length ? tiles(v) : note("No month in this period.")));
       if (v.rows.length) for (const c of [cumCard(v), monthsCard(v), hourlyCard(v), varianceCard(v), downCard(v), extrasCard(v), sitesCard(v), bankrollCard(v), balancesCard(v), yearsCard(v)]) if (c) root.appendChild(c);
       root.appendChild(checksCard());
       root.appendChild(importCard());
@@ -32078,7 +32298,7 @@ const PokerUI = (function () {
  * This file only draws. The figures come from CashFlow (src/cash/flow.js) and the layout of the picture from CashSankey (src/cash/sankey.js);
  * the books are read through the host and never written. Text always goes in with textContent.
  *
- * host: { mode(), spendBook(), spendFx(), pokerBook(), ledger() (the Investments ledger lines, or []), render(), goArea(a), folds }
+ * host: { mode(), spendBook(), spendFx(), pokerBook(), pokerRates() (the Poker area's rate settings, 43.3), ledger() (the Investments ledger lines, or []), render(), goArea(a), folds }
  */
 const CashUI = (function () {
   "use strict";
@@ -32162,10 +32382,11 @@ const CashUI = (function () {
       const fx = host.spendFx();
       const pb = host.pokerBook() || PokerBook.empty();
       const led = host.ledger() || [];
-      const key = [sb, fx, pb, led, st.cur];
+      const pr = host.pokerRates ? host.pokerRates() : undefined;
+      const key = [sb, fx, pb, led, st.cur, pr];
       if (memo.key && memo.key.every((x, i) => x === key[i])) return memo.m;
       const sv = Object.keys(sb.wallets || {}).length ? SpendView.build(sb, fx, { cur: st.cur }) : null;
-      const pk = PokerStats.rows(pb, st.cur);
+      const pk = PokerStats.rows(pb, st.cur, pr);
       const inv = CashFlow.invest(led, fx.convert, st.cur);
       const m = CashFlow.months({ spend: sv ? sv.monthly : [], spendSpan: sv ? sv.span : null, poker: pk.rows, invest: inv.months });
       m.sv = sv;
@@ -32364,7 +32585,7 @@ const CashUI = (function () {
       return fcard({ key: "cash-flow", title: "Where the money went", sub: v.p.n ? (v.p.n === 1 ? monthLong(v.p.from) : monthName(v.p.from) + " to " + monthName(v.p.to)) : "", glance: "Savings rate " + pct(rate, 1) + " · saved " + money(t.saved, cur, { plus: true }), dflt: true }, () => [
         el("div", { class: "rate-badge", "data-k": "cash-rate", tabindex: "0", "data-tip": tip("Savings rate", [["Net income", money(t.net, cur)], ["Spent", money(t.spent, cur)], ["Saved", money(t.saved, cur, { plus: true })], ["Savings rate", pct(rate, 2)]], "Saved ÷ net income. Net income = the table result + rakeback and promotions + your Spendee income + interest and dividends − the poker costs. Saved = net income − what you spent. Not shown when the net income is not above zero.") },
           el("span", { class: "label", text: "Savings rate" }), el("span", { class: "value num " + (rate === null ? "" : rate < 0 ? "neg" : ""), "data-k": "cash-rate-v", text: pct(rate, 2) })),
-        pp.ok ? sankey(v) : banner("bad", "The picture is not drawn", el("span", { text: "Because " + pp.why + ". The tiles below are right; tell us about it." })),
+        pp.ok ? sankey(v) : banner("bad", "The picture is not drawn", el("span", { text: "Because " + pp.why + (pp.gap ? " (off by " + pp.gap + " " + v.cur + ")" : "") + ". The tiles below are right; tell us about it." })),
         el("div", { class: "kpis spend-kpis cash-kpis", "data-k": "cash-kpis" },
           kpi("Income", big(t.income, cur), t.p ? "poker, Spendee, interest" : "Spendee and interest", tip("Income", [["Table result", money(t.table, cur, { plus: true })], ["Rakeback and promotions", money(t.extra, cur, { plus: true })], ["Spendee income", money(t.earned, cur, { plus: true })], ["Interest and dividends", money(t.invInc, cur, { plus: true })], ["Income", money(t.income, cur, { plus: true })]], "Each part as its own area shows it, in the currency chosen.")),
           kpi("Spent", big(t.spent, cur), "your Spendee expenses", tip("Spent", [["Spent", money(t.spent, cur)], ["Poker costs (apart)", money(t.cost, cur)]], "Every expense of the Spending book in these months, converted as the Spending area does it.")),
@@ -32971,9 +33192,9 @@ const PackUI = (function () {
   // it only reads the ECB rate files of this document, and never writes into it.
   const spendPersist = Persist.create({ env: window, navigator: window.navigator, key: "spend" });
   const AREAS = [["invest", "Investments"], ["spend", "Spending"], ["poker", "Poker"], ["cash", "Cash flow"]];
-  const spend = { book: SpendBook.empty(), loaded: false, problem: null, lastSave: null, demoBook: null, fx: null, fxFiles: null, fxDemo: null };
+  const spend = { book: SpendBook.empty(), loaded: false, problem: null, lastSave: null, demoBook: null, fx: null, fxLf: null, fxDemo: null, lf: null, lfFiles: null };
   const pokerPersist = Persist.create({ env: window, navigator: window.navigator, key: "poker" }); // the Poker book (architecture 40.4), apart from every other book
-  const poker = { book: PokerBook.empty(), loaded: false, problem: null, lastSave: null, demoBook: null };
+  const poker = { book: PokerBook.empty(), loaded: false, problem: null, lastSave: null, demoBook: null, rateChoice: null };
   // The filed tax years (architecture 39.6): the frozen copies of the tax adviser pack, a book of their own with their own key and backup file. The tax engine never
   // reads it; the pack only reads the tax figures.
   const filedPersist = Persist.create({ env: window, navigator: window.navigator, key: "filed" });
@@ -34104,13 +34325,25 @@ const PackUI = (function () {
   /** The Spending book shown: the invented one in the demo (kept in memory, nothing saved), else the stored one. */
   const spendBook = () => (ui.mode === "demo" ? spend.demoBook || (spend.demoBook = SpendDemo.build().book) : spend.book);
 
+  /** The ECB ledgers of the Investments document's stored rate files, read only and read once per currency (the demo has its own invented
+   *  table). Shared by the Spending area and the Poker rates (architecture 43.3), so a file is parsed once. */
+  function ecbLedgerFor() {
+    if (ui.mode === "demo") return SpendDemo.ledgerFor;
+    const files = doc && doc.files && doc.files.ecb ? doc.files.ecb : {};
+    if (spend.lf && spend.lfFiles === files) return spend.lf;
+    spend.lf = SpendFx.ledgersFromFiles(files);
+    spend.lfFiles = files;
+    return spend.lf;
+  }
+  const ecbFilesStored = () => ui.mode === "demo" || !!(doc && doc.files && doc.files.ecb && Object.keys(doc.files.ecb).length);
+
   /** The rates for the Spending area: the ECB files of the Investments document, read only (the demo has its own invented table). */
   function spendFx() {
     if (ui.mode === "demo") return spend.fxDemo || (spend.fxDemo = SpendFx.create(SpendDemo.ledgerFor));
-    const files = doc && doc.files && doc.files.ecb ? doc.files.ecb : {};
-    if (spend.fx && spend.fxFiles === files) return spend.fx;
-    spend.fx = SpendFx.create(SpendFx.ledgersFromFiles(files));
-    spend.fxFiles = files;
+    const lf = ecbLedgerFor();
+    if (spend.fx && spend.fxLf === lf) return spend.fx;
+    spend.fx = SpendFx.create(lf);
+    spend.fxLf = lf;
     return spend.fx;
   }
 
@@ -34171,6 +34404,41 @@ const PackUI = (function () {
   /** The Poker book shown: the invented one in the demo (kept in memory, nothing saved), else the stored one. */
   const pokerBook = () => (ui.mode === "demo" ? poker.demoBook || (poker.demoBook = PokerDemo.build().book) : poker.book);
 
+  // The rates of the Poker figures (architecture 43.3): his sheets first or the ECB first, the month's last ECB rate or its mean. The choice is a
+  // setting of this browser (like the open cards), not data: it is kept under its own key and in no backup. Poker and Cash flow read the same.
+  const POKER_RATES_KEY = "att-poker-rates-v1";
+  let pokerRatesMemo = { lf: null, book: null, table: null, s: "", out: null };
+  function pokerRateSettings() {
+    try {
+      return PokerRates.settings(JSON.parse((foldStorage && foldStorage.getItem(POKER_RATES_KEY)) || "null"));
+    } catch (e) {
+      return PokerRates.settings(null);
+    }
+  }
+  function setPokerRates(x) {
+    const s = PokerRates.settings(x);
+    try {
+      if (foldStorage) foldStorage.setItem(POKER_RATES_KEY, JSON.stringify(s));
+    } catch (e) {
+      /* a browser that keeps nothing: the choice lasts while the page is open */
+    }
+    poker.rateChoice = s;
+    render();
+  }
+  /** { source, kind, table, hasFile }: the same object while nothing changes, so the areas can keep their figures. */
+  function pokerRates() {
+    const s = poker.rateChoice || (poker.rateChoice = pokerRateSettings());
+    const lf = ecbLedgerFor();
+    const b = pokerBook() || PokerBook.empty();
+    const key = s.source + "|" + s.kind + "|" + ecbFilesStored();
+    if (pokerRatesMemo.lf !== lf || pokerRatesMemo.book !== b) pokerRatesMemo = { lf, book: b, table: PokerRates.table(lf, Object.keys(b.months), PokerRates.currencies(b)), s: "", out: null };
+    if (pokerRatesMemo.s !== key || !pokerRatesMemo.out) {
+      pokerRatesMemo.s = key;
+      pokerRatesMemo.out = { source: s.source, kind: s.kind, table: pokerRatesMemo.table, hasFile: ecbFilesStored() };
+    }
+    return pokerRatesMemo.out;
+  }
+
   async function pokerSave(book) {
     if (ui.mode === "demo") {
       poker.demoBook = book;
@@ -34194,6 +34462,9 @@ const PackUI = (function () {
   const pokerUI = PokerUI.create({
     mode: () => ui.mode,
     book: pokerBook,
+    rates: pokerRates,
+    setRates: setPokerRates,
+    goInvestData: () => goTab("data"),
     today: todayIso,
     now: () => new Date().toISOString(),
     save: pokerSave,
@@ -34235,6 +34506,7 @@ const PackUI = (function () {
     spendBook,
     spendFx,
     pokerBook,
+    pokerRates,
     ledger: () => (ui.mode === "demo" ? cashDemoLedger || (cashDemoLedger = CashFlow.demoLedger()) : conv && conv.tables && Array.isArray(conv.tables.ledger) ? conv.tables.ledger : []),
     render: () => render(),
     goArea: (a) => goArea(a),
