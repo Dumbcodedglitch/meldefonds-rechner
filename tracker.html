@@ -657,6 +657,35 @@ span.hc { cursor: default; }
 .hc.sel, tr.sel .hc.tot { box-shadow: 0 0 0 2px var(--accent); }
 .hc.tot { font-weight: 600; }
 .hc:hover { filter: brightness(1.15); }
+/* the Poker part in the new look (architecture 44): its own tabs, two or three pictures side by side, coloured total cells, the Month tab */
+.tabs.ptabs { margin: 0 -16px; border-radius: 0; }
+.grid3 { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 860px) { .grid3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.grid3 > .mini > .sub-head { margin-top: 0; }
+.whisker { stroke: var(--fg); stroke-width: 1.5; fill: none; opacity: 0.85; pointer-events: none; }
+.hm-s1 { background-color: color-mix(in srgb, var(--c-austria) 16%, var(--surface-2)); }
+.hm-s2 { background-color: color-mix(in srgb, var(--c-austria) 28%, var(--surface-2)); }
+.hm-s3 { background-color: color-mix(in srgb, var(--c-austria) 40%, var(--surface-2)); color: #fff; }
+.hm-s4 { background-color: color-mix(in srgb, var(--c-austria) 54%, var(--surface-2)); color: #fff; }
+.hm-s5 { background-color: color-mix(in srgb, var(--c-austria) 68%, var(--surface-2)); color: #fff; }
+.heat .ycol { padding-left: 6px; }
+.tbl td.tc { padding: 3px 4px; }
+.tbl td.tc .hc { min-height: 28px; line-height: 28px; padding: 0 8px; text-align: right; white-space: nowrap; }
+.tbl tfoot th, .tbl tfoot td { font-weight: 700; border-top: 1px solid var(--axis); border-bottom: 0; background: var(--surface-2); }
+.tbl .mlink { padding: 0; text-decoration: none; font-weight: 600; white-space: nowrap; }
+.chip.tiny { font-size: 10px; padding: 2px 6px; margin-left: 6px; vertical-align: 1px; }
+.tbl td.chg { color: var(--warn); }
+.pm-tbl td { padding: 4px 4px; vertical-align: middle; }
+.pm-tbl input, .pm-tbl select, .pm-add input[type="month"] { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; color: var(--fg); padding: 6px 8px; min-height: 36px; font: 13px var(--font-mono); font-variant-numeric: tabular-nums; color-scheme: dark; }
+.pm-tbl input:hover, .pm-tbl select:hover, .pm-add input[type="month"]:hover { border-color: var(--axis); }
+.pm-tbl select { font-family: var(--font-body); }
+.pm-tbl input.n { width: 100%; min-width: 88px; text-align: right; }
+.pm-tbl input.t { width: 100%; min-width: 120px; }
+.pm-fields, .pm-rates { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-start; }
+.pm-fields .field, .pm-rates .field { display: grid; gap: 4px; }
+.pm-fields input.n, .pm-rates input.n { width: 140px; text-align: right; }
+input.t.wide { width: min(420px, 100%); }
+input.invalid, select.invalid { border-color: var(--bad) !important; box-shadow: 0 0 0 1px var(--bad); }
 .hm-0 { background-color: var(--surface-2); }
 .hm-p1 { background-color: color-mix(in srgb, var(--c-gain) 20%, var(--surface-2)); }
 .hm-p2 { background-color: color-mix(in srgb, var(--c-gain) 32%, var(--surface-2)); }
@@ -16319,7 +16348,8 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     const doc = el.ownerDocument;
     const win = doc.defaultView;
     const rect = el.getBoundingClientRect();
-    const tabs = doc.querySelector(".tabs");
+    // the bar of tabs that is shown: the Investments tabs, or the Poker part's own (architecture 44.2); a hidden bar has no height
+    const tabs = Array.from(doc.querySelectorAll(".tabs")).find((t) => t.getBoundingClientRect().height > 0) || null;
     const edge = Math.max(8, (tabs ? tabs.getBoundingClientRect().bottom : 0) + 6);
     const bar = doc.querySelector("nav.areas");
     const br = bar && win.getComputedStyle(bar).position === "fixed" && win.getComputedStyle(bar).display !== "none" ? bar.getBoundingClientRect() : null;
@@ -16509,6 +16539,9 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
    *   defaultOn false means off until the button is pressed) and its note is shown under the chart only while it is on. Off, it is not drawn,
    *   not in the axis, not in the tooltip.)
    * }
+   *   diverge: true (stacked, architecture 44.5): the negative parts stack downwards from zero, the positive ones upwards; the axis takes both sums
+   *   whiskers: [{ lo, hi } | null, ...] (split or a single grouped series, architecture 44.5): a thin range line with short caps over each bar, in the
+   *   ink colour; the axis takes the ranges in
    * Grouped and split bars are lit at the data end and have a soft glow; stacked segments are flat (neighbours of different colours).
    */
   function bars(opts) {
@@ -16572,6 +16605,9 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       const withPair = !!pr && pairOn;
       const pairShown = withPair ? shownIdx.map((si) => ({ color: series[si].color, values: pr.series[si].values || [], texts: pr.series[si].texts })) : [];
       const stackSum = (list, i) => list.reduce((t, x) => t + Math.max(0, x.values[i] || 0), 0);
+      const diverge = mode === "stacked" && !!opts.diverge;
+      const negSum = (list, i) => list.reduce((t, x) => t + Math.min(0, x.values[i] || 0), 0);
+      const whisk = mode !== "stacked" && Array.isArray(opts.whiskers) ? opts.whiskers : null;
 
       // value range
       let lo = 0, hi = 0;
@@ -16579,6 +16615,8 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       const pairTotals = cats.map((_, i) => (withPair ? stackSum(pairShown, i) : 0));
       if (mode === "stacked") hi = Math.max.apply(null, totals.concat(pairTotals, [0]));
       else for (const x of shown) for (const v of x.values) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+      if (diverge) lo = Math.min.apply(null, cats.map((_, i) => negSum(shown, i)).concat([0]));
+      if (whisk) for (const w of whisk) if (w && Number.isFinite(w.lo) && Number.isFinite(w.hi)) { lo = Math.min(lo, w.lo); hi = Math.max(hi, w.hi); }
       const sc = niceScale(lo, hi, 4);
       const y = (v) => mt + ph - ((v - sc.min) / (sc.max - sc.min)) * ph;
 
@@ -16624,6 +16662,26 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       const stack = (g, x, list, i, hatched) => {
         let acc = 0;
         let drawn = false;
+        if (diverge) {
+          // below zero: the negative parts, one under the other, the lowest rounded at its end
+          let accN = 0;
+          let drawnN = false;
+          const lastNeg = list.reduce((m, x2, si) => ((x2.values[i] || 0) < 0 ? si : m), -1);
+          list.forEach((x2, si) => {
+            const v = Math.min(0, x2.values[i] || 0);
+            if (v === 0) return;
+            const y0 = y(accN), y1 = y(accN + v);
+            if (y1 - y0 < 1) {
+              accN += v;
+              return;
+            }
+            const gap = drawnN ? Math.min(GAP, y1 - y0 - 1) : 0;
+            const d = si === lastNeg ? barPath(x, bw, y0 + gap, y1) : "M" + x + " " + (y0 + gap) + "V" + y1 + "H" + (x + bw) + "V" + (y0 + gap) + "Z";
+            bar(g, d, x2.color, false, hatched, x2.pattern);
+            drawnN = true;
+            accN += v;
+          });
+        }
         const lastNonZero = list.reduce((m, x2, si) => ((x2.values[i] || 0) > 0 ? si : m), -1);
         list.forEach((x2, si) => {
           const v = Math.max(0, x2.values[i] || 0);
@@ -16676,6 +16734,13 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
           stack(g, gx, shown, i, false);
           if (withPair) stack(g, gx + bw + GAP, pairShown, i, true);
         }
+        // a range over the bar (whiskers): a thin line in the ink colour with short caps
+        const wk = whisk ? whisk[i] : null;
+        if (wk && Number.isFinite(wk.lo) && Number.isFinite(wk.hi)) {
+          const wx = mode === "grouped" ? gx + bw / 2 : gx + bw / 2;
+          const cap = Math.max(3, Math.min(7, bw / 2));
+          s("path", { d: "M" + wx + " " + y(wk.hi) + "V" + y(wk.lo) + "M" + (wx - cap) + " " + y(wk.hi) + "H" + (wx + cap) + "M" + (wx - cap) + " " + y(wk.lo) + "H" + (wx + cap), class: "whisker" }, g);
+        }
         // x label (opts.tickLabels: the text under each bar when it is shorter than the category; an empty one is left out)
         const tl = opts.tickLabels ? opts.tickLabels[i] : c;
         if (tl) {
@@ -16699,7 +16764,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
         }
         // hit area: the whole band, keyboard focusable
         // skipZero (stacked): a series that has nothing in this category is not a row of its tip (a stack of a dozen series would be a tall box of dashes)
-        const rows = shown.filter((x) => !(opts.skipZero && mode === "stacked" && !(x.values[i] > 0))).map((x) => ({ name: x.name, color: mode === "split" ? (x.values[i] < 0 ? opts.colorNeg : opts.colorPos) : x.color, pattern: x.pattern, value: (x.texts && x.texts[i]) || String(x.values[i]) }));
+        const rows = shown.filter((x) => !(opts.skipZero && mode === "stacked" && !(diverge ? x.values[i] : x.values[i] > 0))).map((x) => ({ name: x.name, color: mode === "split" ? (x.values[i] < 0 ? opts.colorNeg : opts.colorPos) : x.color, pattern: x.pattern, value: (x.texts && x.texts[i]) || String(x.values[i]) }));
         if (mode === "stacked" && opts.totalTexts && allShown) rows.push({ name: "Total", value: opts.totalTexts[i] });
         const more = plainRows(opts.details && opts.details[i]);
         // a row of the pair that is about series that are hidden goes away with them
@@ -20729,8 +20794,13 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
  *                            inc?: { items: [{ name, amt }], cost, table, eur, hours, hands, sum } } },
  *     years: { "YYYY": { expenses: [{ name, amt }], expSum, rake: [{ site, rake, rb }] } },
  *     sites: { <name>: { cur } },
- *     imports: [{ on, file, part, months }] }
- * Every amount is an exact decimal text as the workbook had it.
+ *     imports: [{ on, file, part, months }],
+ *     typed: { "YYYY-MM": { bal?: { sites, rates }, inc?: { items: [{ name, amt, cur? }], cost, table, eur, hours, hands }, on, note? } } }
+ * Every amount is an exact decimal text as the workbook had it (or as he typed it).
+ *
+ * Format 2 (architecture 44.3): the part `typed` holds the months he typed in or corrected in the page, kept apart from the imports. A typed
+ * part (balances or income) takes the place of the imported part of the same month; a part he did not type falls back to the import.
+ * `months` keeps the imports exactly as they were. Format 1 books and backups (no `typed`) still read.
  *
  * The unit of replacement is (workbook part, month): a balances file replaces the balances of the months it holds, an income file the
  * income of its months and the lists of its years. Every other month stays as it was; the same file twice changes nothing.
@@ -20743,14 +20813,15 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
 })(typeof self !== "undefined" ? self : this, function (Dec) {
   "use strict";
 
-  const VERSION = "pokerbook-0.2.0";
+  const VERSION = "pokerbook-0.3.0";
   const KIND = "austria-tracker-poker";
-  const FORMAT = 1;
+  const FORMAT = 2;
   const BACKUP_KIND = "austria-tracker-backup";
   const BOOK = "poker";
   const CURS = ["USD", "EUR", "GBP", "HUF"];
   const MAX_NAME = 120;
   const MAX_IMPORTS = 500;
+  const MAX_NOTE = 200;
 
   const isObj = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
   const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -20761,12 +20832,13 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
   const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
   function empty() {
-    return { kind: KIND, format: FORMAT, base: "USD", months: {}, years: {}, sites: {}, imports: [] };
+    return { kind: KIND, format: FORMAT, base: "USD", months: {}, years: {}, sites: {}, imports: [], typed: {} };
   }
 
   // ---------------------------------------------------------------- checking a stored book
 
-  function cleanBal(b, at) {
+  /** typed: a month he typed in (architecture 44.3): its rates may be left empty (the ECB's then count), and it has no Total of his. */
+  function cleanBal(b, at, typed) {
     if (!isObj(b) || !Array.isArray(b.sites) || !isObj(b.rates)) return { error: at + ": the balances are damaged." };
     const sites = [];
     const seen = new Set();
@@ -20777,27 +20849,32 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       sites.push({ name: s.name, open: s.open, xfer: s.xfer, bonus: s.bonus, close: s.close });
     }
     const rates = {};
-    if (!isPos(b.rates.USD)) return { error: at + ": the dollar rate of the balances is missing." };
-    for (const c of ["USD", "HUF", "GBP"]) if (has(b.rates, c)) {
+    if (!typed && !isPos(b.rates.USD)) return { error: at + ": the dollar rate of the balances is missing." };
+    for (const c of ["USD", "HUF", "GBP"]) if (has(b.rates, c) && !(typed && b.rates[c] === "")) {
       if (!isPos(b.rates[c])) return { error: at + ": a rate of the balances is not above zero." };
       rates[c] = b.rates[c];
     }
     const mult = {};
     if (isObj(b.mult)) for (const [k, v] of Object.entries(b.mult)) if (okName(k) && CURS.includes(v)) mult[k] = v;
+    if (typed) return { bal: { sites, rates } };
     return { bal: { sites, rates, rateDay: typeof b.rateDay === "string" ? b.rateDay.slice(0, 10) : "", total: isNumOrEmpty(b.total) ? b.total : "", mult } };
   }
 
-  function cleanInc(x, at) {
+  /** typed: a month he typed in: a line may be in a currency of its own (cur; a line without it is in dollars), and there is no month SUM of his. */
+  function cleanInc(x, at, typed) {
     if (!isObj(x) || !Array.isArray(x.items)) return { error: at + ": the income is damaged." };
     const items = [];
     for (const it of x.items) {
       if (!isObj(it) || !okName(it.name) || !isNum(it.amt)) return { error: at + ": a line of the income is damaged." };
-      items.push({ name: it.name, amt: it.amt });
+      if (has(it, "cur") && (!typed || !CURS.includes(it.cur))) return { error: at + ": the currency of a line of the income is damaged." };
+      items.push(typed && it.cur && it.cur !== "USD" ? { name: it.name, amt: it.amt, cur: it.cur } : { name: it.name, amt: it.amt });
     }
+    if (typed && x.sum === undefined) x = Object.assign({}, x, { sum: "" });
     if (!isNum(x.cost) || !isNum(x.table) || !isNum(x.hours) || !isNumOrEmpty(x.eur) || !isNumOrEmpty(x.sum)) return { error: at + ": a figure of the income is damaged." };
     if (Dec.isNeg(Dec.parse(x.hours))) return { error: at + ": the hours are below zero." };
     if (x.eur !== "" && !isPos(x.eur)) return { error: at + ": the rate '1 EUR =' is not above zero." };
     if (!(x.hands === "" || (typeof x.hands === "string" && /^\d+$/.test(x.hands)))) return { error: at + ": the hands are not a whole number." };
+    if (typed) return { inc: { items, cost: x.cost, table: x.table, eur: x.eur, hours: x.hours, hands: x.hands } };
     return { inc: { items, cost: x.cost, table: x.table, eur: x.eur, hours: x.hours, hands: x.hands, sum: x.sum } };
   }
 
@@ -20844,8 +20921,28 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       if (!okName(k) || !isObj(v) || !CURS.includes(v.cur)) return { ok: false, error: "The currency of a site of the Poker book is damaged." };
       out.sites[k] = { cur: v.cur };
     }
-    for (const m of Object.keys(out.months)) {
-      const b = out.months[m].bal;
+    if (has(p, "typed")) {
+      if (!isObj(p.typed)) return { ok: false, error: "The typed-in months of the Poker book are damaged." };
+      for (const m of Object.keys(p.typed).sort()) {
+        const t = p.typed[m];
+        if (!MONTH_RE.test(m) || !isObj(t)) return { ok: false, error: "A typed-in month of the Poker book is damaged." };
+        const rec = { on: typeof t.on === "string" ? t.on.slice(0, 10) : "" };
+        if (typeof t.note === "string" && t.note.trim()) rec.note = t.note.slice(0, MAX_NOTE);
+        if (has(t, "bal")) {
+          const c = cleanBal(t.bal, m + " (typed in)", true);
+          if (c.error) return { ok: false, error: c.error };
+          rec.bal = c.bal;
+        }
+        if (has(t, "inc")) {
+          const c = cleanInc(t.inc, m + " (typed in)", true);
+          if (c.error) return { ok: false, error: c.error };
+          rec.inc = c.inc;
+        }
+        if (rec.bal || rec.inc) out.typed[m] = rec;
+      }
+    }
+    for (const [m, r] of Object.entries(out.months).concat(Object.entries(out.typed))) {
+      const b = r.bal;
       if (b) for (const s of b.sites) if (!out.sites[s.name]) return { ok: false, error: "The site '" + s.name.slice(0, 40) + "' of " + m + " has no currency in the Poker book." };
     }
     if (Array.isArray(p.imports))
@@ -20911,7 +21008,11 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
         const before = book.months[m] && book.months[m][part] ? book.months[m][part] : null;
         const state = !before ? "new" : same(before, after) ? "same" : "replaced";
         const changes = state === "replaced" && !same(brief(part, before), brief(part, after));
-        rows.push({ month: m, state, before: brief(part, before), after: brief(part, after), changes });
+        // a month he typed in (architecture 44.3): the import stores the file's figures beneath his typed ones, which keep counting; when the
+        // two differ the import needs the second press, and "use the file's figures" takes his typed part away
+        const tp = book.typed && book.typed[m] && book.typed[m][part] ? book.typed[m][part] : null;
+        const typedDiffers = !!tp && !same(brief(part, tp), brief(part, after));
+        rows.push({ month: m, state, before: brief(part, before), after: brief(part, after), changes, typed: !!tp, typedDiffers, typedBrief: brief(part, tp) });
       }
     // A month the file shows as not filled in yet (architecture 40.12) takes away what an earlier import stored for it (his November
     // with empty closing balances, read before as a loss of everything); it needs the second press like any change of figures.
@@ -20931,7 +21032,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     const fileYears = new Set(parsed.sheets.map((s) => s.year));
     const kept = Object.keys(book.months).filter((m) => book.months[m][part] && fileYears.has(m.slice(0, 4)) && !fileMonths.has(m)).sort();
     rows.sort((a, b) => (a.month < b.month ? -1 : 1));
-    return { part, rows, years, kept, second: rows.filter((r) => r.changes).length, sites: part === "bal" ? siteProposals(book, parsed) : {} };
+    return { part, rows, years, kept, second: rows.filter((r) => r.changes || r.typedDiffers).length, typed: rows.filter((r) => r.typed).map((r) => r.month), sites: part === "bal" ? siteProposals(book, parsed) : {} };
   }
 
   function cleanYear(y) {
@@ -20945,7 +21046,8 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
   }
 
   /**
-   * The book after the import. opts: { sites: { name: cur } (his choice for each site of the file that the book does not know), on, file }.
+   * The book after the import. opts: { sites: { name: cur } (his choice for each site of the file that the book does not know), on, file,
+   * useFile: true (the typed part of this workbook part is taken away for every month of the file, so that the file's figures count) }.
    * { ok: true, book, changed: [months] } or { ok: false, error } (a site without a currency, or a part that would not check out).
    */
   function apply(book, parsed, opts) {
@@ -20970,6 +21072,11 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
         if (!b.months[m]) b.months[m] = {};
         if (!same(b.months[m][part] || null, after)) changed.push(m);
         b.months[m][part] = after;
+        if (o.useFile && b.typed && b.typed[m] && b.typed[m][part]) {
+          delete b.typed[m][part];
+          if (!b.typed[m].bal && !b.typed[m].inc) delete b.typed[m];
+          if (changed.indexOf(m) < 0) changed.push(m);
+        }
       }
       for (const m of s.blank || []) {
         if (has(s.months, m) || !b.months[m] || !b.months[m][part]) continue;
@@ -20997,13 +21104,146 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     if (part === "all") {
       b.sites = {};
       b.imports = [];
+      b.typed = {};
     }
     return normalize(b).book;
   }
 
+  /** months: every month that counts (imported or typed in); bal and inc: the imported ones; typed: the months with a typed part. */
   function count(book) {
-    const ms = Object.values((book && book.months) || {});
-    return { months: ms.length, bal: ms.filter((m) => m.bal).length, inc: ms.filter((m) => m.inc).length };
+    const imp = (book && book.months) || {};
+    const ty = (book && book.typed) || {};
+    const ms = Object.values(imp);
+    return { months: new Set(Object.keys(imp).concat(Object.keys(ty))).size, bal: ms.filter((m) => m.bal).length, inc: ms.filter((m) => m.inc).length, typed: Object.keys(ty).length };
+  }
+
+  // ---------------------------------------------------------------- months typed in (architecture 44.3)
+
+  /**
+   * A number as he types it into a box: digits with at most one decimal point and an optional minus sign. { ok, text } or { ok: false, error }.
+   * o: { neg: false (no minus), int: true (a whole number), empty: true (an empty box is allowed: text "") }. A comma, a space or a thousands
+   * separator is refused: "1,234" could be either, so nothing is guessed.
+   */
+  function typedNumber(raw, o) {
+    const opt = o || {};
+    const t = String(raw === undefined || raw === null ? "" : raw).trim();
+    if (t === "") return opt.empty ? { ok: true, text: "" } : { ok: false, error: "is empty" };
+    if (/,/.test(t)) return { ok: false, error: "has a comma: use a point for decimals (1234.56), no thousands separators" };
+    if (/\s/.test(t)) return { ok: false, error: "has a space: type the number without spaces" };
+    const re = opt.int ? /^-?\d+$/ : /^-?(\d+(\.\d*)?|\.\d+)$/;
+    if (!re.test(t)) return { ok: false, error: opt.int ? "is not a whole number" : "is not a number (digits, one point, an optional minus)" };
+    const d = Dec.parse(t.replace(/\.$/, "").replace(/^(-?)\./, "$10."));
+    if (d === null) return { ok: false, error: "is not a number" };
+    if (opt.neg === false && Dec.isNeg(d) && !Dec.isZero(d)) return { ok: false, error: "is below zero" };
+    return { ok: true, text: Dec.str(d) };
+  }
+
+  /**
+   * The book with a typed part of a month. part "bal": data { sites: [{ name, cur?, open, xfer, bonus, close }], rates: { USD, HUF, GBP } }
+   * ("cur" is needed for a site the book does not know yet); part "inc": data { items: [{ name, amt, cur }], cost, table, eur, hours, hands }.
+   * Every value is the text of a box. { ok: true, book } or { ok: false, errors: [{ field, text }] } (nothing changed).
+   */
+  function setTyped(book, month, part, data, on, note) {
+    const errors = [];
+    const bad = (field, label, r) => errors.push({ field, text: label + " " + r.error + "." });
+    if (!MONTH_RE.test(String(month || ""))) return { ok: false, errors: [{ field: "month", text: "Choose a month (YYYY-MM)." }] };
+    if (part !== "bal" && part !== "inc") return { ok: false, errors: [{ field: "part", text: "Unknown part." }] };
+    const d = data || {};
+    const b = JSON.parse(JSON.stringify(book));
+    if (!b.typed) b.typed = {};
+    let rec;
+    if (part === "bal") {
+      const sites = [];
+      const seen = new Set();
+      (Array.isArray(d.sites) ? d.sites : []).forEach((s, i) => {
+        const name = String((s && s.name) || "").trim();
+        const at = "site " + (i + 1) + (name ? " (" + name.slice(0, 40) + ")" : "");
+        const allEmpty = !name && ["open", "xfer", "bonus", "close"].every((f) => String((s && s[f]) || "").trim() === "");
+        if (allEmpty) return; // an empty row is left out
+        if (!okName(name)) return errors.push({ field: "site:" + i + ":name", text: "The name of " + at + " is empty or too long." });
+        if (seen.has(name)) return errors.push({ field: "site:" + i + ":name", text: "The site '" + name.slice(0, 40) + "' stands twice." });
+        seen.add(name);
+        const known = b.sites[name] ? b.sites[name].cur : "";
+        const cur = s.cur || known;
+        if (!CURS.includes(cur)) return errors.push({ field: "site:" + i + ":cur", text: "Choose the currency of " + at + "." });
+        if (known && s.cur && s.cur !== known) return errors.push({ field: "site:" + i + ":cur", text: "The site '" + name.slice(0, 40) + "' is counted in " + known + "; change its currency on the Sites tab." });
+        const row = { name };
+        const labels = { open: "The opening", xfer: "The transfers", bonus: "The bonuses", close: "The closing" };
+        for (const f of ["open", "xfer", "bonus", "close"]) {
+          const r = typedNumber(s[f], { empty: true, neg: f === "open" || f === "close" ? false : true }); // a balance is never below zero; transfers and bonuses may be
+          if (!r.ok) {
+            bad("site:" + i + ":" + f, labels[f] + " of " + at, r);
+            continue;
+          }
+          row[f] = r.text === "" ? "0" : r.text;
+        }
+        if (!known) b.sites[name] = { cur };
+        sites.push(row);
+      });
+      if (!sites.length && !errors.length) errors.push({ field: "sites", text: "Type at least one site." });
+      const rates = {};
+      for (const c of ["USD", "HUF", "GBP"]) {
+        const r = typedNumber(d.rates && d.rates[c], { empty: true, neg: false });
+        if (!r.ok) bad("rate:" + c, "The " + c + " rate", r);
+        else if (r.text !== "") {
+          if (Dec.isZero(Dec.parse(r.text))) errors.push({ field: "rate:" + c, text: "The " + c + " rate must be above zero (leave it empty for the ECB's)." });
+          else rates[c] = r.text;
+        }
+      }
+      rec = { sites, rates };
+    } else {
+      const items = [];
+      (Array.isArray(d.items) ? d.items : []).forEach((it, i) => {
+        const name = String((it && it.name) || "").trim();
+        const at = "line " + (i + 1) + (name ? " (" + name.slice(0, 40) + ")" : "");
+        // an empty row, and a line with a name but no amount (his sheets' way of a line not used that month), are left out
+        if (String((it && it.amt) || "").trim() === "") return;
+        if (!okName(name)) return errors.push({ field: "item:" + i + ":name", text: "The name of " + at + " is empty or too long." });
+        const r = typedNumber(it.amt, {});
+        if (!r.ok) return bad("item:" + i + ":amt", "The amount of " + at, r);
+        const cur = it.cur || "USD";
+        if (!CURS.includes(cur)) return errors.push({ field: "item:" + i + ":cur", text: "Choose the currency of " + at + "." });
+        items.push(cur === "USD" ? { name, amt: r.text } : { name, amt: r.text, cur });
+      });
+      const num = (f, label, o) => {
+        const r = typedNumber(d[f], Object.assign({ empty: true }, o));
+        if (!r.ok) {
+          bad(f, label, r);
+          return "";
+        }
+        return r.text;
+      };
+      const cost = num("cost", "The costs", {});
+      const table = num("table", "TABLE PROFIT", {});
+      const eur = num("eur", "The rate “1 EUR =”", { neg: false });
+      if (eur !== "" && Dec.isZero(Dec.parse(eur))) errors.push({ field: "eur", text: "The rate “1 EUR =” must be above zero (leave it empty for the ECB's)." });
+      const hours = num("hours", "The hours", { neg: false });
+      const hands = num("hands", "The hands", { int: true, neg: false });
+      rec = { items, cost: cost === "" ? "0" : cost, table: table === "" ? "0" : table, eur, hours: hours === "" ? "0" : hours, hands };
+    }
+    if (errors.length) return { ok: false, errors };
+    const t = b.typed[month] || {};
+    t[part] = rec;
+    t.on = String(on || "").slice(0, 10);
+    if (typeof note === "string") {
+      if (note.trim()) t.note = note.trim().slice(0, MAX_NOTE);
+      else delete t.note;
+    }
+    b.typed[month] = t;
+    const n = normalize(b);
+    if (!n.ok) return { ok: false, errors: [{ field: "", text: n.error }] };
+    return { ok: true, book: n.book };
+  }
+
+  /** The book without his typed part of a month (part "bal", "inc" or "all"): the imported figures count again. */
+  function dropTyped(book, month, part) {
+    const b = JSON.parse(JSON.stringify(book));
+    const t = b.typed && b.typed[month];
+    if (!t) return book;
+    if (part === "all" || part === "bal") delete t.bal;
+    if (part === "all" || part === "inc") delete t.inc;
+    if (!t.bal && !t.inc) delete b.typed[month];
+    return normalize(b).book;
   }
 
   // ---------------------------------------------------------------- the backup of this book alone
@@ -21030,7 +21270,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     return { ok: true, book: n.book, savedAt: typeof p.savedAt === "string" ? p.savedAt : "" };
   }
 
-  return { VERSION, KIND, FORMAT, BOOK, BACKUP_KIND, CURS, empty, normalize, plan, apply, siteProposals, removePart, count, toBackup, fromBackup };
+  return { VERSION, KIND, FORMAT, BOOK, BACKUP_KIND, CURS, empty, normalize, plan, apply, siteProposals, removePart, count, toBackup, fromBackup, typedNumber, setTyped, dropTyped };
 });
 
 /* ---- src/poker/stats.js ---- */
@@ -21053,6 +21293,9 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
  *
  * The statistics (hourly, variance, downswings, the luck band, risk of ruin) work in floating point from those exact sums; they are
  * descriptions of his record, not tax figures. Pure functions, no DOM, no clock. Runs in Node (tests) and in the page.
+ *
+ * Since 25 Nov 2026 (architecture 44.3) a month counts as `record(book, m)`: the part he typed in (book.typed) in place of the imported part of
+ * the same month, the other part from the import. A typed income line may be in a currency of its own (cur), converted like every figure.
  */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory(require("../lib/decimal.js"));
@@ -21060,7 +21303,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
 })(typeof self !== "undefined" ? self : this, function (Dec) {
   "use strict";
 
-  const VERSION = "pokerstats-0.3.0";
+  const VERSION = "pokerstats-0.4.0";
   const DP = 6;
   const Z = Dec.mk(0n, 0);
   const ONE = Dec.mk(1n, 0);
@@ -21138,6 +21381,29 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     return o;
   };
 
+  /**
+   * The month as it counts (architecture 44.3): his typed part (balances or income) in place of the imported one, the other part from the
+   * import; null when the book has neither. typed: the parts that are typed in.
+   */
+  function record(book, m) {
+    const imp = book.months && book.months[m] ? book.months[m] : null;
+    const ty = book.typed && book.typed[m] ? book.typed[m] : null;
+    if (!imp && !ty) return null;
+    const rec = {};
+    const typed = [];
+    for (const part of ["bal", "inc"]) {
+      if (ty && ty[part]) {
+        rec[part] = ty[part];
+        typed.push(part);
+      } else if (imp && imp[part]) rec[part] = imp[part];
+    }
+    if (!rec.bal && !rec.inc) return null;
+    rec.typed = typed;
+    return rec;
+  }
+  /** Every month that counts, in order: the imported ones and the typed ones. */
+  const monthsOf = (book) => [...new Set(Object.keys(book.months || {}).concat(Object.keys(book.typed || {})))].filter((m) => record(book, m)).sort();
+
   /** A site's net of a month: closing − bonuses − transfers − opening (exact, in the site's currency). */
   const netOf = (s) => Dec.sub(Dec.sub(Dec.sub(P(s.close), P(s.bonus)), P(s.xfer)), P(s.open));
 
@@ -21153,8 +21419,8 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     const out = [];
     const missing = [];
     const RR = R && R.table ? { source: R.source === "ecb" ? "ecb" : "sheet", kind: R.kind === "avg" ? "avg" : "end", table: R.table } : null;
-    for (const m of Object.keys(book.months).sort()) {
-      const rec = book.months[m];
+    for (const m of monthsOf(book)) {
+      const rec = record(book, m);
       const used = new Map();
       const conv = (rec0, a, from, to) => convIn(rec0, m, a, from, to, RR, used);
       const why = [];
@@ -21194,7 +21460,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       let cost = Z;
       if (rec.inc) {
         for (const it of rec.inc.items) {
-          const v = need(conv(rec, P(it.amt), "USD", cur), "a rate for " + cur);
+          const v = need(conv(rec, P(it.amt), it.cur || "USD", cur), "a rate for " + (it.cur && it.cur !== cur ? it.cur + " or " : "") + cur);
           if (v === null) continue;
           items.push({ name: it.name, value: txt(v) });
           extra = Dec.add(extra, v);
@@ -21222,6 +21488,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
         rates: rateList(used),
         filled: [...used.keys()].filter((k) => k !== "partial" && used.get(k) !== (RR ? RR.source : "sheet")).sort(),
         partial: used.get("partial") === true,
+        typed: rec.typed,
       });
     }
     return { rows: out, missing };
@@ -21614,11 +21881,149 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
 
   /** The months the book holds, and its years (for the period strip). */
   function span(book) {
-    const ms = Object.keys(book.months).sort();
+    const ms = monthsOf(book);
     return { months: ms, years: [...new Set(ms.map((m) => m.slice(0, 4)))].sort(), first: ms[0] || "", last: ms[ms.length - 1] || "" };
   }
 
-  return { VERSION, DP, rateOf, conv, netOf, rows, period, checks, totals, byYear, variance, ruin, downswings, streaks, sites, siteBalances, extras, view, span, phi };
+  return { VERSION, DP, record, monthsOf, rateOf, conv, netOf, rows, period, checks, totals, byYear, variance, ruin, downswings, streaks, sites, siteBalances, extras, view, span, phi };
+});
+
+/* ---- src/poker/insights.js ---- */
+/*
+ * PokerInsights: the figures of the Insights tab of the Poker part (architecture section 44.4), from the rows of PokerStats.rows.
+ *
+ * The calendar runs from the book's first month to its last (in the currency shown, the months left out for a missing rate included). A month
+ * the book does not hold counts as zero (no play, no hours); a month the book holds but that is left out for a missing rate is unknown, and a
+ * figure that needs it is not given. Sums are exact decimal texts (decimal.js); hourlies, ranges and the outlook are floating point, like the
+ * statistics of PokerStats: descriptions of his record, not tax figures.
+ *   rolling 12 months at m : Σ income and Σ hours of m − 11 … m (none when the window holds an unknown month or starts before the book)
+ *   by year with a range   : the year's income per hour ± 1.96 σ ÷ √H, σ and H of the year's table result (PokerStats.variance, ≥ 3 months)
+ *   seasonality            : per calendar month, Σ income ÷ Σ hours of its months with hours; average result and hours; years
+ *   outlook (k = 1 … 12)   : kμ ± 1.96 √(k s² + k² s² ÷ n) of the monthly incomes; P(the next 12 months lose) = Φ(−12μ ÷ spread₁₂)
+ * Pure functions, no DOM, no clock. Runs in Node (tests) and in the page.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("../lib/decimal.js"), require("./stats.js"));
+  else root.PokerInsights = factory(root.Dec, root.PokerStats);
+})(typeof self !== "undefined" ? self : this, function (Dec, Stats) {
+  "use strict";
+
+  const VERSION = "pokerinsights-0.1.0";
+  const Z95 = 1.959963984540054;
+  const Z = Dec.mk(0n, 0);
+  const P = (t) => Dec.parse(t);
+  const f = (t) => Number(t);
+  const addM = (m, k) => {
+    const n = +m.slice(0, 4) * 12 + (+m.slice(5, 7) - 1) + k;
+    return Math.floor(n / 12) + "-" + String((n % 12) + 1).padStart(2, "0");
+  };
+
+  /**
+   * Every calendar month from the first to the last month of the book in this currency: [{ month, state: "row" | "absent" | "unknown", row }].
+   * rows and missing are what PokerStats.rows gives (all months, not a period).
+   */
+  function calendar(rows, missing) {
+    const by = new Map(rows.map((r) => [r.month, r]));
+    const unk = new Set((missing || []).map((x) => x.month));
+    const all = rows.map((r) => r.month).concat([...unk]).sort();
+    if (!all.length) return [];
+    const out = [];
+    for (let m = all[0]; m <= all[all.length - 1]; m = addM(m, 1)) out.push({ month: m, state: by.has(m) ? "row" : unk.has(m) ? "unknown" : "absent", row: by.get(m) || null });
+    return out;
+  }
+
+  /**
+   * The rolling 12 months for each month of [from, to] (open ends allowed): [{ month, ok, income, table, hours (texts), hourly, why }].
+   * ok false: the window reaches before the book's first month ("short") or holds a month left out for a missing rate ("unknown").
+   */
+  function rolling(cal, from, to) {
+    const out = [];
+    cal.forEach((c, i) => {
+      if ((from && c.month < from) || (to && c.month > to)) return;
+      if (i < 11) return out.push({ month: c.month, ok: false, why: "short" });
+      const w = cal.slice(i - 11, i + 1);
+      if (w.some((x) => x.state === "unknown")) return out.push({ month: c.month, ok: false, why: "unknown" });
+      let inc = Z;
+      let tab = Z;
+      let hrs = Z;
+      for (const x of w)
+        if (x.row) {
+          inc = Dec.add(inc, P(x.row.income));
+          tab = Dec.add(tab, P(x.row.table));
+          hrs = Dec.add(hrs, P(x.row.hours));
+        }
+      const h = f(Dec.str(hrs));
+      out.push({ month: c.month, ok: true, income: Dec.str(inc), table: Dec.str(tab), hours: Dec.str(hrs), hourly: h > 0 ? f(Dec.str(inc)) / h : null });
+    });
+    return out;
+  }
+
+  /** The heat map's figures: per month { month, income, table, hours, hourly, hph }, per year the same from PokerStats.totals. */
+  function heat(rows) {
+    const months = rows.map((r) => {
+      const h = f(r.hours);
+      return { month: r.month, income: f(r.income), table: f(r.table), hours: h, hourly: h > 0 ? f(r.income) / h : null, hph: h > 0 && r.hands !== null && r.hands > 0 ? r.hands / h : null };
+    });
+    const years = Stats.byYear(rows).map((y) => ({ year: y.year, income: f(y.income), table: f(y.table), hours: f(y.hours), hourly: y.hourly, hph: y.handsPerHour }));
+    return { months, years };
+  }
+
+  /**
+   * By year: [{ year, hourly, tableHourly, hours, income, n, ci, lo, hi }]: the income per hour, and its 95 % range when the year has at least
+   * three months with hours (the half-width from the variance of the table result; rakeback and costs taken as certain). lo, hi null otherwise.
+   */
+  function yearRanges(rows) {
+    return Stats.byYear(rows).map((y) => {
+      const v = Stats.variance(rows.filter((r) => r.month.startsWith(y.year + "-")));
+      const ok = v.n >= 3 && y.hourly !== null && Number.isFinite(v.ci);
+      return { year: y.year, hourly: y.hourly, tableHourly: y.tableHourly, hours: f(y.hours), income: y.income, n: v.n, ci: ok ? v.ci : null, lo: ok ? y.hourly - v.ci : null, hi: ok ? y.hourly + v.ci : null };
+    });
+  }
+
+  /** What makes up the result, per month: table won (above zero), table lost (below), rakeback and promotions, costs (texts). */
+  function composition(rows) {
+    return rows.map((r) => {
+      const t = P(r.table);
+      const neg = Dec.isNeg(t) && !Dec.isZero(t);
+      return { month: r.month, won: neg ? "0" : r.table, lost: neg ? r.table : "0", extra: r.extra, cost: r.cost, income: r.income };
+    });
+  }
+
+  /** Seasonality: per calendar month (1 … 12) of the rows: { m, n, years, hourly, avg, hours } (none for a month without rows). */
+  function seasonality(rows) {
+    const out = [];
+    for (let k = 1; k <= 12; k++) {
+      const rs = rows.filter((r) => +r.month.slice(5, 7) === k);
+      const wh = rs.filter((r) => f(r.hours) > 0);
+      const inc = rs.reduce((a, r) => Dec.add(a, P(r.income)), Z);
+      const hInc = wh.reduce((a, r) => Dec.add(a, P(r.income)), Z);
+      const hrs = rs.reduce((a, r) => Dec.add(a, P(r.hours)), Z);
+      const hh = wh.reduce((a, r) => Dec.add(a, P(r.hours)), Z);
+      out.push({ m: k, n: rs.length, years: new Set(rs.map((r) => r.month.slice(0, 4))).size, hourly: f(Dec.str(hh)) > 0 ? f(Dec.str(hInc)) / f(Dec.str(hh)) : null, avg: rs.length ? f(Dec.str(inc)) / rs.length : null, hours: rs.length ? f(Dec.str(hrs)) / rs.length : null });
+    }
+    return out;
+  }
+
+  /**
+   * The outlook of the next 12 months from the monthly incomes of the rows (at least 12): { n, mu, sd, steps: [{ k, mean, spread, lo, hi }],
+   * pLose } or null. spread_k = √(k s² + k² s² ÷ n): the swings of k months plus the doubt about the mean itself.
+   */
+  function outlook(rows) {
+    const n = rows.length;
+    if (n < 12) return null;
+    const x = rows.map((r) => f(r.income));
+    const mu = x.reduce((a, b) => a + b, 0) / n;
+    const sd = Math.sqrt(x.reduce((a, v) => a + (v - mu) ** 2, 0) / (n - 1));
+    const steps = [];
+    for (let k = 1; k <= 12; k++) {
+      const spread = Math.sqrt(k * sd * sd + (k * k * sd * sd) / n);
+      steps.push({ k, mean: k * mu, spread, lo: k * mu - Z95 * spread, hi: k * mu + Z95 * spread });
+    }
+    const s12 = steps[11].spread;
+    return { n, mu, sd, steps, pLose: s12 > 0 ? Stats.phi((-12 * mu) / s12) : mu < 0 ? 1 : 0 };
+  }
+
+  return { VERSION, Z95, addM, calendar, rolling, heat, yearRanges, composition, seasonality, outlook };
 });
 
 /* ---- src/poker/rates.js ---- */
@@ -31477,8 +31882,10 @@ const SpendUI = (function () {
 
 /* ---- src/app/ui-poker.js ---- */
 /*
- * The Poker area (browser only; architecture section 40.6): the import of his two workbooks, the figures and pictures of his results
+ * The Poker area (browser only; architecture sections 40.6 and 44): the import of his two workbooks, the figures and pictures of his results
  * (hourly, variance and luck, downswings, sites, the extra money, year by year), the checks of his sheets, and the backup of this book alone.
+ * Since 25 Nov 2026 (architecture 44.2) in tabs of its own, every card open: Overview, Insights, Variance, Sites, Month (a month typed in or
+ * corrected by hand, 44.3) and Data.
  *
  * This file only draws. The figures come from PokerStats (src/poker/stats.js), the import from XlsxRead, PokerSheets and PokerBook; nothing
  * is worked out here except the formatting of a figure for the screen, and text always goes in with textContent. The Poker book is its own
@@ -31486,7 +31893,7 @@ const SpendUI = (function () {
  *
  * host: { mode(), book(), today(), now(), save(book) -> Promise<{ ok, durable, text }>, download(name, text) -> Promise<{ ok, text }>,
  *         render(), folds (a Folds store: which cards are open, kept in the browser), rates() (the rate settings with the ECB table, 43.3),
- *         setRates({ source, kind }), goInvestData() }
+ *         setRates({ source, kind }), goInvestData(), tabStore ({ get(), set(name) }: the open tab, kept in the browser) }
  */
 const PokerUI = (function () {
   "use strict";
@@ -31494,6 +31901,7 @@ const PokerUI = (function () {
   const { el, card, listItem } = Dom;
   const C = Charts;
   const S = PokerStats;
+  const I = PokerInsights;
   const money = (t, cur, o) => SpendUI.money(t, cur, o);
   const compact = (cur) => SpendUI.compact(cur);
   const CURRENCIES = ["USD", "EUR", "HUF"];
@@ -31553,23 +31961,20 @@ const PokerUI = (function () {
   // ---------------------------------------------------------------- the area
 
   function create(host) {
-    const folds = host.folds || Folds.create({ storage: null, key: "att-poker-folds-v1" });
-    const seen = new Map();
-    const openOf = (o) => !!o.busy || folds.isOpen(o.key, o.dflt === true);
+    /** A card of the Poker part: always open since 25 Nov 2026 (architecture 44.2). o: { key (its data-k), title, sub, cls }. */
     function fcard(o, body) {
-      const open = openOf(o);
-      seen.set(o.key, open);
-      return Dom.foldCard({ key: o.key, title: o.title, sub: o.sub, glance: o.glance, open, onToggle: (want) => { if (!want && o.stop) o.stop(); folds.set(o.key, want); host.render(); } }, body);
+      return el("section", { class: "card" + (o.cls ? " " + o.cls : ""), "data-k": o.key }, el("div", { class: "card-head" }, el("h2", { text: o.title }), o.sub ? el("span", { class: "sub", text: o.sub }) : null), typeof body === "function" ? body() : body);
     }
-    function foldBar() {
-      const keys = Array.from(seen.keys());
-      const open = keys.filter((k) => seen.get(k));
-      const all = (want) => () => { if (!want) { st.pending = null; st.msg.import = null; st.restore = null; st.wipe = false; st.msg.backup = null; } folds.setAll(keys, want); host.render(); };
-      return el("div", { class: "fold-bar", "data-k": "poker-fold-bar" },
-        el("span", { class: "fold-count", "data-k": "poker-fold-count", text: open.length + " of " + keys.length + " cards open" }),
-        el("button", { type: "button", class: "btn small", "data-key": "poker-fold-expand", disabled: open.length === keys.length, onclick: all(true), text: "Expand all" }),
-        el("button", { type: "button", class: "btn small", "data-key": "poker-fold-collapse", disabled: open.length === 0, onclick: all(false), text: "Collapse all" }));
-    }
+    const TABS = [["overview", "Overview"], ["insights", "Insights"], ["variance", "Variance"], ["sites", "Sites"], ["month", "Month"], ["data", "Data"]];
+    const tabOf = () => {
+      let t = "";
+      try {
+        t = host.tabStore ? host.tabStore.get() : "";
+      } catch (e) {
+        t = "";
+      }
+      return TABS.some((x) => x[0] === t) ? t : "overview";
+    };
 
     const st = {
       cur: "USD",
@@ -31577,12 +31982,32 @@ const PokerUI = (function () {
       site: "", // the site of "One site, month by month" (architecture 40.13)
       basis: "income", // the monthly bars and the downswings: poker income or the table result
       pending: null, // { items: [{ name, res }], sites: { name: cur }, confirm }
-      msg: { import: null, backup: null, sites: null },
+      msg: { import: null, backup: null, sites: null, month: null },
       restore: null,
       wipe: false,
       busy: false,
       heatAll: false,
+      allMonths: false, // the months table: every month, or the newest 24
+      tab: tabOf(), // the open tab (architecture 44.2)
+      heatMetric: "res", // the calendar heat map: result, hours, hourly, hands per hour
+      roll: "res", // the rolling 12 months: result or hourly
+      month: "", // the month of the Month tab
+      draft: null, // the forms of the Month tab: { month, bal, inc, touched: { bal, inc } }
+      errs: { bal: [], inc: [] }, // the boxes the last save refused, per form
     };
+    function goTab(t) {
+      st.tab = t;
+      try {
+        if (host.tabStore) host.tabStore.set(t);
+      } catch (e) {
+        /* a setting only: the tab still opens */
+      }
+      host.render();
+      if (typeof window !== "undefined" && window.scrollTo) {
+        const bar = document.querySelector('[data-k="poker-tabs"]');
+        if (bar && bar.getBoundingClientRect().top < 0) window.scrollTo({ top: Math.max(0, window.scrollY + bar.getBoundingClientRect().top - 4) });
+      }
+    }
     let memo = { book: null, key: "", v: null };
 
     const book = () => host.book() || PokerBook.empty();
@@ -31608,6 +32033,7 @@ const PokerUI = (function () {
       const key = st.cur + "|" + r.from + "|" + r.to;
       if (memo.v && memo.book === b && memo.key === key && memo.rates === rates) return memo.v;
       const v = S.view(b, st.cur, r.from, r.to, rates);
+      v.all = S.rows(b, st.cur, rates); // every month in this currency (the rolling 12 months reach back before the period, 44.4)
       v.rateSet = rates || null;
       v.from = r.from || sp.first;
       v.to = r.to || sp.last;
@@ -31636,12 +32062,12 @@ const PokerUI = (function () {
     }
 
     /** The book after every readable file of the pending import, in order, with his choices of the sites' currencies. */
-    function applyPending() {
+    function applyPending(useFile) {
       let b = book();
       const done = [];
       for (const it of st.pending.items) {
         if (!it.res.ok) continue;
-        const a = PokerBook.apply(b, it.res, { sites: st.pending.sites, on: host.now(), file: it.name });
+        const a = PokerBook.apply(b, it.res, { sites: st.pending.sites, on: host.now(), file: it.name, useFile: !!useFile });
         if (!a.ok) return { ok: false, error: a.error };
         b = a.book;
         done.push({ name: it.name, part: it.res.part, changed: a.changed });
@@ -31649,15 +32075,17 @@ const PokerUI = (function () {
       return { ok: true, book: b, done };
     }
 
-    async function doImport() {
+    /** useFile: the file's figures take the place of what he typed in for its months (architecture 44.3); asked like a change of stored figures. */
+    async function doImport(useFile) {
       if (!st.pending || st.busy) return;
       const second = st.pending.items.some((it) => it.res.ok && PokerBook.plan(book(), it.res).second > 0);
-      if (second && !st.pending.confirm) {
-        st.pending.confirm = true;
+      const typedAny = st.pending.items.some((it) => it.res.ok && PokerBook.plan(book(), it.res).typed.length > 0);
+      if ((second || (useFile && typedAny)) && st.pending.confirm !== (useFile ? "file" : true)) {
+        st.pending.confirm = useFile ? "file" : true;
         host.render();
         return;
       }
-      const res = applyPending();
+      const res = applyPending(useFile);
       if (!res.ok) {
         st.msg.import = { kind: "bad", text: res.error };
         host.render();
@@ -31725,6 +32153,12 @@ const PokerUI = (function () {
           lines.push(listItem(r.changes ? "warn" : "info", monthName(r.month) + " is replaced: stored " + fig(r.before) + "; from the file " + fig(r.after) + "."));
         }
         for (const r of cl) lines.push(listItem("warn", monthName(r.month) + " is not filled in yet in this file: what is stored for it is taken out until it is filled in."));
+        const ty = p.rows.filter((r) => r.typed);
+        if (ty.length) {
+          const fig = (x) => (p.part === "bal" ? plural(x.sites, "site") : "table result " + money(x.table, "USD") + ", " + plural(x.lines, "line") + ", " + hrs(x.hours));
+          const diff = ty.filter((r) => r.typedDiffers);
+          lines.push(listItem(diff.length ? "warn" : "info", "You typed in the " + (p.part === "bal" ? "balances" : "income") + " of " + plural(ty.length, "month") + " (" + ty.map((r) => monthName(r.month)).join(", ") + "). Your typed figures keep counting; the file's are stored beneath them. To use the file's figures instead, press “Import and use the file's figures”." + (diff.length ? " They differ in " + diff.map((r) => monthName(r.month) + " (typed " + fig(r.typedBrief) + "; file " + fig(r.after) + ")").join("; ") + "." : "")));
+        }
         if (p.kept.length) lines.push(listItem("info", plural(p.kept.length, "stored month") + " of these years " + (p.kept.length === 1 ? "is" : "are") + " not in this file and stay" + (p.kept.length === 1 ? "s" : "") + " as " + (p.kept.length === 1 ? "it is" : "they are") + ": " + p.kept.map(monthName).join(", ") + "."));
         for (const s of it.res.sheets) for (const x of s.skipped || []) lines.push(listItem("info", "Sheet " + s.name + ": " + x + "."));
         for (const x of it.res.problems) lines.push(listItem("bad", "Sheet " + x.sheet + " was not used: " + x.text + "."));
@@ -31737,10 +32171,13 @@ const PokerUI = (function () {
       if (q.node) out.push(q.node);
       const okN = st.pending.items.filter((x) => x.res.ok).length;
       const second = st.pending.items.some((it) => it.res.ok && PokerBook.plan(book(), it.res).second > 0);
-      if (st.pending.confirm && second) out.push(banner("bad", "Some stored months would change", el("span", { text: "Their figures differ from what is stored. Press the button once more to replace them, or Cancel." })));
+      const typedAny = st.pending.items.some((it) => it.res.ok && PokerBook.plan(book(), it.res).typed.length > 0);
+      if (st.pending.confirm === true && second) out.push(banner("bad", "Some stored months would change", el("span", { text: "Their figures differ from what is stored or from what you typed in (your typed figures keep counting). Press the button once more to go ahead, or Cancel." })));
+      if (st.pending.confirm === "file") out.push(banner("bad", "Use the file's figures for the months you typed in?", el("span", { text: "What you typed in for the months of this file is taken away, and the file's figures count. Press the button once more to go ahead, or Cancel." })));
       if (q.missing) out.push(note("Choose the currency of " + plural(q.missing, "site") + " above first.", "poker-sites-missing"));
       out.push(el("div", { class: "btn-row" },
-        okN ? btn(st.pending.confirm && second ? "Yes, replace those months" : "Import " + plural(okN, "file"), doImport, "primary", "poker-import", q.missing > 0 || st.busy) : null,
+        okN ? btn(st.pending.confirm === true && second ? "Yes, import" : "Import " + plural(okN, "file"), () => doImport(false), "primary", "poker-import", q.missing > 0 || st.busy) : null,
+        okN && typedAny ? btn(st.pending.confirm === "file" ? "Yes, use the file's figures" : "Import and use the file's figures", () => doImport(true), "", "poker-import-file", q.missing > 0 || st.busy) : null,
         btn("Cancel", () => { st.pending = null; host.render(); }, "", "poker-cancel")));
       return el("div", { class: "spend-preview", "data-k": "poker-preview" }, out);
     }
@@ -31890,47 +32327,256 @@ const PokerUI = (function () {
       return (x > 0 ? "hm-p" : "hm-n") + Math.min(5, Math.max(1, Math.ceil((Math.abs(x) / scale) * 5)));
     }
 
-    function monthsCard(v) {
+    /** The month bars of the Overview (poker income or table result). */
+    function barsCard(v) {
       const rs = v.rows;
       if (!rs.length) return null;
       const cur = v.cur;
       const key = st.basis === "table" ? "table" : "income";
       const vals = rs.map((r) => num(r[key]));
-      const abs = vals.map(Math.abs).sort((a, b) => a - b);
-      const scale = Math.max(1e-9, abs[Math.min(abs.length - 1, Math.floor(abs.length * 0.9))] || 1);
-      const byMonth = new Map(rs.map((r) => [r.month, r]));
-      const years = [...new Set(rs.map((r) => r.month.slice(0, 4)))].sort().reverse();
-      const shown = st.heatAll ? years : years.slice(0, 8);
-      const head = el("tr", {}, el("th", { scope: "col", text: "Year" }), el("th", { scope: "col", text: "Total" }), MONTHS.map((n) => el("th", { scope: "col", text: n })));
-      const yearTot = new Map(v.years.map((y) => [y.year, num(y[key])]));
-      const cellText = (x) => compact(cur)(x).replace(/^(?=[^−])/, x > 0 ? "+" : "");
-      const body = shown.map((y) => el("tr", { "data-k": "phm:" + y }, el("th", { scope: "row", text: y }),
-        el("td", {}, el("span", { class: "hc tot " + heatClass(yearTot.get(y) || 0, scale * 6), tabindex: "0", "data-tip": tip(y, [["Total", fm(yearTot.get(y) || 0, cur, { plus: true })]]), text: cellText(yearTot.get(y) || 0) })),
-        MONTHS.map((n, k) => {
-          const r = byMonth.get(y + "-" + String(k + 1).padStart(2, "0"));
-          if (!r) return el("td", {}, el("span", { class: "hc hm-void", "aria-hidden": "true" }));
-          const x = num(r[key]);
-          return el("td", {}, el("span", { class: "hc " + heatClass(x, scale), tabindex: "0", "data-k": "phc:" + r.month, "aria-label": MONTHS_L[k] + " " + y + ": " + fm(x, cur, { plus: true }), "data-tip": tip(MONTHS_L[k] + " " + y, [["Table result", money(r.table, cur, { plus: true })], ["Rakeback and promotions", money(r.extra, cur, { plus: true })], ["Costs", money(r.cost, cur)], ["Poker income", money(r.income, cur, { plus: true })], ["Hours", hrs(r.hours)]]), text: cellText(x) }));
-        })));
-      const legend = el("div", { class: "hlegend", "aria-hidden": "true" }, el("span", { text: "Loss" }), [5, 4, 3, 2, 1].map((k) => el("span", { class: "hsw hm-n" + k })), el("span", { class: "hsw hm-0" }), [1, 2, 3, 4, 5].map((k) => el("span", { class: "hsw hm-p" + k })), el("span", { text: "Gain" }));
-      return fcard({ key: "poker-months", title: "Every month", sub: st.basis === "table" ? "table result" : "poker income", glance: plural(v.totals.won, "winning month") + ", " + plural(v.totals.lost, "losing month"), dflt: true }, () => [
+      return fcard({ key: "poker-months", title: "Every month", sub: (st.basis === "table" ? "table result" : "poker income") + " · " + plural(v.totals.won, "winning month") }, () => [
         el("div", { class: "spendbar" }, seg("poker-basis", [["income", "Poker income"], ["table", "Table result"]], st.basis, (x) => { st.basis = x; host.render(); })),
-        C.bars({ categories: rs.map((r) => monthName(r.month)), tickLabels: rs.map((r, k) => tick(r.month, k, rs.length)), series: [{ id: "m", name: st.basis === "table" ? "Table result" : "Poker income", values: vals, texts: rs.map((r) => money(r[key], cur, { plus: true })) }], mode: "split", colorPos: "var(--c-gain)", colorNeg: "var(--c-more)", splitLegend: [{ name: "Gain", color: "var(--c-gain)" }, { name: "Loss", color: "var(--c-more)" }], format: compact(cur), details: rs.map((r) => [["Hours", hrs(r.hours)], ["Table result", money(r.table, cur, { plus: true })], ["Rakeback and promotions", money(r.extra, cur, { plus: true })]]), height: 210, ariaLabel: "The result of every month, in " + cur }),
+        C.bars({ categories: rs.map((r) => monthName(r.month)), tickLabels: rs.map((r, k) => tick(r.month, k, rs.length)), series: [{ id: "m", name: st.basis === "table" ? "Table result" : "Poker income", values: vals, texts: rs.map((r) => money(r[key], cur, { plus: true })) }], mode: "split", colorPos: "var(--c-gain)", colorNeg: "var(--c-more)", splitLegend: [{ name: "Gain", color: "var(--c-gain)" }, { name: "Loss", color: "var(--c-more)" }], format: compact(cur), details: rs.map((r) => [["Hours", hrs(r.hours)], ["Table result", money(r.table, cur, { plus: true })], ["Rakeback and promotions", money(r.extra, cur, { plus: true })]]), height: 230, ariaLabel: "The result of every month, in " + cur }),
+      ]);
+    }
+
+    /** The scale of the coloured cells: the 90th percentile of the absolute values, so one huge month does not wash out the others. */
+    function scaleOf(values) {
+      const abs = values.filter((x) => x !== null && Number.isFinite(x)).map(Math.abs).sort((a, b) => a - b);
+      return Math.max(1e-9, abs[Math.min(abs.length - 1, Math.floor(abs.length * 0.9))] || 1);
+    }
+    /** A sequential cell (hours, hands per hour): one blue, stronger with the value. */
+    const seqClass = (x, max) => (x === null || !Number.isFinite(x) || x <= 0 ? "hm-0" : "hm-s" + Math.min(5, Math.max(1, Math.ceil((x / Math.max(1e-9, max)) * 5))));
+
+    /** The months table of the Overview (architecture 44.2): the income in a coloured cell, newest first, a total row. */
+    function monthsTable(v) {
+      const rs = v.rows;
+      if (!rs.length) return null;
+      const cur = v.cur;
+      const sc = scaleOf(rs.map((r) => num(r.income)));
+      const t = v.totals;
+      const hourly = (r) => (num(r.hours) > 0 ? fm(num(r.income) / num(r.hours), cur, { plus: true }) : "–");
+      const hph = (r) => (num(r.hours) > 0 && r.hands ? int(r.hands / num(r.hours)) : "–");
+      const head = el("tr", {}, ["Month", "Table", "Rakeback & promos", "Costs", "Income", "Hours", "Hourly", "Hands/h"].map((c, i) => el("th", { scope: "col", class: i ? "r" : "", text: c })));
+      const SHOW = 24; // the newest two years; the rest on request, so the Overview stays short
+      const list = rs.slice().reverse();
+      const shownRows = st.allMonths ? list : list.slice(0, SHOW);
+      const body = shownRows.map((r) => el("tr", { "data-k": "pmt:" + r.month, "data-tip": tip(MONTHS_L[+r.month.slice(5, 7) - 1] + " " + r.month.slice(0, 4), [["Table result", money(r.table, cur, { plus: true })], ["Rakeback and promotions", money(r.extra, cur, { plus: true })], ["Costs", money(r.cost, cur)], ["Poker income", money(r.income, cur, { plus: true })], ["Hours", hrs(r.hours)]], r.typed && r.typed.length ? "Typed in on the Month tab (" + r.typed.map((x) => (x === "bal" ? "balances" : "income")).join(" and ") + ")." : ""), tabindex: "0" },
+        el("th", { scope: "row" }, el("button", { type: "button", class: "linkish mlink", "data-key": "pmo:" + r.month, onclick: () => { st.month = r.month; st.draft = null; goTab("month"); }, text: monthName(r.month) }), r.typed && r.typed.length ? el("span", { class: "chip info tiny", text: "typed" }) : null),
+        el("td", { class: "r num " + tone(num(r.table)), text: money(r.table, cur, { plus: true }) }),
+        el("td", { class: "r num", text: money(r.extra, cur, { plus: true }) }),
+        el("td", { class: "r num", text: money(r.cost, cur) }),
+        el("td", { class: "r num tc" }, el("span", { class: "hc tot " + heatClass(num(r.income), sc), "data-k": "pmi:" + r.month, text: money(r.income, cur, { plus: true }) })),
+        el("td", { class: "r num", text: hrs(r.hours) }),
+        el("td", { class: "r num", text: hourly(r) }),
+        el("td", { class: "r num", text: hph(r) })));
+      const foot = el("tr", { class: "tot-row" }, el("th", { scope: "row", text: "Total" }),
+        el("td", { class: "r num " + tone(num(t.table)), text: money(t.table, cur, { plus: true }) }), el("td", { class: "r num", text: money(t.extra, cur, { plus: true }) }), el("td", { class: "r num", text: money(t.cost, cur) }),
+        el("td", { class: "r num tc" }, el("span", { class: "hc tot " + heatClass(num(t.income), sc * Math.max(1, rs.length / 2)), text: money(t.income, cur, { plus: true }) })),
+        el("td", { class: "r num", text: hrs(t.hours) }), el("td", { class: "r num", text: t.hourly === null ? "–" : fm(t.hourly, cur, { plus: true }) }), el("td", { class: "r num", text: t.handsPerHour ? int(t.handsPerHour) : "–" }));
+      return fcard({ key: "poker-mtable", title: "Months", sub: plural(rs.length, "month") + " · newest first" }, () => [
+        el("div", { class: "tbl-wrap", "data-k": "poker-mtable-wrap" }, el("table", { class: "tbl mtable" }, el("caption", { class: "sr-only", text: "Every month of the period: table result, rakeback and promotions, costs, poker income, hours, hourly, hands per hour" }), el("thead", {}, head), el("tbody", {}, body), el("tfoot", {}, foot))),
+        list.length > SHOW ? el("div", { class: "btn-row" }, btn(st.allMonths ? "Show the newest " + SHOW + " months" : "Show all " + list.length + " months", () => { st.allMonths = !st.allMonths; host.render(); }, "small", "pmt-more")) : null,
+        note("The income cell is green for a gain and red for a loss, stronger the larger it is. The total row adds up every month of the period. Press a month to see it, correct it or type it in on the Month tab."),
+      ]);
+    }
+
+    /** The calendar heat map with a year column (architecture 44.4): result, hours, hourly or hands per hour. */
+    function heatCard(v) {
+      const rs = v.rows;
+      if (!rs.length) return null;
+      const cur = v.cur;
+      const H = I.heat(rs);
+      const metric = st.heatMetric;
+      const get = (x) => (metric === "res" ? x.income : metric === "h" ? x.hours : metric === "hr" ? x.hourly : x.hph);
+      const vals = H.months.map(get);
+      const diverge = metric === "res" || metric === "hr";
+      const sc = diverge ? scaleOf(vals) : Math.max(1e-9, ...vals.filter((x) => x !== null && Number.isFinite(x)), 0);
+      const yScale = metric === "res" ? sc * 6 : sc; // a year's result is about six months' worth; its hourly is on the months' scale
+      const yScaleSeq = metric === "h" ? Math.max(1e-9, ...H.years.map((y) => y.hours), 0) : sc;
+      const cls = (x, isYear) => (x === null || x === undefined || !Number.isFinite(x) ? "hm-none" : diverge ? heatClass(x, isYear ? yScale : sc) : seqClass(x, isYear ? yScaleSeq : sc));
+      const text = (x) => {
+        if (x === null || x === undefined || !Number.isFinite(x)) return "–";
+        if (metric === "h") return x >= 100 ? int(x) : x.toFixed(0);
+        if (metric === "hph") return int(x);
+        return compact(cur)(x).replace(/^(?=[^−])/, x > 0 ? "+" : "");
+      };
+      const byMonth = new Map(H.months.map((m, k) => [m.month, { m, r: rs[k] }]));
+      const yearOf = new Map(H.years.map((y) => [y.year, y]));
+      const years = [...new Set(rs.map((r) => r.month.slice(0, 4)))].sort().reverse();
+      const shown = st.heatAll ? years : years.slice(0, 10);
+      const head = el("tr", {}, el("th", { scope: "col", text: "Year" }), MONTHS.map((n) => el("th", { scope: "col", text: n })), el("th", { scope: "col", class: "ycol", text: "Year" }));
+      const body = shown.map((y) => {
+        const yy = yearOf.get(y);
+        return el("tr", { "data-k": "phm:" + y }, el("th", { scope: "row", text: y }),
+          MONTHS.map((n, k) => {
+            const c = byMonth.get(y + "-" + String(k + 1).padStart(2, "0"));
+            if (!c) return el("td", {}, el("span", { class: "hc hm-void", "aria-hidden": "true" }));
+            const x = get(c.m);
+            return el("td", {}, el("span", { class: "hc " + cls(x, false), tabindex: "0", "data-k": "phc:" + c.m.month, "aria-label": MONTHS_L[k] + " " + y + ": " + text(x), "data-tip": tip(MONTHS_L[k] + " " + y, [["Poker income", money(c.r.income, cur, { plus: true })], ["Table result", money(c.r.table, cur, { plus: true })], ["Rakeback and promotions", money(c.r.extra, cur, { plus: true })], ["Hours", hrs(c.r.hours)], ["Hourly", c.m.hourly === null ? "–" : fm(c.m.hourly, cur, { plus: true })], ["Hands per hour", c.m.hph === null ? "–" : int(c.m.hph)]]), text: text(x) }));
+          }),
+          el("td", { class: "ycol" }, el("span", { class: "hc tot " + cls(get(yy), true), tabindex: "0", "data-k": "phy:" + y, "data-tip": tip(y, [["Poker income", fm(yy.income, cur, { plus: true })], ["Hours", hrs(String(yy.hours))], ["Hourly", yy.hourly === null ? "–" : fm(yy.hourly, cur, { plus: true })], ["Hands per hour", yy.hph ? int(yy.hph) : "–"]]), text: text(get(yy)) })));
+      });
+      const legend = diverge
+        ? el("div", { class: "hlegend", "aria-hidden": "true" }, el("span", { text: "Loss" }), [5, 4, 3, 2, 1].map((k) => el("span", { class: "hsw hm-n" + k })), el("span", { class: "hsw hm-0" }), [1, 2, 3, 4, 5].map((k) => el("span", { class: "hsw hm-p" + k })), el("span", { text: "Gain" }))
+        : el("div", { class: "hlegend", "aria-hidden": "true" }, el("span", { text: "Less" }), [1, 2, 3, 4, 5].map((k) => el("span", { class: "hsw hm-s" + k })), el("span", { text: "More" }));
+      const what = { res: "poker income", h: "hours played", hr: "poker income per hour", hph: "hands per hour" }[metric];
+      return fcard({ key: "poker-heat-card", title: "Calendar heat map", sub: "every month at a glance · " + what }, () => [
+        el("div", { class: "spendbar" }, seg("poker-heat-metric", [["res", "Result"], ["h", "Hours"], ["hr", "Hourly"], ["hph", "Hands/h"]], metric, (x) => { st.heatMetric = x; host.render(); })),
         el("div", { class: "heat-box", "data-k": "poker-heat" },
-          el("div", { class: "heat-wrap" }, el("table", { class: "heat" }, el("caption", { class: "sr-only", text: "The result of every month by year" }), el("thead", {}, head), el("tbody", {}, body))),
-          el("div", { class: "hfoot" }, legend, el("span", { class: "note", text: "The strongest colour starts at ±" + fm(scale, cur) + " a month (a year at six times that). Losses are red and hatched." })),
-          years.length > 8 ? el("div", { class: "btn-row" }, btn(st.heatAll ? "Show fewer years" : "Show all " + years.length + " years", () => { st.heatAll = !st.heatAll; host.render(); }, "small", "phm-more")) : null,
+          el("div", { class: "heat-wrap" }, el("table", { class: "heat pheat" }, el("caption", { class: "sr-only", text: "The " + what + " of every month by year, with the year in the last column" }), el("thead", {}, head), el("tbody", {}, body))),
+          el("div", { class: "hfoot" }, legend, el("span", { class: "note", text: diverge ? "The strongest colour starts at ±" + (metric === "hr" ? fm(sc, cur) + "/h" : fm(sc, cur) + " a month") + ". Losses are red and hatched." : "The strongest blue is the largest month (" + (metric === "h" ? int(sc) + " h" : int(sc) + " hands/h") + ")." })),
+          years.length > 10 ? el("div", { class: "btn-row" }, btn(st.heatAll ? "Show fewer years" : "Show all " + years.length + " years", () => { st.heatAll = !st.heatAll; host.render(); }, "small", "phm-more")) : null,
           el("p", { class: "note only-narrow", text: "Slide sideways to see all the months." })),
       ]);
     }
 
-    function hourlyCard(v) {
-      const ys = v.years.filter((y) => y.hourly !== null);
-      if (!ys.length) return null;
+    /** The rolling 12 months (architecture 44.4): each point adds up the twelve months that end there. */
+    function rollCard(v) {
       const cur = v.cur;
-      return fcard({ key: "poker-hourly", title: "Hourly by year", sub: "per hour played", glance: "All: " + fm(v.totals.hourly, cur, { plus: true }) + "/h · table " + fm(v.totals.tableHourly, cur, { plus: true }) + "/h" }, () => [
-        C.bars({ categories: ys.map((y) => y.year), series: [{ id: "inc", name: "Poker income per hour", color: "var(--c-gain)", values: ys.map((y) => y.hourly), texts: ys.map((y) => fm(y.hourly, cur, { plus: true })) }, { id: "tab", name: "Table result per hour", color: "var(--c-put)", values: ys.map((y) => y.tableHourly), texts: ys.map((y) => fm(y.tableHourly, cur, { plus: true })) }], mode: "grouped", legend: true, toggle: true, key: "poker-hourly", format: compact(cur), details: ys.map((y) => [["Hours", hrs(y.hours)], ["Poker income", money(y.income, cur, { plus: true })]]), height: 210, ariaLabel: "Poker income and table result per hour, for each year, in " + cur }),
-        C.bars({ categories: ys.map((y) => y.year), series: [{ id: "h", name: "Hours played", color: "var(--c-austria)", values: ys.map((y) => num(y.hours)), texts: ys.map((y) => hrs(y.hours)) }], mode: "grouped", legend: true, format: (x) => int(x), height: 150, ariaLabel: "Hours played in each year" }),
+      const cal = I.calendar(v.all.rows, v.all.missing);
+      const pts = I.rolling(cal, v.from, v.to);
+      const ok = pts.filter((x) => x.ok && (st.roll === "res" || x.hourly !== null));
+      const broken = pts.filter((x) => x.why === "unknown");
+      const kids = [el("div", { class: "spendbar" }, seg("poker-roll", [["res", "Result"], ["hr", "Hourly"]], st.roll, (x) => { st.roll = x; host.render(); }))];
+      if (ok.length < 2) kids.push(note(cal.length < 12 ? "The rolling 12 months need twelve months of results; the book has " + cal.length + "." : "Not enough months in this period with a full twelve months before them.", "poker-roll-short"));
+      else {
+        const vals = ok.map((x) => (st.roll === "res" ? num(x.income) : x.hourly));
+        kids.push(C.timeLines({
+          days: ok.map((x) => x.month + "-01"),
+          series: [{ name: st.roll === "res" ? "Poker income, last 12 months" : "Hourly, last 12 months", color: "var(--c-gain)", values: vals, texts: ok.map((x) => (st.roll === "res" ? money(x.income, cur, { plus: true }) : fm(x.hourly, cur, { plus: true }) + "/h")), area: true }],
+          format: compact(cur),
+          zero: true,
+          dateText: (d) => monthName(I.addM(d.slice(0, 7), -11)) + " to " + monthName(d.slice(0, 7)),
+          key: "poker-roll",
+          rows: (i) => [["Poker income", money(ok[i].income, cur, { plus: true }), tone(num(ok[i].income))], ["Table result", money(ok[i].table, cur, { plus: true })], ["Hours", hrs(ok[i].hours)], ["Hourly", ok[i].hourly === null ? "–" : fm(ok[i].hourly, cur, { plus: true })]],
+          ariaLabel: "The poker income of the twelve months up to each month, in " + cur,
+          height: 230,
+        }));
+      }
+      if (broken.length) kids.push(note(plural(broken.length, "point") + " left out: their twelve months hold a month without a rate (" + broken.slice(0, 3).map((x) => monthName(x.month)).join(", ") + (broken.length > 3 ? " …" : "") + ").", "poker-roll-broken"));
+      kids.push(note("Each point adds up the twelve months that end there, so the seasons and short streaks drop out. A month with no record counts as zero."));
+      return fcard({ key: "poker-roll-card", title: "Rolling 12 months", sub: st.roll === "res" ? "result" : "hourly" }, () => kids);
+    }
+
+    /** By year (architecture 44.4): the result, the hours and the hourly with its 95 % range, side by side on a wide screen. */
+    function byYearCard(v) {
+      if (!v.years.length) return null;
+      const cur = v.cur;
+      const ys = v.years;
+      const R = I.yearRanges(v.rows);
+      const box = (title, chart) => el("div", { class: "mini" }, el("h3", { class: "sub-head", text: title }), chart);
+      return fcard({ key: "poker-byyear", title: "By year", sub: "result, hours and hourly with its range" }, () => [
+        el("div", { class: "grid3" },
+          box("Poker income", C.bars({ categories: ys.map((y) => y.year), series: [{ id: "y", name: "Poker income", values: ys.map((y) => num(y.income)), texts: ys.map((y) => money(y.income, cur, { plus: true })) }], mode: "split", colorPos: "var(--c-gain)", colorNeg: "var(--c-more)", format: compact(cur), details: ys.map((y) => [["Table result", money(y.table, cur, { plus: true })], ["Rakeback and promotions", money(y.extra, cur, { plus: true })], ["Costs", money(y.cost, cur)], ["Months", String(y.months)]]), height: 190, ariaLabel: "Poker income of each year, in " + cur })),
+          box("Hours played", C.bars({ categories: ys.map((y) => y.year), series: [{ id: "h", name: "Hours played", color: "var(--c-austria)", values: ys.map((y) => num(y.hours)), texts: ys.map((y) => hrs(y.hours)) }], mode: "grouped", format: (x) => int(x), details: ys.map((y) => [["Months with hours", String(y.hoursMonths)]]), height: 190, ariaLabel: "Hours played in each year" })),
+          box("Hourly, with its 95 % range", R.some((y) => y.hourly !== null) ? C.bars({ categories: R.map((y) => y.year), series: [{ id: "hr", name: "Poker income per hour", values: R.map((y) => (y.hourly === null ? 0 : y.hourly)), texts: R.map((y) => (y.hourly === null ? "–" : fm(y.hourly, cur, { plus: true }))) }], mode: "split", colorPos: "var(--c-gain)", colorNeg: "var(--c-more)", whiskers: R.map((y) => (y.lo === null ? null : { lo: y.lo, hi: y.hi })), labelMax: false, format: compact(cur), details: R.map((y) => [["95 % range", y.lo === null ? (y.n < 3 ? "needs 3 months with hours" : "–") : fm(y.lo, cur, { plus: true }) + " to " + fm(y.hi, cur, { plus: true })], ["Table result per hour", y.tableHourly === null ? "–" : fm(y.tableHourly, cur, { plus: true })], ["Hours", hrs(String(y.hours))]]), height: 190, ariaLabel: "Poker income per hour of each year with its 95 % range, in " + cur }) : note("No hours in this period."))),
+        note("The thin line over each hourly is its 95 % range: with that year's hours and swings the true hourly lies inside it. It comes from the swings at the tables; rakeback and costs are taken as certain. A year needs three months with hours."),
+      ]);
+    }
+
+    /** Hours per month (Insights). */
+    function hoursCard(v) {
+      const cal = I.calendar(v.rows, []);
+      if (cal.length < 2) return null;
+      return fcard({ key: "poker-hours", title: "Hours per month", sub: "volume over time" }, () => [
+        C.bars({ categories: cal.map((c) => monthName(c.month)), tickLabels: cal.map((c, k) => tick(c.month, k, cal.length)), series: [{ id: "h", name: "Hours played", color: "var(--c-austria)", values: cal.map((c) => (c.row ? num(c.row.hours) : 0)), texts: cal.map((c) => (c.row ? hrs(c.row.hours) : "no record")) }], mode: "grouped", format: (x) => int(x), details: cal.map((c) => (c.row && c.row.hands ? [["Hands", int(c.row.hands)]] : [])), height: 200, ariaLabel: "Hours played in each month" }),
+      ]);
+    }
+
+    /** The drawdown of the poker income (Insights): how far below its best running total, with the deepest, now and the longest stretch. */
+    function drawCard(v) {
+      const rs = v.rows;
+      if (rs.length < 2) return null;
+      const cur = v.cur;
+      const d = v.down;
+      const lab = (i) => (i < 0 ? "start" : monthName(rs[i].month));
+      const now = d.under[d.under.length - 1];
+      return fcard({ key: "poker-draw", title: "Drawdown", sub: "below your best running total" }, () => [
+        el("p", { class: "chips", "data-k": "poker-draw-chips" },
+          d.episodes.length ? Dom.chip("Deepest " + fm(d.episodes[0].depth, cur) + " (" + lab(d.episodes[0].trough) + ")", "bad") : Dom.chip("No drawdown", "ok"), " ",
+          d.current ? Dom.chip("Now " + fm(now, cur) + " below the high", "warn") : Dom.chip("At a high now", "ok"), " ",
+          d.longest ? Dom.chip("Longest below a high: " + plural(d.longest.below, "month"), "info") : null),
+        C.timeLines({ days: rs.map((r) => r.month + "-01"), series: [{ name: "Below the previous high", color: "var(--c-more)", values: d.under, texts: d.under.map((x) => fm(x, cur)), area: true }], format: compact(cur), zero: true, dateText: (x) => monthName(x.slice(0, 7)), key: "poker-draw", ariaLabel: "How far the running poker income was below its previous high, month by month, in " + cur, height: 200 }),
+      ]);
+    }
+
+    /** What makes up the result (Insights): table won and lost, rakeback and promotions, costs, stacked; per year beyond three years. */
+    function compCard(v) {
+      const rs = v.rows;
+      if (!rs.length) return null;
+      const cur = v.cur;
+      const comp = I.composition(rs);
+      const yearly = rs.length > 36;
+      const groups = yearly ? [...new Set(rs.map((r) => r.month.slice(0, 4)))] : rs.map((r) => r.month);
+      const sumOf = (f) => groups.map((g) => comp.reduce((a, c) => a + (c.month.startsWith(g) ? num(c[f]) : 0), 0));
+      const parts = [["won", "Table, months won", "var(--c-gain)"], ["lost", "Table, months lost", "var(--c-more)"], ["extra", "Rakeback and promotions", "var(--c-real)"], ["cost", "Costs", "var(--c-sec-13)"]];
+      const series = parts.map((p) => {
+        const vals = sumOf(p[0]);
+        return { id: p[0], name: p[1], color: p[2], values: vals, texts: vals.map((x) => fm(x, cur, { plus: p[0] !== "cost" })) };
+      });
+      const totals = groups.map((g, k) => series.reduce((a, x) => a + x.values[k], 0));
+      return fcard({ key: "poker-comp", title: "What makes up the result", sub: (yearly ? "per year" : "per month") + " · total " + money(v.totals.income, cur, { plus: true }) }, () => [
+        C.bars({ categories: yearly ? groups : groups.map(monthName), tickLabels: yearly ? null : groups.map((m, k) => tick(m, k, groups.length)), series, mode: "stacked", diverge: true, legend: true, toggle: true, key: "poker-comp", skipZero: true, totalTexts: totals.map((x) => fm(x, cur, { plus: true }) + " income"), labelMax: false, format: compact(cur), height: 240, ariaLabel: "Table won, table lost, rakeback and promotions and costs of each " + (yearly ? "year" : "month") + ", in " + cur }),
+        note("Above zero: the table result of the months won, and the rakeback and promotion money (light orange). Below: the table result of the months lost (red) and the costs (lavender)." + (yearly ? " Per year, because the period is longer than three years: the months won and the months lost of each year are added up apart." : "")),
+      ]);
+    }
+
+    /** Table result by site and the sources of the extra money (Insights), as horizontal bars. */
+    function siteBarsCard(v) {
+      if (!v.sites.length) return null;
+      const cur = v.cur;
+      const items = v.sites.slice().sort((a, b) => num(b.netShown) - num(a.netShown)).map((x) => ({ label: x.name, value: num(x.netShown), text: money(x.netShown, cur, { plus: true }), tip: "Table result", details: [["In " + x.cur, money(x.net, x.cur, { plus: true })], ["Bonuses", money(x.bonus, x.cur)]] }));
+      return fcard({ key: "poker-site-bars", title: "Table result by site", sub: cur }, () => [C.hbars({ items, color: "var(--c-gain)", colorNeg: "var(--c-more)", format: compact(cur), ariaLabel: "The table result of each site in the period, in " + cur })]);
+    }
+    function sourcesCard(v) {
+      const ex = v.extras;
+      if (!ex.names.length) return null;
+      const cur = v.cur;
+      const items = ex.names.slice(0, 14).map((x) => ({ label: x.name, value: num(x.total), text: money(x.total, cur, { plus: true }), tip: "In the period" }));
+      return fcard({ key: "poker-sources", title: "Rakeback and promotion sources", sub: ex.names.length > 14 ? "the 14 largest of " + ex.names.length : cur }, () => [C.hbars({ items, color: "var(--c-real)", colorNeg: "var(--c-more)", format: compact(cur), ariaLabel: "The rakeback and promotion lines of the period, largest first, in " + cur })]);
+    }
+
+    /** Seasonality (Insights): the hourly of each calendar month, pooled over the years. */
+    function seasonCard(v) {
+      if (v.rows.length < 18) return null;
+      const cur = v.cur;
+      const se = I.seasonality(v.rows);
+      return fcard({ key: "poker-season", title: "Seasonality", sub: "hourly per calendar month, all years pooled" }, () => [
+        C.bars({ categories: MONTHS_L, tickLabels: MONTHS, series: [{ id: "s", name: "Poker income per hour", values: se.map((x) => (x.hourly === null ? 0 : x.hourly)), texts: se.map((x) => (x.hourly === null ? "–" : fm(x.hourly, cur, { plus: true }))) }], mode: "split", colorPos: "var(--c-gain)", colorNeg: "var(--c-more)", format: compact(cur), details: se.map((x) => [["Average result", x.avg === null ? "–" : fm(x.avg, cur, { plus: true })], ["Average hours", x.hours === null ? "–" : x.hours.toFixed(1) + " h"], ["Years", String(x.years)]]), height: 210, ariaLabel: "Poker income per hour of each calendar month over all years of the period, in " + cur }),
+        note("Few years per month make these bars wobble: look for a pattern that repeats, not for one tall bar."),
+      ]);
+    }
+
+    /** The outlook of the next 12 months (architecture 44.4): a range, not a promise. */
+    function outlookCard(v) {
+      const o = I.outlook(v.rows);
+      const cur = v.cur;
+      if (!o) return fcard({ key: "poker-outlook", title: "Outlook for the next 12 months", sub: "poker income" }, () => [note("The outlook needs at least twelve months in the period.", "poker-outlook-short")]);
+      const last = v.rows[v.rows.length - 1].month;
+      const e = o.steps[11];
+      const kpi = (label, value, sub, cls, t) => el("div", { class: "kpi", tabindex: "0", "data-k": "pok:" + label, "data-tip": t || false }, el("span", { class: "label", text: label }), el("span", { class: "value " + (cls || ""), text: value }), sub ? el("span", { class: "subline", text: sub }) : null);
+      return fcard({ key: "poker-outlook", title: "Outlook for the next 12 months", sub: "poker income · from " + plural(o.n, "month") }, () => [
+        el("div", { class: "kpis", "data-k": "poker-outlook-kpis" },
+          kpi("Expected next 12 months", fm(e.mean, cur, { plus: true }), "95 %: " + fm(e.lo, cur, { plus: true }) + " to " + fm(e.hi, cur, { plus: true }), tone(e.mean), tip("Expected next 12 months", [["Average month", fm(o.mu, cur, { plus: true })], ["Swing of a month (1 σ)", fm(o.sd, cur)], ["95 % range", fm(e.lo, cur, { plus: true }) + " to " + fm(e.hi, cur, { plus: true })]], "12 × the average month; the range adds the swings of twelve months and the doubt about the average itself.")),
+          kpi("Chance of a losing year", pct(o.pLose, o.pLose < 0.01 ? 2 : 0), "the next 12 months together below zero", o.pLose > 0.25 ? "neg" : "", tip("Chance of a losing year", [["Chance", pct(o.pLose, 2)]], "Φ(−12 × average ÷ spread of twelve months): a normal approximation.")),
+          kpi("Average month", fm(o.mu, cur, { plus: true }), "swing of a month " + fm(o.sd, cur), tone(o.mu))),
+        C.timeLines({
+          days: o.steps.map((x) => I.addM(last, x.k) + "-01"),
+          series: [
+            { name: "Expected", color: "var(--c-gain)", values: o.steps.map((x) => x.mean), texts: o.steps.map((x) => fm(x.mean, cur, { plus: true })) },
+            { name: "Upper 95 %", color: "var(--c-austria)", values: o.steps.map((x) => x.hi), texts: o.steps.map((x) => fm(x.hi, cur, { plus: true })), width: 1.2, glow: false, opacity: 0.8, noPill: true },
+            { name: "Lower 95 %", color: "var(--c-austria)", values: o.steps.map((x) => x.lo), texts: o.steps.map((x) => fm(x.lo, cur, { plus: true })), width: 1.2, glow: false, opacity: 0.8, noPill: true },
+          ],
+          bands: [{ a: 1, b: 2, up: "var(--c-austria)", down: "var(--c-austria)", cls: "soft" }],
+          format: compact(cur),
+          zero: true,
+          dateText: (d) => "By the end of " + monthName(d.slice(0, 7)),
+          key: "poker-outlook",
+          ariaLabel: "The expected poker income added up over the next twelve months, with the range where 95 % of outcomes would fall, in " + cur,
+          height: 220,
+        }),
+        note("Built from the " + plural(o.n, "month") + " of the period: it assumes the coming year is like them, at the same stakes and volume. A range, not a promise."),
       ]);
     }
 
@@ -32158,8 +32804,13 @@ const PokerUI = (function () {
     function yearsCard(v) {
       if (!v.years.length) return null;
       const cur = v.cur;
-      return fcard({ key: "poker-years", title: "Year by year", sub: plural(v.years.length, "year"), glance: v.years.slice(-3).map((y) => y.year + " " + money(y.income, cur, { plus: true })).join(" · ") }, () => [
-        table(["Year", "Hours", "Hands", "Table", "Extra", "Costs", "Income", "Hourly", "Table/h", "Per 100"], v.years.slice().reverse().map((y) => [y.year, cell(hrs(y.hours), "r num"), cell(y.hands ? int(y.hands) : "–", "r num"), cell(money(y.table, cur, { plus: true }), "r num"), cell(money(y.extra, cur, { plus: true }), "r num"), cell(money(y.cost, cur), "r num"), cell(money(y.income, cur, { plus: true }), "r num " + tone(num(y.income))), cell(fm(y.hourly, cur, { plus: true }), "r num"), cell(fm(y.tableHourly, cur, { plus: true }), "r num"), cell(fm(y.per100, cur, { plus: true }), "r num")]), "Every year: hours, hands, table result, rakeback and promotions, costs, poker income, both hourlies and the result per 100 hands", "drrrrrrrrr", "poker-years-table"),
+      const R = new Map(I.yearRanges(v.rows).map((y) => [y.year, y]));
+      const sc = scaleOf(v.years.map((y) => num(y.income)));
+      return fcard({ key: "poker-years", title: "Year by year", sub: plural(v.years.length, "year") }, () => [
+        table(["Year", "Hours", "Hands", "Table", "Extra", "Costs", "Income", "Hourly", "95 % range", "Table/h", "Per 100", "Won"], v.years.slice().reverse().map((y) => {
+          const r = R.get(y.year);
+          return [y.year, cell(hrs(y.hours), "r num"), cell(y.hands ? int(y.hands) : "–", "r num"), cell(money(y.table, cur, { plus: true }), "r num " + tone(num(y.table))), cell(money(y.extra, cur, { plus: true }), "r num"), cell(money(y.cost, cur), "r num"), cell(el("span", { class: "hc tot " + heatClass(num(y.income), sc), "data-k": "pyi:" + y.year, text: money(y.income, cur, { plus: true }) }), "r num tc"), cell(fm(y.hourly, cur, { plus: true }), "r num"), cell(r && r.lo !== null ? fm(r.lo, cur, { plus: true }) + " to " + fm(r.hi, cur, { plus: true }) : "–", "r num muted"), cell(fm(y.tableHourly, cur, { plus: true }), "r num"), cell(fm(y.per100, cur, { plus: true }), "r num"), cell(y.won + "/" + y.months, "r num")];
+        }), "Every year: hours, hands, table result, rakeback and promotions, costs, poker income, the hourly and its 95 % range, the table hourly, the result per 100 hands and the months won", "drrrrrrrrrrr", "poker-years-table"),
       ]);
     }
 
@@ -32261,29 +32912,241 @@ const PokerUI = (function () {
       return fcard({ key: "poker-backup-card", title: "Backup of the Poker book", sub: isDemo() ? "not in the demo" : "this part only", glance: "Save, restore or delete this part only", busy: !!(st.msg.backup || st.restore || st.wipe), stop: () => { st.msg.backup = null; st.restore = null; st.wipe = false; } }, () => kids);
     }
 
-    // ---------------------------------------------------------------- draw
+    // ---------------------------------------------------------------- the Month tab (architecture 44.3)
 
-    function render(root) {
-      seen.clear();
-      const has = PokerBook.count(book()).months > 0;
-      if (!has) {
-        root.appendChild(card("Your poker results", null, note("Import your two poker workbooks (balances and income) to see your results: hourly, variance and luck, downswings, sites, rakeback and costs, year by year, in dollars, euro or forints. Your files are read in this page and stay in this browser.")));
-        root.appendChild(importCard());
-        root.appendChild(backupCard());
+    const blankSite = () => ({ name: "", cur: "", open: "", xfer: "", bonus: "", close: "" });
+    const blankLine = () => ({ name: "", amt: "", cur: "USD" });
+    const balDraft = (bal) => ({ sites: bal.sites.map((x) => ({ name: x.name, cur: "", open: x.open, xfer: x.xfer, bonus: x.bonus, close: x.close })), rates: { USD: bal.rates.USD || "", HUF: bal.rates.HUF || "", GBP: bal.rates.GBP || "" } });
+    const incDraft = (inc) => ({ items: inc.items.map((x) => ({ name: x.name, amt: x.amt, cur: x.cur || "USD" })), cost: inc.cost, table: inc.table, eur: inc.eur, hours: inc.hours, hands: inc.hands });
+    /** The month before m that counts in the book, or "". */
+    const prevOf = (m) => S.monthsOf(book()).filter((x) => x < m).pop() || "";
+    /** A new month's balances: each site's opening = its closing of the month before. */
+    function openingsFrom(m) {
+      const p = prevOf(m);
+      const rec = p ? S.record(book(), p) : null;
+      if (!rec || !rec.bal) return { sites: [blankSite()], rates: { USD: "", HUF: "", GBP: "" } };
+      return { sites: rec.bal.sites.map((x) => ({ name: x.name, cur: "", open: x.close, xfer: "", bonus: "", close: "" })), rates: { USD: "", HUF: "", GBP: "" } };
+    }
+    function draftOf(m) {
+      const b = book();
+      const rec = S.record(b, m);
+      const p = prevOf(m);
+      const prev = p ? S.record(b, p) : null;
+      const inc = rec && rec.inc ? incDraft(rec.inc) : { items: prev && prev.inc && prev.inc.items.length ? prev.inc.items.map((x) => ({ name: x.name, amt: "", cur: x.cur || "USD" })) : [blankLine()], cost: prev && prev.inc ? prev.inc.cost : "", table: "", eur: "", hours: "", hands: "" };
+      return { month: m, bal: rec && rec.bal ? balDraft(rec.bal) : openingsFrom(m), inc, note: (b.typed && b.typed[m] && b.typed[m].note) || "", touched: { bal: false, inc: false } };
+    }
+    const nextMonth = () => {
+      const ms = S.monthsOf(book());
+      return ms.length ? I.addM(ms[ms.length - 1], 1) : String(host.today()).slice(0, 7);
+    };
+
+    async function saveTyped(part) {
+      const d = st.draft;
+      const r = PokerBook.setTyped(book(), d.month, part, d[part], host.today(), d.note);
+      if (!r.ok) {
+        st.errs[part] = r.errors;
+        st.msg.month = { kind: "bad", part, text: "Not saved: " + r.errors.length + (r.errors.length === 1 ? " box needs" : " boxes need") + " a look." };
+        host.render();
         return;
       }
-      const v = figures();
-      const at = root.childNodes.length;
-      root.appendChild(el("section", { class: "card", "data-k": "poker-top" }, el("div", { class: "card-head" }, el("h2", { text: "Your poker results" }), el("span", { class: "sub", text: isDemo() ? "invented demo data" : "from your poker workbooks" })), controls(v), missingBanner(v), ratesNote(v), v.rows.length ? tiles(v) : note("No month in this period.")));
-      if (v.rows.length) for (const c of [cumCard(v), monthsCard(v), hourlyCard(v), varianceCard(v), downCard(v), extrasCard(v), sitesCard(v), bankrollCard(v), balancesCard(v), yearsCard(v)]) if (c) root.appendChild(c);
-      root.appendChild(checksCard());
-      root.appendChild(importCard());
-      root.appendChild(backupCard());
-      root.appendChild(taxCard());
-      root.insertBefore(foldBar(), root.childNodes[at + 1] || null);
+      st.errs[part] = [];
+      const s2 = await host.save(r.book);
+      st.msg.month = s2 && s2.ok ? { kind: "ok", part, text: (part === "bal" ? "The balances" : "The income") + " of " + monthName(d.month) + " " + (isDemo() ? "are kept in the demo (nothing is saved)." : "are saved as typed in.") } : { kind: "bad", part, text: "NOT SAVED: " + ((s2 && s2.text) || "the browser refused") };
+      if (s2 && s2.ok) d.touched[part] = false;
+      host.render();
+    }
+    async function dropTypedPart(part) {
+      const d = st.draft;
+      const b = PokerBook.dropTyped(book(), d.month, part);
+      const s2 = await host.save(b);
+      st.msg.month = s2 && s2.ok ? { kind: "ok", part, text: "What you typed in is taken away: " + monthName(d.month) + " counts " + (S.record(b, d.month) ? "your file's figures again." : "nothing any more.") } : { kind: "bad", part, text: "NOT SAVED: " + ((s2 && s2.text) || "the browser refused") };
+      if (s2 && s2.ok) st.draft = null;
+      st.errs[part] = [];
+      host.render();
     }
 
-    return { render, state: st };
+    /** A box of the Month tab: it commits on change and the page is drawn again (the figures beside it follow). */
+    function box(key, value, label, onCommit, o) {
+      const bad = (st.errs[o && o.part] || []).some((x) => x.field === key);
+      return el("input", { type: "text", class: "mono " + ((o && o.cls) || "n") + (bad ? " invalid" : ""), "aria-invalid": bad ? "true" : false, inputmode: (o && o.mode) || "decimal", autocomplete: "off", spellcheck: "false", "aria-label": label, "data-key": "pm:" + key, value: value === undefined || value === null ? "" : value, placeholder: (o && o.ph) || false, onchange: (e) => { onCommit(e.target.value); st.draft.touched[(o && o.part) || "inc"] = true; host.render(); } });
+    }
+    const netText = (x, cur) => {
+      const f = ["open", "xfer", "bonus", "close"].map((k) => PokerBook.typedNumber(x[k], { empty: true }));
+      if (!f.every((r) => r.ok)) return "–";
+      const d = (t) => Dec.parse(t === "" ? "0" : t);
+      const n = Dec.sub(Dec.sub(Dec.sub(d(f[3].text), d(f[2].text)), d(f[1].text)), d(f[0].text));
+      return cur ? money(Dec.str(n), cur, { plus: true }) : Dec.str(n);
+    };
+    function errList(part) {
+      const es = st.errs[part] || [];
+      const m = st.msg.month && st.msg.month.part === part ? st.msg.month : null;
+      return [m ? banner(m.kind, m.kind === "ok" ? "Done" : "Not done", el("span", { text: m.text })) : null, es.length ? el("ul", { class: "list", "data-k": "pm-errs:" + part }, es.map((x) => listItem("bad", x.text))) : null];
+    }
+
+    function balForm(m, rec, typed, ecb) {
+      const d = st.draft.bal;
+      const b = book();
+      const knownCur = (name) => (b.sites[name] ? b.sites[name].cur : "");
+      const imp = b.months[m] && b.months[m].bal;
+      const rows = d.sites.map((x, i) => {
+        const kc = knownCur(x.name.trim());
+        const cur = kc || x.cur;
+        return el("tr", { "data-k": "pms:" + i },
+          el("td", {}, box("site:" + i + ":name", x.name, "Site " + (i + 1), (t) => { x.name = t; }, { part: "bal", cls: "t", mode: "text", ph: "site" })),
+          el("td", {}, kc ? el("span", { class: "muted", text: kc }) : el("select", { "aria-label": "Currency of site " + (i + 1), "data-key": "pm:site:" + i + ":cur", class: (st.errs.bal || []).some((e) => e.field === "site:" + i + ":cur") ? "invalid" : "", onchange: (e) => { x.cur = e.target.value; st.draft.touched.bal = true; host.render(); } }, [el("option", { value: "", text: "Currency…", selected: !x.cur })].concat(SITE_CURS.map((c) => el("option", { value: c, text: c, selected: x.cur === c }))))),
+          ["open", "xfer", "bonus", "close"].map((f) => el("td", {}, box("site:" + i + ":" + f, x[f], { open: "Opening", xfer: "Transfers", bonus: "Bonuses", close: "Closing" }[f] + " of site " + (i + 1), (t) => { x[f] = t; }, { part: "bal", ph: f === "close" ? "" : "0" }))),
+          el("td", { class: "r num", "data-k": "pmnet:" + i, text: netText(x, cur) }),
+          el("td", {}, el("button", { type: "button", class: "btn small quiet", "aria-label": "Remove site " + (i + 1), "data-key": "pm:site:" + i + ":del", onclick: () => { d.sites.splice(i, 1); if (!d.sites.length) d.sites.push(blankSite()); st.draft.touched.bal = true; host.render(); }, text: "✕" })));
+      });
+      const rateBox = (c) => el("div", { class: "field" }, el("label", { text: c + " per 1 EUR" }), box("rate:" + c, d.rates[c], c + " per euro", (t) => { d.rates[c] = t; }, { part: "bal", ph: ecb && ecb[c] ? "ECB " + Number(ecb[c].end).toFixed(c === "HUF" ? 2 : 4) : "empty: ECB" }));
+      return fcard({ key: "pm-bal", title: "Site balances", sub: typed ? "typed in" : imp ? "from your file" : "not in your files" }, () => [
+        el("div", { class: "tbl-wrap" }, el("table", { class: "tbl pm-tbl" }, el("caption", { class: "sr-only", text: "The balance of each site in its own currency" }),
+          el("thead", {}, el("tr", {}, ["Site", "Currency", "Opening", "Transfers", "Bonuses", "Closing", "Net", ""].map((c, i) => el("th", { scope: "col", class: i >= 2 && i <= 6 ? "r" : "", text: c })))),
+          el("tbody", {}, rows))),
+        el("div", { class: "btn-row" },
+          btn("Add a site", () => { d.sites.push(blankSite()); host.render(); }, "small", "pm-add-site"),
+          imp && typed ? btn("Start from the file's figures", () => { st.draft.bal = balDraft(imp); st.draft.touched.bal = true; host.render(); }, "small", "pm-bal-file") : null,
+          prevOf(m) ? btn("Start from last month's closing balances", () => { st.draft.bal = openingsFrom(m); st.draft.touched.bal = true; host.render(); }, "small", "pm-bal-prev") : null),
+        el("div", { class: "row pm-rates" }, ["USD", "HUF", "GBP"].map(rateBox)),
+        note("Each site in its own currency. Transfers: money put in +, taken out −. Bonuses: credited on the site. Net = closing − bonuses − transfers − opening. Leave a rate empty to use the ECB's" + (ecb ? " (shown in the box)" : "; with no ECB file stored the month waits for one") + ". Use a point for decimals."),
+        errList("bal"),
+        el("div", { class: "btn-row" },
+          btn("Save the balances", () => saveTyped("bal"), "primary", "pm-save-bal"),
+          typed ? btn(imp ? "Delete what I typed (back to the file's figures)" : "Delete what I typed", () => dropTypedPart("bal"), "quiet", "pm-drop-bal") : null),
+      ]);
+    }
+
+    function incForm(m, rec, typed) {
+      const d = st.draft.inc;
+      const imp = book().months[m] && book().months[m].inc;
+      const lines = d.items.map((x, i) => el("tr", { "data-k": "pml:" + i },
+        el("td", {}, box("item:" + i + ":name", x.name, "Line " + (i + 1), (t) => { x.name = t; }, { part: "inc", cls: "t", mode: "text", ph: "rakeback, promotion …" })),
+        el("td", {}, box("item:" + i + ":amt", x.amt, "Amount of line " + (i + 1), (t) => { x.amt = t; }, { part: "inc" })),
+        el("td", {}, el("select", { "aria-label": "Currency of line " + (i + 1), "data-key": "pm:item:" + i + ":cur", onchange: (e) => { x.cur = e.target.value; st.draft.touched.inc = true; host.render(); } }, SITE_CURS.map((c) => el("option", { value: c, text: c, selected: (x.cur || "USD") === c })))),
+        el("td", {}, el("button", { type: "button", class: "btn small quiet", "aria-label": "Remove line " + (i + 1), "data-key": "pm:item:" + i + ":del", onclick: () => { d.items.splice(i, 1); if (!d.items.length) d.items.push(blankLine()); st.draft.touched.inc = true; host.render(); }, text: "✕" }))));
+      const fld = (key, label, hint, o) => el("div", { class: "field" }, el("label", { text: label }), box(key, d[key], label, (t) => { d[key] = t; }, Object.assign({ part: "inc" }, o || {})), hint ? el("span", { class: "subline muted", text: hint }) : null);
+      return fcard({ key: "pm-inc", title: "Income: rakeback, promotions, hours", sub: typed ? "typed in" : imp ? "from your file" : "not in your files" }, () => [
+        el("div", { class: "tbl-wrap" }, el("table", { class: "tbl pm-tbl" }, el("caption", { class: "sr-only", text: "The rakeback and promotion lines of the month" }),
+          el("thead", {}, el("tr", {}, ["Line", "Amount", "Currency", ""].map((c, i) => el("th", { scope: "col", class: i === 1 ? "r" : "", text: c })))),
+          el("tbody", {}, lines))),
+        el("div", { class: "btn-row" },
+          btn("Add a line", () => { d.items.push(blankLine()); host.render(); }, "small", "pm-add-line"),
+          imp && typed ? btn("Start from the file's figures", () => { st.draft.inc = incDraft(imp); st.draft.touched.inc = true; host.render(); }, "small", "pm-inc-file") : null),
+        el("div", { class: "row pm-fields" },
+          fld("hours", "Hours played", "", { ph: "0" }),
+          fld("hands", "Hands", "", { mode: "numeric", ph: "" }),
+          fld("cost", "Costs (USD, negative)", "your expense share, as Kiadás"),
+          fld("table", "TABLE PROFIT (USD)", "only used without balances", { ph: "0" }),
+          fld("eur", "1 EUR = (USD)", "empty: the balances' or the ECB's rate", { ph: "" })),
+        el("div", { class: "field" }, el("label", { text: "Note (for you)" }), box("note", st.draft.note, "Note", (t) => { st.draft.note = t; }, { part: "inc", cls: "t wide", mode: "text" })),
+        note("A line with a name but no amount is left out, as in your sheet. A line in EUR, GBP or HUF is converted at the month's rates like every other figure."),
+        errList("inc"),
+        el("div", { class: "btn-row" },
+          btn("Save the income", () => saveTyped("inc"), "primary", "pm-save-inc"),
+          typed ? btn(imp ? "Delete what I typed (back to the file's figures)" : "Delete what I typed", () => dropTypedPart("inc"), "quiet", "pm-drop-inc") : null),
+      ]);
+    }
+
+    function monthTab(root, v) {
+      const b = book();
+      const ms = S.monthsOf(b);
+      if (!st.month) st.month = ms.length ? ms[ms.length - 1] : nextMonth();
+      const m = st.month;
+      if (!st.draft || st.draft.month !== m) {
+        st.draft = draftOf(m);
+        st.errs = { bal: [], inc: [] };
+        if (st.msg.month && st.msg.month.month !== m) st.msg.month = null;
+      }
+      const list = [...new Set(ms.concat([m]))].sort();
+      const k = list.indexOf(m);
+      const go = (x) => { st.month = x; st.draft = null; st.msg.month = null; host.render(); };
+      const rec = S.record(b, m);
+      const typed = (b.typed && b.typed[m]) || null;
+      const cur = st.cur;
+      const row = v ? v.all.rows.find((r) => r.month === m) : null;
+      const miss = v ? v.all.missing.find((x) => x.month === m) : null;
+      const rates = host.rates ? host.rates() : null;
+      const ecb = rates && rates.table && rates.table[m] ? rates.table[m] : null;
+      let pick = nextMonth();
+      const kids = [
+        el("div", { class: "spendbar pm-bar", "data-k": "pm-bar" },
+          btn("‹", () => go(list[k - 1]), "small", "pm-prev", k <= 0),
+          el("select", { "aria-label": "Month", "data-key": "pm-month", onchange: (e) => go(e.target.value) }, list.slice().reverse().map((x) => el("option", { value: x, text: monthName(x) + (b.typed && b.typed[x] ? " · typed" : S.record(b, x) ? "" : " · new"), selected: x === m }))),
+          btn("›", () => go(list[k + 1]), "small", "pm-next", k >= list.length - 1),
+          seg("poker-cur-m", CURRENCIES.map((c) => [c, c]), st.cur, (x) => { st.cur = x; host.render(); })),
+        el("div", { class: "spendbar pm-add", "data-k": "pm-add" },
+          el("label", { class: "pick" }, el("span", { text: "Add a month " }), el("input", { type: "month", "data-key": "pm-new", value: pick, onchange: (e) => { pick = e.target.value; }, "aria-label": "The month to add" })),
+          btn("Start this month", () => { const x = String(pick || "").slice(0, 7); if (/^\d{4}-(0[1-9]|1[0-2])$/.test(x)) go(x); }, "small", "pm-new-go")),
+      ];
+      const chip = (part) => {
+        const name = part === "bal" ? "Balances" : "Income";
+        if (typed && typed[part]) return Dom.chip(name + ": typed in" + (typed.on ? " on " + typed.on : "") + (b.months[m] && b.months[m][part] ? " (your file's figures are kept beneath)" : ""), "info");
+        if (b.months[m] && b.months[m][part]) return Dom.chip(name + ": from your file", "ok");
+        return Dom.chip(name + ": none", "neutral");
+      };
+      kids.push(el("p", { class: "chips", "data-k": "pm-chips" }, chip("bal"), " ", chip("inc")));
+      if (row) {
+        const kpi = (label, value, cls) => el("div", { class: "kpi", "data-k": "pmk:" + label }, el("span", { class: "label", text: label }), el("span", { class: "value " + (cls || ""), "data-k": "pmv:" + label, text: value }));
+        const h = num(row.hours);
+        kids.push(el("div", { class: "kpis", "data-k": "pm-kpis" },
+          kpi("Poker income", money(row.income, cur, { plus: true }), tone(num(row.income))),
+          kpi("Table result", money(row.table, cur, { plus: true }), tone(num(row.table))),
+          kpi("Rakeback and promotions", money(row.extra, cur, { plus: true })),
+          kpi("Costs", money(row.cost, cur)),
+          kpi("Hours", hrs(row.hours)),
+          kpi("Hourly", h > 0 ? fm(num(row.income) / h, cur, { plus: true }) + "/h" : "–", h > 0 ? tone(num(row.income)) : ""),
+          kpi("Hands per hour", h > 0 && row.hands ? int(row.hands / h) : "–")));
+        if (typed && b.months[m]) {
+          const fileBook = PokerBook.dropTyped(b, m, "all");
+          const fr = S.rows(fileBook, cur, rates || undefined).rows.find((r) => r.month === m);
+          if (fr) {
+            const line = (label, a, c, f) => [label, cell(f(a), "r num"), cell(f(c), "r num"), cell(f === hrs ? hrs(String(num(c) - num(a))) : money(Dec.str(Dec.sub(Dec.parse(c), Dec.parse(a))), cur, { plus: true }), "r num " + (num(c) === num(a) ? "" : "chg"))];
+            const mf = (t) => money(t, cur, { plus: true });
+            kids.push(el("h3", { class: "sub-head", text: "Your file and what counts now" }), table(["", "Your file", "Counts now", "Difference"], [line("Table result", fr.table, row.table, mf), line("Rakeback and promotions", fr.extra, row.extra, mf), line("Costs", fr.cost, row.cost, mf), line("Poker income", fr.income, row.income, mf), line("Hours", fr.hours, row.hours, hrs)], "The imported figures of the month against the ones that count with what you typed in", "lrrr", "pm-diff"));
+          }
+        }
+      } else if (rec && miss) kids.push(banner("bad", monthName(m) + " is not counted in " + cur, el("span", { "data-k": "pm-miss", text: miss.why + ". Type the rates below, or store an ECB file on the Data tab of Investments (step 4)." })));
+      else if (!rec) kids.push(note("Nothing is stored for " + monthName(m) + " yet. Type it in below: the balances start from last month's closing balances, the income lines from last month's names.", "pm-new-note"));
+      root.appendChild(fcard({ key: "pm-head", title: "Month", sub: monthName(m) + (isDemo() ? " · demo: kept in this page only" : "") }, () => kids));
+      root.appendChild(balForm(m, rec, !!(typed && typed.bal), ecb));
+      root.appendChild(incForm(m, rec, !!(typed && typed.inc)));
+      root.appendChild(note("What you type here is kept apart from your imports: a later import of the same month keeps your typed figures counting unless you choose the file's (the import asks). Your workbooks are never changed.", "pm-apart"));
+    }
+
+    // ---------------------------------------------------------------- draw
+
+    function tabBar() {
+      return el("nav", { class: "tabs ptabs", role: "tablist", "aria-label": "Poker", "data-k": "poker-tabs" }, TABS.map((t) => el("button", { type: "button", class: "tab", role: "tab", "aria-selected": String(st.tab === t[0]), "data-key": "ptab:" + t[0], "data-k": "ptab:" + t[0], text: t[1], onclick: () => goTab(t[0]) })));
+    }
+    const pair = (key, a, b) => (a && b ? el("div", { class: "grid2", "data-k": key }, a, b) : a || b || null);
+
+    function render(root) {
+      const has = PokerBook.count(book()).months > 0;
+      root.appendChild(tabBar());
+      if (st.tab === "data") {
+        root.appendChild(importCard());
+        if (has) root.appendChild(checksCard());
+        root.appendChild(backupCard());
+        root.appendChild(taxCard());
+        return;
+      }
+      if (!has && st.tab !== "month") {
+        root.appendChild(card("Your poker results", null, note("Import your two poker workbooks (balances and income) on the Data tab, or type a month in on the Month tab, to see your results: hourly, variance and luck, downswings, sites, rakeback and costs, year by year, in dollars, euro or forints. Your files are read in this page and stay in this browser."), el("div", { class: "btn-row" }, btn("Import on the Data tab", () => goTab("data"), "primary", "poker-go-data"), btn("Type in a month", () => goTab("month"), "", "poker-go-month"))));
+        return;
+      }
+      const v = has ? figures() : null;
+      if (st.tab === "month") return monthTab(root, v);
+      const top = el("section", { class: "card", "data-k": "poker-top" }, el("div", { class: "card-head" }, el("h2", { text: { overview: "Your poker results", insights: "Insights", variance: "Variance", sites: "Sites" }[st.tab] }), el("span", { class: "sub", text: isDemo() ? "invented demo data" : "from your poker workbooks" })), controls(v), missingBanner(v), ratesNote(v), st.tab === "overview" ? (v.rows.length ? tiles(v) : note("No month in this period.")) : null);
+      root.appendChild(top);
+      if (!v.rows.length) return;
+      const add = (...cs) => { for (const c of cs) if (c) root.appendChild(c); };
+      if (st.tab === "overview") add(pair("poker-pair-1", cumCard(v), barsCard(v)), monthsTable(v));
+      else if (st.tab === "insights") add(rollCard(v), heatCard(v), byYearCard(v), pair("poker-pair-2", hoursCard(v), drawCard(v)), compCard(v), pair("poker-pair-3", siteBarsCard(v), sourcesCard(v)), seasonCard(v), outlookCard(v), yearsCard(v), extrasCard(v));
+      else if (st.tab === "variance") add(varianceCard(v), downCard(v));
+      else if (st.tab === "sites") add(sitesCard(v), bankrollCard(v), balancesCard(v));
+    }
+
+    return { render, state: st, goTab };
   }
 
   return { create };
@@ -34431,7 +35294,7 @@ const PackUI = (function () {
     const lf = ecbLedgerFor();
     const b = pokerBook() || PokerBook.empty();
     const key = s.source + "|" + s.kind + "|" + ecbFilesStored();
-    if (pokerRatesMemo.lf !== lf || pokerRatesMemo.book !== b) pokerRatesMemo = { lf, book: b, table: PokerRates.table(lf, Object.keys(b.months), PokerRates.currencies(b)), s: "", out: null };
+    if (pokerRatesMemo.lf !== lf || pokerRatesMemo.book !== b) pokerRatesMemo = { lf, book: b, table: PokerRates.table(lf, PokerStats.monthsOf(b), PokerRates.currencies(b)), s: "", out: null };
     if (pokerRatesMemo.s !== key || !pokerRatesMemo.out) {
       pokerRatesMemo.s = key;
       pokerRatesMemo.out = { source: s.source, kind: s.kind, table: pokerRatesMemo.table, hasFile: ecbFilesStored() };
@@ -34470,6 +35333,8 @@ const PackUI = (function () {
     save: pokerSave,
     download: spendDownload,
     render: () => render(),
+    // the open tab of the Poker part (architecture 44.2): a setting of this browser, like the open cards, in no backup
+    tabStore: { get: () => (foldStorage && foldStorage.getItem("att-poker-tab-v1")) || "", set: (t) => { if (foldStorage) foldStorage.setItem("att-poker-tab-v1", String(t)); } },
     folds: Folds.create({ storage: foldStorage, key: "att-poker-folds-v1" }), // which Poker cards are open, apart from the other parts'
   });
 
