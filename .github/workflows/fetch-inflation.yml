@@ -38,7 +38,7 @@ jobs:
         # The next steps still run when this one fails, so that the country that could be updated is saved; the last step then makes the run fail,
         # which is what makes GitHub tell you.
         continue-on-error: true
-        run: node scripts/fetch-inflation.js data/inflation.json
+        run: node scripts/fetch-inflation.js data/inflation.json data/inflation-groups.json
 
       - name: Save the figures
         env:
@@ -47,6 +47,7 @@ jobs:
           git config user.name "inflation-bot"
           git config user.email "actions@users.noreply.github.com"
           if [ -f data/inflation.json ]; then git add data/inflation.json; fi
+          if [ -f data/inflation-groups.json ]; then git add data/inflation-groups.json; fi
           # hooksPath: no script left in the folder by an earlier step runs while the token is in use
           git -c core.hooksPath=/dev/null diff --quiet --cached || git -c core.hooksPath=/dev/null commit -m "Update inflation ($(date -u +%Y-%m-%d))"
           remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
