@@ -663,6 +663,34 @@ span.hc { cursor: default; }
 @media (min-width: 860px) { .grid3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .grid3 > .mini > .sub-head { margin-top: 0; }
 .whisker { stroke: var(--fg); stroke-width: 1.5; fill: none; opacity: 0.85; pointer-events: none; }
+.net-path { fill: none; stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; pointer-events: none; filter: drop-shadow(0 0 2px rgba(11, 14, 20, 0.9)); }
+.net-dot { stroke: var(--surface); stroke-width: 1; pointer-events: none; }
+/* Spending in the new look (architecture 45.7): spending cells in orange (a cost is not a loss), the roles, the changes */
+.hm-o1 { background-color: color-mix(in srgb, var(--c-real-line) 14%, var(--surface-2)); }
+.hm-o2 { background-color: color-mix(in srgb, var(--c-real-line) 26%, var(--surface-2)); }
+.hm-o3 { background-color: color-mix(in srgb, var(--c-real-line) 40%, var(--surface-2)); }
+.hm-o4 { background-color: color-mix(in srgb, var(--c-real-line) 56%, var(--surface-2)); }
+.hm-o5 { background-color: color-mix(in srgb, var(--c-real-line) 72%, var(--surface-2)); color: #1a1206; }
+.chg { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.chg.up { color: var(--c-real-line); }
+.chg.down { color: var(--c-gain); }
+.chg.flat { color: var(--muted); }
+.kpi .value.chg-up-v { color: var(--c-real-line); }
+.kpi .value.role-fixed { color: color-mix(in srgb, var(--c-austria) 70%, var(--fg)); }
+.kpi .value.role-essential { color: color-mix(in srgb, var(--c-pie-5) 70%, var(--fg)); }
+.kpi .value.role-flexible { color: var(--c-real); }
+.role-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; background: var(--rc); vertical-align: -1px; flex: 0 0 auto; }
+.role-legend { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); margin: 4px 0 12px; }
+@media (min-width: 860px) { .role-legend { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.role-pill { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px 8px 12px; border-radius: 8px; background: var(--surface-2); border-left: 4px solid var(--rc); font-size: 13px; }
+.role-pill span { color: var(--muted); }
+.tbl.roles select { min-width: 9.5em; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; color: var(--fg); padding: 5px 8px; min-height: 32px; font: inherit; font-size: 13px; }
+.tbl.roles th[scope="row"] { white-space: normal; }
+.btn-row.tight { gap: 6px; align-items: center; flex-wrap: wrap; margin: 0; }
+.tbl.roles .narrow-only { display: none; }
+.role-sub { color: var(--muted); font-size: 12px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.role-chip { margin-top: 4px; }
+@media (max-width: 759px) { .tbl.roles .wide-only { display: none; } .tbl.roles .narrow-only { display: block; } .tbl.roles select { min-width: 0; width: 100%; } }
 .hm-s1 { background-color: color-mix(in srgb, var(--c-austria) 16%, var(--surface-2)); }
 .hm-s2 { background-color: color-mix(in srgb, var(--c-austria) 28%, var(--surface-2)); }
 .hm-s3 { background-color: color-mix(in srgb, var(--c-austria) 40%, var(--surface-2)); color: #fff; }
@@ -16542,6 +16570,8 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
    *   diverge: true (stacked, architecture 44.5): the negative parts stack downwards from zero, the positive ones upwards; the axis takes both sums
    *   whiskers: [{ lo, hi } | null, ...] (split or a single grouped series, architecture 44.5): a thin range line with short caps over each bar, in the
    *   ink colour; the axis takes the ranges in
+   *   netLine: { name, values, texts, color } (stacked, architecture 45.7): a solid line with a dot on each bar through the middle of the bars
+   *   (the net of the month over its income and spending), in the axis range, the legend (a plain entry) and the hover box; never dashed
    * Grouped and split bars are lit at the data end and have a soft glow; stacked segments are flat (neighbours of different colours).
    */
   function bars(opts) {
@@ -16579,6 +16609,13 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       syncLegend(ul, offNames());
       box.appendChild(ul);
     } else if (series.length > 1 || opts.legend || (mode === "split" && opts.splitLegend)) box.appendChild(mode === "split" ? legend(opts.splitLegend) : legend(series));
+    const net = mode === "stacked" && opts.netLine && Array.isArray(opts.netLine.values) ? opts.netLine : null;
+    if (net) {
+      const ul = box.querySelector("ul.legend");
+      const li = h("li", { class: "net-key" }, [keyOf({ name: net.name, color: net.color || "var(--c-put)", kind: "line" }), h("span", { text: net.name })]);
+      if (ul) ul.appendChild(li);
+      else box.appendChild(h("ul", { class: "legend", "aria-label": "Legend" }, [li]));
+    }
     box.appendChild(wrap);
     if (pr && pr.note) {
       note = h("p", { class: "note chart-note", text: pr.note });
@@ -16617,6 +16654,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       else for (const x of shown) for (const v of x.values) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
       if (diverge) lo = Math.min.apply(null, cats.map((_, i) => negSum(shown, i)).concat([0]));
       if (whisk) for (const w of whisk) if (w && Number.isFinite(w.lo) && Number.isFinite(w.hi)) { lo = Math.min(lo, w.lo); hi = Math.max(hi, w.hi); }
+      if (net) for (const v of net.values) if (Number.isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
       const sc = niceScale(lo, hi, 4);
       const y = (v) => mt + ph - ((v - sc.min) / (sc.max - sc.min)) * ph;
 
@@ -16766,6 +16804,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
         // skipZero (stacked): a series that has nothing in this category is not a row of its tip (a stack of a dozen series would be a tall box of dashes)
         const rows = shown.filter((x) => !(opts.skipZero && mode === "stacked" && !(diverge ? x.values[i] : x.values[i] > 0))).map((x) => ({ name: x.name, color: mode === "split" ? (x.values[i] < 0 ? opts.colorNeg : opts.colorPos) : x.color, pattern: x.pattern, value: (x.texts && x.texts[i]) || String(x.values[i]) }));
         if (mode === "stacked" && opts.totalTexts && allShown) rows.push({ name: "Total", value: opts.totalTexts[i] });
+        if (net && net.texts && net.texts[i]) rows.push({ name: net.name, value: net.texts[i], color: net.color || "var(--c-put)", tone: net.tone ? net.tone[i] : undefined });
         const more = plainRows(opts.details && opts.details[i]);
         // a row of the pair that is about series that are hidden goes away with them
         const goneRow = (r) => [].concat(r.of || []).some((id) => hidden.has((series.find((x) => x.id === id) || {}).name));
@@ -16777,6 +16816,28 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
         hit.addEventListener("mouseleave", () => tipper.hide());
         hit.addEventListener("blur", () => tipper.hide());
       });
+      // the net line over the bars: drawn after them, under the hit areas' focus ring (the hit rects are transparent)
+      if (net) {
+        const col = net.color || "var(--c-put)";
+        const g = s("g", { class: "netline" }, svg);
+        let d = "";
+        cats.forEach((_, i) => {
+          const v = net.values[i];
+          if (!Number.isFinite(v)) return;
+          const cx = ml + band * i + band / 2;
+          d += (d && Number.isFinite(net.values[i - 1]) ? "L" : "M") + cx.toFixed(1) + " " + y(v).toFixed(1);
+        });
+        const path = s("path", { d, class: "net-path" }, g);
+        path.style.stroke = col;
+        cats.forEach((_, i) => {
+          const v = net.values[i];
+          if (!Number.isFinite(v) || cats.length > 60) return;
+          const dot = s("circle", { cx: ml + band * i + band / 2, cy: y(v), r: cats.length > 30 ? 2 : 3, class: "net-dot" }, g);
+          dot.style.fill = col;
+        });
+        // the hit areas lie on top again, so that the line does not take the pointer
+        for (const r of Array.from(svg.querySelectorAll("rect.hit"))) svg.appendChild(r);
+      }
     }
     redraw = responsive(wrap, draw);
     const again = redraw;
@@ -19269,7 +19330,8 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
  *
  * The book is a store of its own (key "spend"), apart from the Investments document: the tax engine and the performance module never see it,
  * and it never writes anywhere else. It keeps every row of every imported wallet as the file had it (his answer of 24 Nov 2026):
- *   { kind: KIND, format: FORMAT, wallets: { <name>: { aliases: [names], rows: [row], imports: [{ on, file, months, rows }] } } }
+ *   { kind: KIND, format: FORMAT, wallets: { <name>: { aliases: [names], rows: [row], imports: [{ on, file, months, rows }] } }, roles: { <category>: role } }
+ *   roles (format 2, architecture 45.3): only the roles he chose (fixed, essential, flexible, none); a category without one follows SpendRoles.propose.
  *   row = { at, day, type, cat, amt, cur, note, labels, by }   (see spendee.js; amt is the exact text of the amount)
  *
  * The unit of replacement is (wallet, month): a file changes only its own wallet, and for every month it holds it replaces that wallet's
@@ -19283,9 +19345,11 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
 })(typeof self !== "undefined" ? self : this, function (Dec, Spendee) {
   "use strict";
 
-  const VERSION = "spendbook-0.1.0";
+  const VERSION = "spendbook-0.2.0";
   const KIND = "austria-tracker-spending";
-  const FORMAT = 1;
+  const FORMAT = 2;
+  const ROLES = ["fixed", "essential", "flexible", "none"];
+  const MAX_ROLES = 500;
   const BACKUP_KIND = "austria-tracker-backup";
   const BOOK = "spending";
   const MAX_WALLETS = 200;
@@ -19296,7 +19360,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
   const monthOf = (row) => row.day.slice(0, 7);
 
   function empty() {
-    return { kind: KIND, format: FORMAT, wallets: {} };
+    return { kind: KIND, format: FORMAT, wallets: {}, roles: {} };
   }
 
   /** The order rows are kept in: by day, then by the moment as written, then by everything else (so the order never depends on the file). */
@@ -19349,6 +19413,16 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
         ? w.imports.filter((i) => isObj(i) && typeof i.on === "string").map((i) => ({ on: i.on.slice(0, 40), file: typeof i.file === "string" ? i.file.slice(0, 200) : "", months: Number.isInteger(i.months) ? i.months : 0, rows: Number.isInteger(i.rows) ? i.rows : 0 }))
         : [];
       out.wallets[name] = { aliases: Array.from(new Set(aliases)).sort(), rows, imports: imports.slice(-100) };
+    }
+    // the roles he chose (format 2): a format 1 book has none; anything that is not a known role makes the whole book damaged
+    if (p.roles !== undefined) {
+      if (!isObj(p.roles)) return { ok: false, error: "The roles of the Spending book are damaged." };
+      const cats = Object.keys(p.roles);
+      if (cats.length > MAX_ROLES) return { ok: false, error: "The Spending book has more than " + MAX_ROLES + " category roles." };
+      for (const c of cats.sort()) {
+        if (!c || c.length > MAX_NAME || ROLES.indexOf(p.roles[c]) < 0) return { ok: false, error: "The role of the category '" + c.slice(0, 60) + "' in the Spending book is damaged." };
+        out.roles[c] = p.roles[c];
+      }
     }
     return { ok: true, book: out };
   }
@@ -19449,7 +19523,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
    */
   function apply(book, p, on) {
     if (!p || !p.ok) throw new Error("SpendBook.apply: not a usable plan");
-    const out = { kind: KIND, format: FORMAT, wallets: Object.assign({}, book.wallets) };
+    const out = { kind: KIND, format: FORMAT, wallets: Object.assign({}, book.wallets), roles: Object.assign({}, book.roles || {}) };
     const old = out.wallets[p.target] || { aliases: [], rows: [], imports: [] };
     const replace = new Set(p.months.map((x) => x.month));
     const rows = old.rows.filter((r) => !replace.has(monthOf(r))).concat(p._file.rows.map((r) => Object.assign({}, r)));
@@ -19481,9 +19555,23 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
 
   /** The book without one wallet. */
   function removeWallet(book, name) {
-    const out = { kind: KIND, format: FORMAT, wallets: Object.assign({}, book.wallets) };
+    const out = { kind: KIND, format: FORMAT, wallets: Object.assign({}, book.wallets), roles: Object.assign({}, book.roles || {}) };
     delete out.wallets[name];
     return out;
+  }
+
+  /**
+   * The book with the role of one category set to his choice (role one of ROLES) or, with role null, back to the proposal (architecture 45.3).
+   * Returns { ok, book } or { ok: false, error }; the old book is not changed.
+   */
+  function setRole(book, cat, role) {
+    if (typeof cat !== "string" || !cat || cat.length > MAX_NAME) return { ok: false, error: "No such category." };
+    if (role !== null && ROLES.indexOf(role) < 0) return { ok: false, error: "Not a role: " + String(role).slice(0, 20) + "." };
+    const roles = Object.assign({}, book.roles || {});
+    if (role === null) delete roles[cat];
+    else roles[cat] = role;
+    if (Object.keys(roles).length > MAX_ROLES) return { ok: false, error: "At most " + MAX_ROLES + " categories can have a role of your choice." };
+    return { ok: true, book: { kind: KIND, format: FORMAT, wallets: Object.assign({}, book.wallets), roles } };
   }
 
   // ---------------------------------------------------------------- facts about the book
@@ -19555,7 +19643,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     return null;
   }
 
-  return { VERSION, KIND, FORMAT, BOOK, BACKUP_KIND, empty, normalize, plan, apply, applyAll, removeWallet, wallets, count, monthsBetween, toBackup, fromBackup, otherBookMessage, rowKey };
+  return { VERSION, KIND, FORMAT, BOOK, BACKUP_KIND, ROLES, empty, setRole, normalize, plan, apply, applyAll, removeWallet, wallets, count, monthsBetween, toBackup, fromBackup, otherBookMessage, rowKey };
 });
 
 /* ---- src/spend/view.js ---- */
@@ -19575,7 +19663,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
 })(typeof self !== "undefined" ? self : this, function (Dec, Spendee, SpendBook) {
   "use strict";
 
-  const VERSION = "spendview-0.1.0";
+  const VERSION = "spendview-0.2.0";
   const DP = 6;
   const Z = Dec.mk(0n, DP);
   const NO_CAT = "(no category)";
@@ -19611,7 +19699,8 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
   const kindOf = (r) => (r.type === "Expense" ? "spend" : r.type === "Income" ? "earn" : "other");
 
   /**
-   * opts: { cur (default EUR), from, to ("yyyy-mm", inclusive; default: the whole span), wallets (names or null for all) }.
+   * opts: { cur (default EUR), from, to ("yyyy-mm", inclusive; default: the whole span), wallets (names or null for all), skip (categories whose
+   * role is "not spending", architecture 45.2: their expense rows are not spending; counted apart in totals.skipped) }.
    * Returns the figures of the screens; every amount is a decimal text with 6 decimals in the currency `cur`.
    */
   function build(book, fx, opts) {
@@ -19640,6 +19729,10 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     const walletSpent = new Map();
     const walletEarned = new Map();
     const largest = [];
+    const skip = new Set(opts.skip || []);
+    let skipSum = Z;
+    let skipN = 0;
+    const skipCats = new Map();
     for (const { w, r } of allRows(book, opts.wallets || null)) {
       const m = r.day.slice(0, 7);
       if (!inRange.has(m)) continue;
@@ -19655,7 +19748,12 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       const v = c.value;
       const kind = kindOf(r);
       const cat = r.cat || NO_CAT;
-      if (kind === "spend") {
+      if (kind === "spend" && skip.has(cat)) {
+        // not spending (a transfer, money saved or put on a poker site): kept apart, never in a spending figure
+        skipN++;
+        skipSum = Dec.add(skipSum, Dec.neg(v));
+        add(skipCats, cat, Dec.neg(v));
+      } else if (kind === "spend") {
         const s = Dec.neg(v);
         spent = Dec.add(spent, s);
         add(cats, cat, s);
@@ -19694,7 +19792,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       from,
       to,
       months,
-      totals: { spent: txt(spent), earned: txt(earned), net: txt(Dec.sub(earned, spent)), avg: txt(avg), rows: n, other: { n: otherN, sum: txt(otherSum) } },
+      totals: { spent: txt(spent), earned: txt(earned), net: txt(Dec.sub(earned, spent)), avg: txt(avg), rows: n, other: { n: otherN, sum: txt(otherSum) }, skipped: { n: skipN, sum: txt(skipSum), cats: Array.from(skipCats.keys()).sort(byText).map((c) => ({ cat: c, sum: txt(skipCats.get(c)) })) } },
       missing: { n: missing.n, ccys: Array.from(missing.ccys).sort(), days: Array.from(missing.days).sort(), reasons: Array.from(missing.reasons).sort() },
       cats: catList.map((x) => ({ cat: x.key, spent: txt(x.value), n: x.n })),
       incomeCats: rankDesc(incomeCats, incomeN).map((x) => ({ cat: x.key, earned: txt(x.value), n: x.n })),
@@ -19778,7 +19876,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
 })(typeof self !== "undefined" ? self : this, function (Dec, Spendee, SpendBook, SpendView) {
   "use strict";
 
-  const VERSION = "paidin-0.2.0";
+  const VERSION = "paidin-0.3.0";
   const DP = 6;
   const Z = Dec.mk(0n, DP);
   /** The currencies a label may name: the euro and the currencies of the ECB's reference rates (with two that left the list). */
@@ -19828,7 +19926,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
   }
 
   /**
-   * The spending of the period by the currency it was paid in. opts as SpendView.build: { cur, from, to, wallets }.
+   * The spending of the period by the currency it was paid in. opts as SpendView.build: { cur, from, to, wallets, skip }.
    * Only expenses count (an income or another type is not spending). Returns {
    *   cur, months, rows: [{ paid, n, own, shown, ownMissing, converted }]   own: spent in the currency paid in (6 decimals; null when a rate
    *                                                                 is missing for one of its entries), shown: in the currency shown,
@@ -19853,11 +19951,12 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     const missing = { n: 0, days: new Set() };
     let total = Z;
     let n = 0;
+    const skip = new Set(opts.skip || []); // the categories that are not spending (architecture 45.2)
     for (const w of Object.keys(book.wallets).sort()) {
       if (opts.wallets && opts.wallets.indexOf(w) < 0) continue;
       for (const r of book.wallets[w].rows) {
         const m = r.day.slice(0, 7);
-        if (!inRange.has(m) || SpendView.kindOf(r) !== "spend") continue;
+        if (!inRange.has(m) || SpendView.kindOf(r) !== "spend" || skip.has(r.cat || SpendView.NO_CAT)) continue;
         const c = classify(r);
         const amount = Dec.parse(r.amt);
         const shown = fx.convert(amount, r.cur, cur, r.day);
@@ -19906,6 +20005,391 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
   return { VERSION, CODES, classify, noteCurrency, labelCurrency, moreThanCents, build };
 });
 
+/* ---- src/spend/roles.js ---- */
+/*
+ * SpendRoles: the role of each Spendee category (fixed, essential, flexible, not spending), proposed from its name or chosen by him, and the
+ * figures built on it: fixed against variable costs, and the trend of a year against the year before (architecture sections 45.2 and 45.4).
+ *
+ * The book keeps only the roles he chose (SpendBook format 2, `roles`); every other category follows propose(), so a better proposal later
+ * reaches it. Every amount is an exact decimal (decimal.js) with 6 decimals, made from SpendView.build; the shares are numbers for the screen.
+ *
+ * Pure functions, no DOM, no clock. Runs in Node (tests) and in the page.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("../lib/decimal.js"), require("./book.js"), require("./view.js"));
+  else root.SpendRoles = factory(root.Dec, root.SpendBook, root.SpendView);
+})(typeof self !== "undefined" ? self : this, function (Dec, SpendBook, SpendView) {
+  "use strict";
+
+  const VERSION = "spendroles-0.1.0";
+  const DP = 6;
+  const Z = Dec.mk(0n, DP);
+  const ROLES = ["fixed", "essential", "flexible", "none"];
+  const NAME = { fixed: "Fixed", essential: "Essential", flexible: "Flexible", none: "Not spending" };
+  const SPENDING = ["fixed", "essential", "flexible"];
+  const txt = (d) => Dec.str(Dec.round(d, DP));
+  const P = (t) => Dec.parse(t) || Z;
+  const byText = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  const has = (o, k) => !!o && Object.prototype.hasOwnProperty.call(o, k);
+
+  // ---------------------------------------------------------------- the proposal from the name (45.2)
+
+  // Each list: whole words, a trailing \p{L}* lets a word go on ("insurance" → "insurances"). The first list that matches wins, in this order.
+  const W = (words) => new RegExp("(?<!\\p{L})(?:" + words.join("|") + ")(?!\\p{L})", "iu");
+  const RULES = [
+    ["none", W(["transfer\\p{L}*", "überweisung\\p{L}*", "átutalás\\p{L}*", "saving\\p{L}*", "sparen", "spar(?:konto|plan|buch)\\p{L}*", "megtakarítás\\p{L}*", "invest\\p{L}*", "befektetés\\p{L}*", "deposit\\p{L}*", "poker\\p{L}*"])],
+    ["fixed", W(["rent", "rents", "miete\\p{L}*", "lakbér\\p{L}*", "albérlet\\p{L}*", "bills?", "fees?", "rezsi\\p{L}*", "utilit\\p{L}*", "insurance\\p{L}*", "versicherung\\p{L}*", "biztosítás\\p{L}*", "subscription\\p{L}*", "abos?", "előfizetés\\p{L}*", "internet", "phone\\p{L}*", "handy", "telefon\\p{L}*", "electricity", "strom", "áram", "gas", "gáz", "heating", "heizung", "water", "wasser", "víz", "loans?", "kredit\\p{L}*", "hitel\\p{L}*", "mortgage\\p{L}*", "tax", "taxes", "steuer\\p{L}*", "adó\\p{L}*", "membership\\p{L}*", "mitglied\\p{L}*", "home", "housing", "wohnung\\p{L}*", "lakás\\p{L}*", "betriebskosten"])],
+    ["essential", W(["grocer\\p{L}*", "lebensmittel\\p{L}*", "élelmiszer\\p{L}*", "supermarket\\p{L}*", "food(?!.*drink)", "health\\p{L}*", "doctor\\p{L}*", "pharmac\\p{L}*", "apotheke\\p{L}*", "gyógyszer\\p{L}*", "orvos\\p{L}*", "arzt\\p{L}*", "medic\\p{L}*", "transport\\p{L}*", "fuel", "tanken", "benzin", "car", "cars", "auto", "autó\\p{L}*", "taxi", "öffi\\p{L}*", "child\\p{L}*", "kids?", "baby", "kinder\\p{L}*", "gyerek\\p{L}*", "family", "familie", "család\\p{L}*", "school\\p{L}*", "schule", "education", "bildung", "oktatás\\p{L}*"])],
+    ["flexible", W(["restaurant\\p{L}*", "drink\\p{L}*", "eating out", "café", "cafe", "coffee", "kaffee", "kávé\\p{L}*", "bar", "bars", "shopping", "entertainment", "travel\\p{L}*", "holiday\\p{L}*", "urlaub", "utazás\\p{L}*", "gift\\p{L}*", "geschenk\\p{L}*", "ajándék\\p{L}*", "sport\\p{L}*", "hobb\\p{L}*", "beauty", "cloth\\p{L}*", "kleidung", "ruha\\p{L}*", "fun", "leisure", "freizeit", "games?", "electronics", "work", "other", "others", "egyéb", "sonstige\\p{L}*"])],
+  ];
+
+  /** { role, rule (the words that matched, "" when none did), guess (no rule matched: proposed flexible) } */
+  function propose(cat) {
+    const name = String(cat || "");
+    for (const [role, re] of RULES) {
+      const m = re.exec(name);
+      if (m) return { role, rule: m[0], guess: false };
+    }
+    return { role: "flexible", rule: "", guess: true };
+  }
+
+  /** The role that counts: his choice, else the proposal. { role, mine, guess, rule } */
+  function roleOf(book, cat) {
+    const r = book && book.roles;
+    if (has(r, cat) && ROLES.indexOf(r[cat]) >= 0) return { role: r[cat], mine: true, guess: false, rule: "" };
+    return Object.assign({ mine: false }, propose(cat));
+  }
+
+  /** Every category of an expense row in the book (empty category: SpendView.NO_CAT), sorted. */
+  function catsOf(book, wallets) {
+    const s = new Set();
+    for (const w of Object.keys((book && book.wallets) || {})) {
+      if (wallets && wallets.indexOf(w) < 0) continue;
+      for (const r of book.wallets[w].rows) if (SpendView.kindOf(r) === "spend") s.add(r.cat || SpendView.NO_CAT);
+    }
+    return Array.from(s).sort(byText);
+  }
+
+  /** The categories that are not spending (role none, his or proposed): the `skip` of SpendView.build and PaidIn.build. */
+  function skipOf(book, wallets) {
+    return catsOf(book, wallets).filter((c) => roleOf(book, c).role === "none");
+  }
+
+  /**
+   * The roles table of the Categories tab: every expense category of the book (of the chosen wallets) with its role and its spending in the
+   * period of opts ({ cur, from, to, wallets }; nothing skipped, so a "not spending" category shows its sum too). Largest first.
+   * Returns { rows: [{ cat, role, mine, guess, rule, spent, n, months }], total (spent of the period, the skipped categories included) }.
+   */
+  function table(book, fx, opts) {
+    const o = Object.assign({}, opts || {}, { skip: [] });
+    const v = SpendView.build(book, fx, o);
+    const spentOf = new Map(v.cats.map((c, k) => [c.cat, { spent: c.spent, n: c.n, k }]));
+    const rows = catsOf(book, o.wallets || null).map((cat) => {
+      const r = roleOf(book, cat);
+      const s = spentOf.get(cat);
+      const months = s ? v.monthly.filter((m) => !Dec.isZero(P(m.byCat[s.k]))).length : 0;
+      return { cat, role: r.role, mine: r.mine, guess: r.guess, rule: r.rule, spent: s ? s.spent : txt(Z), n: s ? s.n : 0, months };
+    });
+    rows.sort((a, b) => Dec.cmp(P(b.spent), P(a.spent)) || byText(a.cat, b.cat));
+    return { rows, total: v.totals.spent, cur: v.cur };
+  }
+
+  // ---------------------------------------------------------------- fixed against variable (45.4)
+
+  /**
+   * view: a SpendView.build result (with the `none` categories skipped); role(cat) gives the role that counts. Per month and for the period:
+   * { fixed, essential, flexible, total } (texts). ok is false when the parts do not add up to the period's spending (then nothing is shown).
+   * shares: { fixed, hard (fixed + essential), flexible } of the period's spending, numbers or null without spending.
+   */
+  function split(view, role) {
+    const roleK = view.cats.map((c) => {
+      const r = role(c.cat);
+      return SPENDING.indexOf(r) >= 0 ? r : "flexible"; // a none category is not in a skipped view; were it there, it would count as flexible
+    });
+    const acc = { fixed: Z, essential: Z, flexible: Z };
+    const months = view.monthly.map((m) => {
+      const x = { fixed: Z, essential: Z, flexible: Z };
+      m.byCat.forEach((t, k) => (x[roleK[k]] = Dec.add(x[roleK[k]], P(t))));
+      for (const r of SPENDING) acc[r] = Dec.add(acc[r], x[r]);
+      const total = Dec.add(Dec.add(x.fixed, x.essential), x.flexible);
+      return { month: m.month, fixed: txt(x.fixed), essential: txt(x.essential), flexible: txt(x.flexible), total: txt(total), ok: Dec.cmp(Dec.round(total, DP), Dec.round(P(m.spent), DP)) === 0 };
+    });
+    const total = Dec.add(Dec.add(acc.fixed, acc.essential), acc.flexible);
+    const ok = months.every((m) => m.ok) && Dec.cmp(Dec.round(total, DP), Dec.round(P(view.totals.spent), DP)) === 0;
+    const share = (d) => (Dec.isNeg(total) || Dec.isZero(total) ? null : Number(Dec.str(Dec.divRound(d, total, 12))));
+    const perCat = view.cats.map((c, k) => ({ cat: c.cat, role: roleK[k], spent: c.spent, n: c.n }));
+    return {
+      ok,
+      months,
+      totals: { fixed: txt(acc.fixed), essential: txt(acc.essential), flexible: txt(acc.flexible), total: txt(total) },
+      shares: { fixed: share(acc.fixed), hard: share(Dec.add(acc.fixed, acc.essential)), flexible: share(acc.flexible) },
+      cats: perCat,
+    };
+  }
+
+  /** "yyyy-mm" moved by k months. */
+  function addMonths(m, k) {
+    const n = +m.slice(0, 4) * 12 + (+m.slice(5, 7) - 1) + k;
+    return Math.floor(n / 12) + "-" + String((n % 12) + 1).padStart(2, "0");
+  }
+
+  /**
+   * The last 12 months up to opts.to (default the book's last month) against the 12 before, per role and per category (45.4).
+   * opts: { cur, wallets, skip, to }. Returns { ok: false, why } when the 24 months are not all inside the book's span, else
+   * { ok: true, now: { from, to }, before: { from, to }, roles: { fixed | essential | flexible | total: item }, cats: [item + { cat, role }] }
+   * with item = { now, before, diff (texts), pct (diff ÷ before as a number, null when before is zero or below) }; cats largest now first.
+   */
+  function trend(book, fx, opts, role) {
+    const o = opts || {};
+    const sp = SpendView.span(book, o.wallets || null);
+    if (!sp.first) return { ok: false, why: "no spending" };
+    const to = o.to && o.to < sp.last ? o.to : sp.last;
+    const from = addMonths(to, -11);
+    const bTo = addMonths(to, -12);
+    const bFrom = addMonths(to, -23);
+    if (bFrom < sp.first) return { ok: false, why: "needs 24 months of spending" };
+    const base = { cur: o.cur, wallets: o.wallets || null, skip: o.skip || [] };
+    const vNow = SpendView.build(book, fx, Object.assign({}, base, { from, to }));
+    const vBef = SpendView.build(book, fx, Object.assign({}, base, { from: bFrom, to: bTo }));
+    const sNow = split(vNow, role);
+    const sBef = split(vBef, role);
+    const item = (a, b) => {
+      const d = Dec.sub(P(a), P(b));
+      const bb = P(b);
+      return { now: txt(P(a)), before: txt(bb), diff: txt(d), pct: Dec.isNeg(bb) || Dec.isZero(bb) ? null : Number(Dec.str(Dec.divRound(d, bb, 12))) };
+    };
+    const roles = {};
+    for (const r of SPENDING.concat(["total"])) roles[r] = item(sNow.totals[r], sBef.totals[r]);
+    const now = new Map(vNow.cats.map((c) => [c.cat, c.spent]));
+    const bef = new Map(vBef.cats.map((c) => [c.cat, c.spent]));
+    const names = Array.from(new Set(Array.from(now.keys()).concat(Array.from(bef.keys()))));
+    const cats = names.map((c) => Object.assign({ cat: c, role: role(c) }, item(now.get(c) || "0", bef.get(c) || "0")));
+    cats.sort((a, b) => Dec.cmp(P(b.now), P(a.now)) || byText(a.cat, b.cat));
+    return { ok: sNow.ok && sBef.ok, why: sNow.ok && sBef.ok ? "" : "the parts do not add up", now: { from, to }, before: { from: bFrom, to: bTo }, roles, cats };
+  }
+
+  return { VERSION, ROLES, NAME, SPENDING, RULES, propose, roleOf, catsOf, skipOf, table, split, trend, addMonths };
+});
+
+/* ---- src/spend/bills.js ---- */
+/*
+ * SpendBills: the recurring bills found in the notes and labels of the Spending book, with their price changes (architecture section 45.5).
+ *
+ * A key is a row's note or one of its labels (trimmed, lower case, spaces folded). A key is a bill when it was paid in at least 3 months, at most
+ * 3 times in any month and once in most months, in a steady rhythm (1, 2, 3, 6 or 12 months) and at a steady price (the price changes by more
+ * than 1.5 % in at most half of the steps). Prices are compared in the row's own currency, so an exchange rate never looks like a price change;
+ * the amounts per month and per year are in the currency shown (SpendFx at the day of the payment). Descriptions of his records, not advice.
+ *
+ * Pure functions, no DOM, no clock. Runs in Node (tests) and in the page.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("../lib/decimal.js"), require("./spendee.js"), require("./view.js"));
+  else root.SpendBills = factory(root.Dec, root.Spendee, root.SpendView);
+})(typeof self !== "undefined" ? self : this, function (Dec, Spendee, SpendView) {
+  "use strict";
+
+  const VERSION = "spendbills-0.1.0";
+  const DP = 6;
+  const Z = Dec.mk(0n, DP);
+  const MIN_MONTHS = 3;
+  const MAX_PER_MONTH = 3;
+  const RHYTHMS = [1, 2, 3, 6, 12];
+  const RHYTHM_TENTHS = 7; // at least 7 tenths of the gaps equal to the rhythm (whole numbers, so 70 % of 10 gaps is exactly 7)
+  const STEP = 0.015; // a price step larger than this is a price change
+  const MAX_NOTE = 80;
+  // a label that is only a currency code marks how a payment was made (his "huf"), not a bill
+  const CODES = new Set("eur usd jpy bgn czk dkk gbp huf pln ron sek chf isk nok try aud brl cad cny hkd idr ils inr krw mxn myr nzd php sgd thb zar hrk rub cyp eek ltl lvl mtl sit skk".split(" "));
+  const txt = (d) => Dec.str(Dec.round(d, DP));
+  const byText = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  const idx = (m) => +m.slice(0, 4) * 12 + (+m.slice(5, 7) - 1);
+  const norm = (t) => String(t || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const ratio = (a, b) => Number(Dec.str(Dec.divRound(Dec.sub(a, b), b, 12))); // a ÷ b − 1
+
+  /** The keys of one row: its note and its labels, normalised, without currency codes; each once. [{ key, from: "note" | "label", text }] */
+  function keysOf(r) {
+    const out = [];
+    const seen = new Set();
+    const n = norm(r.note);
+    if (n && n.length <= MAX_NOTE) {
+      out.push({ key: n, from: "note", text: String(r.note).trim().replace(/\s+/g, " ") });
+      seen.add(n);
+    }
+    for (const l of Spendee.splitLabels(r.labels)) {
+      const k = norm(l);
+      if (!k || seen.has(k) || CODES.has(k)) continue;
+      seen.add(k);
+      out.push({ key: k, from: "label", text: l });
+    }
+    return out;
+  }
+
+  /**
+   * opts: { cur (default EUR), wallets (names or null), skip (categories that are not spending) }.
+   * Returns { cur, last (the book's last month), bills: [bill], monthly, yearly (texts: the active bills added up), active (n), changes: [change],
+   *           inflation: { rate, n, changed: [{ name, pct }], missing } | null }
+   * bill = { key, name, from, cat, cur (its own), n (payments), months, first, last, rhythm, active, price (own currency), monthly, yearly
+   *          (currency shown, null without a rate), seq: [{ month, day, price, n }], changes: [{ month, from, to, pct }], otherCur (months in
+   *          another currency, left out) }
+   */
+  function detect(book, fx, opts) {
+    const o = opts || {};
+    const cur = o.cur || "EUR";
+    const skip = new Set(o.skip || []);
+    const span = SpendView.span(book, o.wallets || null);
+    const groups = new Map(); // key -> { key, from, text, newest, rows: [{ id, r }] }
+    for (const w of Object.keys(book.wallets).sort()) {
+      if (o.wallets && o.wallets.indexOf(w) < 0) continue;
+      for (const r of book.wallets[w].rows) {
+        if (SpendView.kindOf(r) !== "spend" || skip.has(r.cat || SpendView.NO_CAT)) continue;
+        const id = w + "\u0001" + [r.day, r.at, r.type, r.cat, r.amt, r.cur, r.note, r.labels, r.by].join("\u0000");
+        for (const k of keysOf(r)) {
+          if (!groups.has(k.key)) groups.set(k.key, { key: k.key, from: k.from, text: k.text, newest: "", rows: [] });
+          const g = groups.get(k.key);
+          g.rows.push({ id, r });
+          if (k.from === "label") g.from = "label";
+          const stamp = r.day + "\u0000" + r.at;
+          if (stamp >= g.newest) {
+            g.newest = stamp;
+            g.text = k.text;
+          }
+        }
+      }
+    }
+    const bills = [];
+    for (const g of groups.values()) {
+      const b = one(g, fx, cur, span.last);
+      if (b) bills.push(b);
+    }
+    // a note and a label of the same payments are one bill: the label's name is kept
+    const bySig = new Map();
+    for (const b of bills) {
+      const prev = bySig.get(b.sig);
+      if (!prev || (prev.from === "note" && b.from === "label") || (prev.from === b.from && b.key < prev.key)) bySig.set(b.sig, b);
+    }
+    const kept = Array.from(bySig.values());
+    const P = (t) => (t === null ? null : Dec.parse(t));
+    kept.sort((a, b) => (a.active !== b.active ? (a.active ? -1 : 1) : 0) || (a.monthly === null) - (b.monthly === null) || (a.monthly !== null && b.monthly !== null ? Dec.cmp(P(b.monthly), P(a.monthly)) : 0) || byText(a.key, b.key));
+    let monthly = Z;
+    let active = 0;
+    for (const b of kept) {
+      delete b.sig;
+      if (b.active && b.monthly !== null) {
+        monthly = Dec.add(monthly, Dec.parse(b.monthly));
+        active++;
+      }
+    }
+    const changes = [];
+    for (const b of kept) for (const c of b.changes) changes.push(Object.assign({ name: b.name, cur: b.cur }, c));
+    changes.sort((a, b) => byText(b.month, a.month) || byText(a.name, b.name));
+    return { version: VERSION, cur, last: span.last, bills: kept, active, monthly: txt(monthly), yearly: txt(Dec.mul(monthly, Dec.mk(12n, 0))), changes, inflation: inflation(kept, fx, cur, span.last) };
+  }
+
+  function one(g, fx, shownCur, bookLast) {
+    // the currency of the newest row; months in another currency are left out
+    const sorted = g.rows.slice().sort((a, b) => byText(a.r.day + a.r.at, b.r.day + b.r.at));
+    const own = sorted[sorted.length - 1].r.cur;
+    const per = new Map(); // month -> { sum, n, day (the last payment's) }
+    const other = new Set();
+    for (const { r } of sorted) {
+      const m = r.day.slice(0, 7);
+      if (r.cur !== own) {
+        other.add(m);
+        continue;
+      }
+      const a = Dec.neg(Dec.parse(r.amt));
+      const x = per.get(m) || { sum: Z, n: 0, day: r.day };
+      x.sum = Dec.add(x.sum, a);
+      x.n++;
+      if (r.day > x.day) x.day = r.day;
+      per.set(m, x);
+    }
+    for (const m of per.keys()) other.delete(m);
+    const months = Array.from(per.keys()).sort();
+    if (months.length < MIN_MONTHS) return null;
+    const counts = months.map((m) => per.get(m).n);
+    if (Math.max.apply(null, counts) > MAX_PER_MONTH) return null;
+    const cs = counts.slice().sort((a, b) => a - b);
+    if (cs[cs.length >> 1] !== 1) return null;
+    const gaps = months.slice(1).map((m, k) => idx(m) - idx(months[k]));
+    const gs = gaps.slice().sort((a, b) => a - b);
+    const rhythm = gs[gs.length >> 1];
+    if (RHYTHMS.indexOf(rhythm) < 0 || gaps.filter((x) => x === rhythm).length * 10 < RHYTHM_TENTHS * gaps.length) return null;
+    const seq = months.map((m) => {
+      const x = per.get(m);
+      return { month: m, day: x.day, price: Dec.divRound(x.sum, Dec.mk(BigInt(x.n), 0), DP), n: x.n };
+    });
+    if (seq.some((x) => Dec.isNeg(x.price) || Dec.isZero(x.price))) return null; // a refund month is not a price
+    const changes = [];
+    for (let k = 1; k < seq.length; k++) {
+      const c = ratio(seq[k].price, seq[k - 1].price);
+      if (Math.abs(c) > STEP) changes.push({ month: seq[k].month, from: txt(seq[k - 1].price), to: txt(seq[k].price), pct: c });
+    }
+    if (changes.length * 2 > seq.length - 1) return null;
+    const last = seq[seq.length - 1];
+    const conv = fx.convert(last.price, own, shownCur, last.day);
+    const monthly = conv.ok ? Dec.divRound(conv.value, Dec.mk(BigInt(rhythm), 0), DP) : null;
+    const catN = new Map();
+    for (const { r } of sorted) if (r.cur === own) catN.set(r.cat || SpendView.NO_CAT, (catN.get(r.cat || SpendView.NO_CAT) || 0) + 1);
+    const cat = Array.from(catN.entries()).sort((a, b) => b[1] - a[1] || byText(a[0], b[0]))[0][0];
+    const ids = Array.from(new Set(sorted.filter((x) => x.r.cur === own).map((x) => x.id))).sort();
+    return {
+      key: g.key,
+      name: g.text,
+      from: g.from,
+      cat,
+      cur: own,
+      n: counts.reduce((a, b) => a + b, 0),
+      months: months.length,
+      first: months[0],
+      last: last.month,
+      rhythm,
+      active: !!bookLast && idx(bookLast) - idx(last.month) <= rhythm + 1,
+      price: txt(last.price),
+      monthly: monthly === null ? null : txt(monthly),
+      yearly: monthly === null ? null : txt(Dec.mul(monthly, Dec.mk(12n, 0))),
+      seq: seq.map((x) => ({ month: x.month, day: x.day, price: txt(x.price), n: x.n })),
+      changes,
+      otherCur: other.size,
+      sig: ids.join("\u0002"),
+    };
+  }
+
+  /**
+   * The bills' price change over a year (45.5): each active bill with a payment 12 months before the book's last month (at most rhythm + 1
+   * months older): its price now ÷ its price then − 1 in its own currency, weighted by that old payment per month in the currency shown.
+   */
+  function inflation(bills, fx, cur, last) {
+    if (!last) return null;
+    const ref = idx(last) - 12;
+    let W = 0;
+    let S = 0;
+    let n = 0;
+    let missing = 0;
+    const changed = [];
+    for (const b of bills) {
+      if (!b.active) continue;
+      const old = b.seq.filter((x) => idx(x.month) <= ref).pop();
+      if (!old || ref - idx(old.month) > b.rhythm + 1) continue;
+      const now = b.seq[b.seq.length - 1];
+      const c = ratio(Dec.parse(now.price), Dec.parse(old.price));
+      const conv = fx.convert(Dec.parse(old.price), b.cur, cur, old.day);
+      if (!conv.ok) {
+        missing++;
+        continue;
+      }
+      const w = Number(Dec.str(conv.value)) / b.rhythm;
+      if (!(w > 0)) continue;
+      W += w;
+      S += w * c;
+      n++;
+      if (Math.abs(c) > STEP) changed.push({ name: b.name, pct: c });
+    }
+    return n && W > 0 ? { rate: S / W, n, changed, missing } : null;
+  }
+
+  return { VERSION, MIN_MONTHS, MAX_PER_MONTH, RHYTHMS, STEP, keysOf, detect, inflation };
+});
+
 /* ---- src/spend/demo.js ---- */
 /*
  * SpendDemo: invented spending for the demo of the Spending area (architecture section 38.4). Nothing in it is anybody's data: the wallets,
@@ -19920,7 +20404,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
 })(typeof self !== "undefined" ? self : this, function (Spendee, SpendBook) {
   "use strict";
 
-  const VERSION = "spenddemo-0.1.0";
+  const VERSION = "spenddemo-0.2.0";
   const FIRST = "2024-01";
   const LAST = "2026-10";
 
@@ -19996,6 +20480,26 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     { type: "Expense", cat: "Education", base: 999, spread: 0, day: 16, every: 12, note: "#demopod", labels: "demopod" },
   ];
 
+  // the demo's recurring bills (architecture 45.5): notes that repeat word for word, at a steady price that changes now and then
+  const BILLS = [
+    { note: "Demo power", cat: "Bills & Fees", day: 6, every: 1, cents: [[FIRST, 8600], ["2025-03", 9200]] },
+    { note: "Demo stream", cat: "Entertainment", day: 12, every: 1, cents: [[FIRST, 1299], ["2026-01", 1499]], labels: "demostream" },
+    { note: "Demo mobile", cat: "Bills & Fees", day: 20, every: 1, cents: [[FIRST, 1990]] },
+    { note: "Demo gym", cat: "Sport & Hobbies", day: 2, every: 3, cents: [[FIRST, 11700], ["2025-07", 12900]] },
+    { note: "Demo insurance", cat: "Bills & Fees", day: 15, every: 12, cents: [[FIRST, 42000], ["2026-01", 44500]] },
+  ];
+  function billsCsv(name) {
+    const lines = [HEAD];
+    SpendBook.monthsBetween(FIRST, LAST).forEach((m, mi) => {
+      for (const b of BILLS) {
+        if (mi % b.every !== 0) continue;
+        const cents = b.cents.filter((x) => x[0] <= m).pop()[1];
+        lines.push([m + "-" + pad(b.day) + "T09:30:00+00:00", name, "Expense", b.cat, amount(-cents, 2), "EUR", b.note, b.labels || "", "Demo person"].map(q).join(","));
+      }
+    });
+    return lines.join("\n") + "\n";
+  }
+
   /** A made-up rate table: one rate per working day, smooth and invented (not the ECB's). */
   function ledgerFor(ccy) {
     const base = { USD: [1.09, 0.03], HUF: [390, 12] }[ccy];
@@ -20022,6 +20526,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       { name: "demo_household.csv", text: walletCsv("Household (demo)", "EUR", EUR_PLAN, 11) },
       { name: "demo_hungary.csv", text: walletCsv("Hungary (demo)", "HUF", HUF_PLAN, 22) },
       { name: "demo_subscriptions.csv", text: walletCsv("Subscriptions (demo)", "EUR", SUB_PLAN, 33) },
+      { name: "demo_bills.csv", text: billsCsv("Bills (demo)") },
     ];
     const items = files.map((f) => {
       const r = Spendee.read(f.text);
@@ -22278,7 +22783,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
 })(typeof self !== "undefined" ? self : this, function (Dec) {
   "use strict";
 
-  const VERSION = "cashflow-0.2.0";
+  const VERSION = "cashflow-0.3.0";
   const DP = 6;
   const Z = Dec.mk(0n, DP);
   const P = (t) => (t === "" || t === null || t === undefined ? Z : Dec.parse(String(t)));
@@ -22452,8 +22957,9 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
    * The flows of a period for the picture (architecture 41.5). t: period(...).totals; cats: [{ cat, spent }] and incomeCats: [{ cat, earned }] of
    * the same months (SpendView.build for the period). Every part is positive; the left side are the sources, the right side the uses, and both
    * add up to `total`. { left: [part], right: [part], total (text), ok, why } with part = { id, name, kind, value (text) }; kind is one of
-   * "table", "extra", "earned", "invInc", "sold", "savings" (left) and "cost", "loss", "spent", "invested", "kept" (right). A part of zero is
-   * left out. ok is false (and nothing should be drawn) when the categories do not add up to the period's spending or income.
+   * "poker", "extra", "earned", "invInc", "sold", "savings" (left) and "cost", "loss", "spent", "invested", "kept" (right). A part of zero is
+   * left out. Since 25 Nov 2026 (architecture 45.6, his wish of 44.1) the table result and the rakeback and promotions are ONE source "Poker"
+   * (or, when they add up below zero, one use "Lost at poker", a loss); the part carries both as `table` and `extra` for its hover box. ok is false (and nothing should be drawn) when the categories do not add up to the period's spending or income.
    */
   function parts(t, cats, incomeCats) {
     const left = [];
@@ -22463,8 +22969,12 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
       if (Dec.isNeg(d)) right.push({ id: id + ":neg", name: flipName, kind: flipKind, value: txt(Dec.neg(d)) });
       else left.push({ id, name, kind, value: txt(d) });
     };
-    put("table", "Table result", "table", P(t.table), "Lost at the tables", "loss");
-    put("extra", "Rakeback and promotions", "extra", P(t.extra), "Rakeback lines below zero", "cost");
+    const pk = Dec.add(P(t.table), P(t.extra));
+    if (!Dec.isZero(pk)) {
+      const both = { table: txt(P(t.table)), extra: txt(P(t.extra)) };
+      if (Dec.isNeg(pk)) right.push(Object.assign({ id: "poker:neg", name: "Lost at poker", kind: "loss", value: txt(Dec.neg(pk)) }, both));
+      else left.push(Object.assign({ id: "poker", name: "Poker", kind: "poker", value: txt(pk) }, both));
+    }
     let sumE = Z;
     for (const c of incomeCats || []) {
       const d = P(c.earned);
@@ -22523,6 +23033,31 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
   }
 
   /**
+   * The series of the Cash flow pictures (architecture 45.6), from the months of a period (period(...).months, in order, every month counted).
+   * Per month: { month, poker (table + extra), other (earned + invInc), cost, spent, net (= saved), cum (the running total of net from the
+   * period's first month), roll (the sum of net of this month and the 11 before, only when those 12 months are all in the list and follow each
+   * other; else null) } as texts.
+   */
+  function series(rows) {
+    const out = [];
+    let cum = Z;
+    const idx = (m) => +m.slice(0, 4) * 12 + (+m.slice(5, 7) - 1);
+    for (let k = 0; k < rows.length; k++) {
+      const r = rows[k];
+      const net = P(r.saved);
+      cum = Dec.add(cum, net);
+      let roll = null;
+      if (k >= 11 && idx(r.month) - idx(rows[k - 11].month) === 11) {
+        let s = Z;
+        for (let j = k - 11; j <= k; j++) s = Dec.add(s, P(rows[j].saved));
+        roll = txt(s);
+      }
+      out.push({ month: r.month, poker: txt(Dec.add(P(r.table), P(r.extra))), other: txt(Dec.add(P(r.earned), P(r.invInc))), cost: txt(P(r.cost)), spent: txt(P(r.spent)), net: txt(net), cum: txt(cum), roll });
+    }
+    return out;
+  }
+
+  /**
    * The demo's investments (made up, the same every time): a monthly purchase of an invented fund in euro, a sale now and then, a few dividends
    * and a yearly bank interest, in the shape of the Investments ledger lines. Nothing in it is real.
    */
@@ -22541,7 +23076,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     return out;
   }
 
-  return { VERSION, DP, monthsBetween, invest, demoLedger, months, period, parts, group, rateOf: (s, n) => rateOf(P(s), P(n)) };
+  return { VERSION, DP, monthsBetween, invest, demoLedger, months, period, parts, group, series, rateOf: (s, n) => rateOf(P(s), P(n)) };
 });
 
 /* ---- src/cash/sankey.js ---- */
@@ -31254,8 +31789,9 @@ const RegularUI = (function () {
  * The Spending book is its own store (key "spend"): the page hands in host.book() and host.save(book). The tax engine never sees it.
  *
  * host: { mode(), book(), fx(), today(), now(), save(book) -> Promise<{ ok, durable, text }>, download(name, text) -> Promise<{ ok, text }>,
- *         render(), goInvestData(), folds (a Folds store, optional: which cards are open, kept in the browser) }
- * Every card under "Your spending" opens and shuts like the cards of the Holdings tab (architecture 38.11); a bar says how many are open.
+ *         render(), goInvestData(), tabStore ({ get(), set(tab) }: the open tab, kept in the browser) }
+ * Since 25 Nov 2026 (architecture 45.7) in tabs of its own, every card open: Overview, Categories (the role of each category), Fixed & flexible,
+ * Bills (the recurring bills of the notes and labels), Details, Entries, Data. The roles come from SpendRoles, the bills from SpendBills.
  */
 const SpendUI = (function () {
   "use strict";
@@ -31347,27 +31883,32 @@ const SpendUI = (function () {
   // ---------------------------------------------------------------- the area
 
   function create(host) {
-    // which cards are open (architecture 38.11): kept by host.folds in the browser, never in the Spending book
-    const folds = host.folds || Folds.create({ storage: null, key: "att-spend-folds-v1" });
-    const seen = new Map(); // the cards drawn now and whether each is open; emptied at the start of every drawing
-    /**
-     * A card that opens and shuts. o: { key, title, sub, glance, dflt (open until the owner chooses), busy (something is going on inside it:
-     * it stays open, and shutting it ends that thing through o.stop) }. body: a function, only called when the card is open.
-     */
-    const openOf = (o) => !!o.busy || folds.isOpen(o.key, o.dflt === true);
+    /** An open card (architecture 45.7: no folding cards in this part any more). o: { key, title, sub }; body: a function or nodes. */
     function fcard(o, body) {
-      const open = openOf(o);
-      seen.set(o.key, open);
-      return Dom.foldCard({ key: o.key, title: o.title, sub: o.sub, glance: o.glance, open, onToggle: (want) => { if (!want && o.stop) o.stop(); folds.set(o.key, want); host.render(); } }, body);
+      return el("section", { class: "card", "data-k": o.key }, el("div", { class: "card-head" }, el("h2", { text: o.title }), o.sub ? el("span", { class: "sub", text: o.sub }) : null), typeof body === "function" ? body() : body);
     }
-    function foldBar() {
-      const keys = Array.from(seen.keys());
-      const open = keys.filter((k) => seen.get(k));
-      const all = (want) => () => { if (!want) { st.pending = null; st.msg.import = null; st.remove = null; st.restore = null; st.wipe = false; st.msg.backup = null; } folds.setAll(keys, want); host.render(); };
-      return el("div", { class: "fold-bar", "data-k": "spend-fold-bar" },
-        el("span", { class: "fold-count", "data-k": "spend-fold-count", text: open.length + " of " + keys.length + " cards open" }),
-        el("button", { type: "button", class: "btn small", "data-key": "spend-fold-expand", disabled: open.length === keys.length, onclick: all(true), text: "Expand all" }),
-        el("button", { type: "button", class: "btn small", "data-key": "spend-fold-collapse", disabled: open.length === 0, onclick: all(false), text: "Collapse all" }));
+    const TABS = [["overview", "Overview"], ["cats", "Categories"], ["costs", "Fixed & flexible"], ["bills", "Bills"], ["details", "Details"], ["entries", "Entries"], ["data", "Data"]];
+    const tabOf = () => {
+      let t = "";
+      try {
+        t = host.tabStore ? host.tabStore.get() : "";
+      } catch (e) {
+        t = "";
+      }
+      return TABS.some((x) => x[0] === t) ? t : "overview";
+    };
+    function goTab(t) {
+      st.tab = t;
+      try {
+        if (host.tabStore) host.tabStore.set(t);
+      } catch (e) {
+        /* a setting only: the tab still opens */
+      }
+      host.render();
+      if (typeof window !== "undefined" && window.scrollTo) {
+        const bar = document.querySelector('[data-k="spend-tabs"]');
+        if (bar && bar.getBoundingClientRect().top < 0) window.scrollTo({ top: Math.max(0, window.scrollY + bar.getBoundingClientRect().top - 4) });
+      }
     }
 
     const st = {
@@ -31385,7 +31926,11 @@ const SpendUI = (function () {
       gridEl: null, // the grid of months last scrolled to its newest month, and for which months
       gridEnd: "",
       paidOpen: {}, // which lists of the card "Paid in which currency" are open (architecture 38.12)
+      tab: "overview", // the open tab (architecture 45.7)
+      allMonths: false, // the months table of the Overview: every month, or the newest 24
+      roleMsg: null, // what the last change of a role said
     };
+    st.tab = tabOf();
     let memo = { v: null };
 
     const book = () => host.book() || SpendBook.empty();
@@ -31409,7 +31954,8 @@ const SpendUI = (function () {
       const b = book();
       const wallets = st.wallet && b.wallets[st.wallet] ? [st.wallet] : null;
       const sp = V.span(b, wallets);
-      return Object.assign({ cur: st.cur, wallets }, periodRange(sp));
+      // the categories that are not spending (architecture 45.2) are left out of every spending figure of this part
+      return Object.assign({ cur: st.cur, wallets, skip: SpendRoles.skipOf(b, wallets) }, periodRange(sp));
     }
 
     function figures() {
@@ -31540,6 +32086,15 @@ const SpendUI = (function () {
       });
       st.msg.import = r && r.ok ? { kind: "ok", text: (isDemo() ? "Imported into the demo (nothing is saved). " : "Imported and saved in this browser. ") + said.join(" · ") } : { kind: "bad", text: "NOT SAVED: " + ((r && r.text) || "the browser refused") + ". Nothing was changed." };
       if (r && r.ok) st.pending = null;
+      // the message is in the import card, on the Data tab: an import from the empty page (drawn on whatever tab was kept) stays there
+      if (r && r.ok && st.tab !== "data") {
+        st.tab = "data";
+        try {
+          if (host.tabStore) host.tabStore.set("data");
+        } catch (e) {
+          /* a setting only */
+        }
+      }
       host.render();
     }
 
@@ -31649,7 +32204,7 @@ const SpendUI = (function () {
       const b = book();
       const fx = host.fx();
       if (order.book !== b || order.fx !== fx) {
-        const all = V.build(b, fx, { cur: "EUR" }).cats.map((c) => c.cat);
+        const all = V.build(b, fx, { cur: "EUR", skip: SpendRoles.skipOf(b) }).cats.map((c) => c.cat);
         const n = all.length > MAX_SLOTS ? MAX_SLOTS - 1 : MAX_SLOTS;
         order = { book: b, fx, slot: new Map(all.slice(0, n).map((c, k) => [c, k])), n };
       }
@@ -31720,8 +32275,7 @@ const SpendUI = (function () {
       const pick = (month, cat) => {
         st.filter = { month, cat, kind: "spend", text: "" };
         st.shown = 50;
-        folds.set("spend-rows", true); // the entries of the cell are in that card: it opens
-        host.render();
+        goTab("entries"); // the entries of the cell are on the Entries tab
         const n = document.querySelector('[data-k="spend-rows"]');
         if (n && typeof n.scrollIntoView === "function") n.scrollIntoView({ block: "start" });
       };
@@ -31758,8 +32312,7 @@ const SpendUI = (function () {
       const cur = v.cur;
       const f = st.filter;
       const filtered = !!(f.month || f.cat || f.text || f.kind !== "spend");
-      const fo = { key: "spend-rows", title: "The entries", dflt: true, glance: plural(v.cats.reduce((n, c) => n + c.n, 0), "expense") + " in the period" + (filtered ? " · a filter is set" : "") };
-      if (!openOf(fo)) return fcard(Object.assign(fo, { sub: "every entry, with search" }), null);
+      const fo = { key: "spend-rows", title: "The entries" };
       const o = opts();
       const r = V.rows(book(), host.fx(), o, { month: f.month, cat: f.cat, kind: f.kind, text: f.text, limit: st.shown });
       const set = (k, val) => {
@@ -31779,6 +32332,246 @@ const SpendUI = (function () {
         r.more ? el("div", { class: "btn-row" }, btn("Show " + Math.min(100, r.n - r.rows.length) + " more", () => { st.shown += 100; host.render(); }, "small", "sr-more")) : null,
         filtered ? el("div", { class: "btn-row" }, btn("Show every expense again", () => { st.filter = { month: "", cat: "", kind: "spend", text: "" }; host.render(); }, "small quiet", "sr-clear")) : null]);
     }
+
+    // ---------------------------------------------------------------- roles, fixed against variable, bills (architecture 45.2 to 45.5)
+
+    const ROLE_COLOR = { fixed: "var(--c-austria)", essential: "var(--c-pie-5)", flexible: "var(--c-real)", none: "var(--muted)" };
+    const ROLE_SAY = {
+      fixed: "the same every month, bound by a contract: rent, bills, insurance, subscriptions",
+      essential: "needed, the amount varies: groceries, health, transport, children",
+      flexible: "by choice: eating out, travel, shopping, gifts, fun",
+      none: "not spending: a transfer, money saved or put on a poker site (left out of every spending figure)",
+    };
+    const roleFn = () => {
+      const b = book();
+      return (c) => SpendRoles.roleOf(b, c).role;
+    };
+    let splitMemo = { v: null };
+    function splitOf(v) {
+      if (splitMemo.v === v && splitMemo.book === book()) return splitMemo.s;
+      const s = SpendRoles.split(v, roleFn());
+      splitMemo = { v, book: book(), s };
+      return s;
+    }
+    let trendMemo = { key: "" };
+    function trendOf(v) {
+      const o = opts();
+      const key = JSON.stringify([o.cur, o.wallets, o.skip, v.to]);
+      if (trendMemo.key === key && trendMemo.book === book() && trendMemo.fx === host.fx()) return trendMemo.t;
+      const t = SpendRoles.trend(book(), host.fx(), { cur: o.cur, wallets: o.wallets, skip: o.skip, to: v.to }, roleFn());
+      trendMemo = { key, book: book(), fx: host.fx(), t };
+      return t;
+    }
+    let billMemo = { key: "" };
+    function billsOf() {
+      const o = opts();
+      const key = JSON.stringify([o.cur, o.wallets, o.skip]);
+      if (billMemo.key === key && billMemo.book === book() && billMemo.fx === host.fx()) return billMemo.r;
+      const r = SpendBills.detect(book(), host.fx(), { cur: o.cur, wallets: o.wallets, skip: o.skip });
+      billMemo = { key, book: book(), fx: host.fx(), r };
+      return r;
+    }
+    const pctTxt = (x, dp) => (x === null || x === undefined || !Number.isFinite(x) ? "–" : (100 * x).toFixed(dp === undefined ? 1 : dp) + "\u00a0%");
+    /** A change of spending: up is orange, down is green, never red (a cost is not a loss). */
+    function change(pct, diffText) {
+      if (pct === null || pct === undefined) return el("span", { class: "muted", text: diffText ? diffText + " (new)" : "–" });
+      const up = pct > 0.0005;
+      const down = pct < -0.0005;
+      return el("span", { class: "chg " + (up ? "up" : down ? "down" : "flat"), text: (up ? "▲ +" : down ? "▼ −" : "") + (100 * Math.abs(pct)).toFixed(1) + "\u00a0%" });
+    }
+    const kpi = (label, value, sub, tipObj, cls, key) => el("div", { class: "kpi", tabindex: "0", "data-tip": tipObj, "data-k": (key || "kpi") + ":" + label }, el("span", { class: "label", text: label }), el("span", { class: "value " + (cls || ""), "data-k": (key || "kpi") + "v:" + label, text: value }), sub ? el("span", { class: "subline", text: sub }) : null);
+
+    /** The banner while a category is left out as not spending (45.2): a proposal can do it without his press, so it is always said. */
+    function skippedBanner(v) {
+      const sk = v.totals.skipped;
+      if (!sk || !sk.cats.length) return null;
+      return banner("info", plural(sk.cats.length, "category is", "categories are") + " not counted as spending", el("span", { "data-k": "spend-skipped", text: sk.cats.map((c) => c.cat + " (" + money(c.sum, v.cur) + ")").join(", ") + ": their role is “not spending”, so they are left out of every figure here and in Cash flow. Their entries stay in the book and on the Entries tab." }),
+        el("div", { class: "btn-row" }, btn("Check the roles", () => goTab("cats"), "small", "spend-go-cats")));
+    }
+
+    /** The tiles of fixed against variable (Overview and the Fixed & flexible tab). */
+    function costTiles(v, sp) {
+      const cur = v.cur;
+      const n = v.months.length || 1;
+      const per = (t) => Dec.str(Dec.divRound(Dec.parse(t), Dec.mk(BigInt(n), 0), 6));
+      const tr = trendOf(v);
+      const vs = (r) => (tr.ok ? "year on year " + (tr.roles[r].pct === null ? "–" : (tr.roles[r].pct >= 0 ? "+" : "−") + (100 * Math.abs(tr.roles[r].pct)).toFixed(1) + "\u00a0%") : "");
+      return el("div", { class: "kpis spend-kpis role-kpis" },
+        kpi("Fixed", money(per(sp.totals.fixed), cur) + "/mo", pctTxt(sp.shares.fixed, 0) + " of spending" + (tr.ok ? " · " + vs("fixed") : ""), tip("Fixed costs", [["In the period", money(sp.totals.fixed, cur)], ["Per month", money(per(sp.totals.fixed), cur)], ["Share", pctTxt(sp.shares.fixed)]], "The categories whose role is fixed: " + ROLE_SAY.fixed + "."), "role-fixed", "ckpi"),
+        kpi("Essential", money(per(sp.totals.essential), cur) + "/mo", pctTxt(sp.shares.hard - sp.shares.fixed, 0) + " of spending" + (tr.ok ? " · " + vs("essential") : ""), tip("Essential", [["In the period", money(sp.totals.essential, cur)], ["Per month", money(per(sp.totals.essential), cur)]], ROLE_SAY.essential + "."), "role-essential", "ckpi"),
+        kpi("Flexible", money(per(sp.totals.flexible), cur) + "/mo", pctTxt(sp.shares.flexible, 0) + " of spending" + (tr.ok ? " · " + vs("flexible") : ""), tip("Flexible", [["In the period", money(sp.totals.flexible, cur)], ["Per month", money(per(sp.totals.flexible), cur)]], ROLE_SAY.flexible + ". This is where you could cut."), "role-flexible", "ckpi"),
+        kpi("Hard to change", pctTxt(sp.shares.hard, 0), "fixed + essential", tip("Hard to change", [["Fixed + essential", money(Dec.str(Dec.add(Dec.parse(sp.totals.fixed), Dec.parse(sp.totals.essential))), cur)], ["Of the spending", pctTxt(sp.shares.hard)]], "The share of the spending that you cannot easily cut from one month to the next."), "", "ckpi"));
+    }
+
+    /** The months table of the Overview: the spending in an orange cell (spending is not a loss), the roles beside it, newest first, a total row. */
+    function monthsTable(v, sp) {
+      if (!v.months.length || !sp.ok) return null;
+      const cur = v.cur;
+      const list = sp.months.slice().reverse();
+      const SHOW = 24;
+      const shown = st.allMonths ? list : list.slice(0, SHOW);
+      // the shade spreads the months of the period from the lightest (the cheapest month) to the strongest (the dearest), so they can be told apart
+      const vals = list.map((m) => num(m.total)).filter((x) => x > 0);
+      const lo = Math.min.apply(null, vals.concat([Infinity]));
+      const hi = Math.max.apply(null, vals.concat([0]));
+      const oc = (x) => (num(x) > 0 ? "hm-o" + (hi > lo ? Math.min(5, 1 + Math.floor(((num(x) - lo) / (hi - lo)) * 4.999)) : 3) : "hm-0");
+      const share = (m) => (num(m.total) > 0 ? pctTxt((num(m.fixed) + num(m.essential)) / num(m.total), 0) : "–");
+      const head = el("tr", {}, ["Month", "Spent", "Fixed", "Essential", "Flexible", "Hard to change"].map((c, i) => el("th", { scope: "col", class: i ? "r" : "", text: c })));
+      const body = shown.map((m) => el("tr", { "data-k": "smt:" + m.month },
+        el("th", { scope: "row", text: monthName(m.month) }),
+        el("td", { class: "r num tc" }, el("span", { class: "hc tot " + oc(m.total), "data-k": "smi:" + m.month, text: money(m.total, cur) })),
+        el("td", { class: "r num", text: money(m.fixed, cur) }), el("td", { class: "r num", text: money(m.essential, cur) }), el("td", { class: "r num", text: money(m.flexible, cur) }), el("td", { class: "r num", text: share(m) })));
+      const t = sp.totals;
+      const foot = el("tr", { class: "tot-row" }, el("th", { scope: "row", text: "Total" }), el("td", { class: "r num tc" }, el("span", { class: "hc tot hm-o5", "data-k": "smi:total", text: money(t.total, cur) })),
+        el("td", { class: "r num", text: money(t.fixed, cur) }), el("td", { class: "r num", text: money(t.essential, cur) }), el("td", { class: "r num", text: money(t.flexible, cur) }), el("td", { class: "r num", text: pctTxt(sp.shares.hard, 0) }));
+      return fcard({ key: "spend-mtable", title: "Months", sub: plural(list.length, "month") + " · newest first" }, () => [
+        el("div", { class: "tbl-wrap", "data-k": "spend-mtable-wrap" }, el("table", { class: "tbl mtable" }, el("caption", { class: "sr-only", text: "Every month of the period: spent, fixed, essential, flexible and the share that is hard to change" }), el("thead", {}, head), el("tbody", {}, body), el("tfoot", {}, foot))),
+        list.length > SHOW ? el("div", { class: "btn-row" }, btn(st.allMonths ? "Show the newest " + SHOW + " months" : "Show all " + list.length + " months", () => { st.allMonths = !st.allMonths; host.render(); }, "small", "smt-more")) : null,
+        note("The spent cell is orange, stronger the more you spent (spending is not a loss, so it is never red). Fixed, essential and flexible come from the roles on the Categories tab.")]);
+    }
+
+    async function setRole(cat, role) {
+      const r = SpendBook.setRole(book(), cat, role);
+      if (!r.ok) {
+        st.roleMsg = { kind: "bad", text: r.error };
+        host.render();
+        return;
+      }
+      const sv = await host.save(r.book);
+      st.roleMsg = sv && sv.ok ? { kind: "ok", text: cat + ": " + (role ? SpendRoles.NAME[role].toLowerCase() + (sv.durable ? "" : " (in this page only)") : "back to the proposal") + "." } : { kind: "bad", text: "NOT SAVED: " + ((sv && sv.text) || "the browser refused") };
+      host.render();
+    }
+
+    /** The Categories tab: every expense category with its role, proposed or chosen (45.2). */
+    function rolesCard(v) {
+      const o = opts();
+      const t = SpendRoles.table(book(), host.fx(), { cur: o.cur, from: o.from, to: o.to, wallets: o.wallets });
+      if (!t.rows.length) return null;
+      const cur = v.cur;
+      const counts = { fixed: 0, essential: 0, flexible: 0, none: 0 };
+      for (const r of t.rows) counts[r.role]++;
+      const guessed = t.rows.filter((r) => r.guess).length;
+      const head = el("tr", {}, ["Category", "Role", "", "Spent", "Share", "Months"].map((c, i) => el("th", { scope: "col", class: (i >= 3 ? "r " : "") + (i >= 2 ? "wide-only" : ""), text: c })));
+      // on a phone the figures go under the name and the chip under the select, so the table needs no sideways slide
+      const body = t.rows.map((r, k) => el("tr", { "data-k": "role:" + r.cat, class: "role-row role-" + r.role },
+        el("th", { scope: "row" }, el("span", { class: "role-dot", style: "--rc:" + ROLE_COLOR[r.role] }), el("span", { text: r.cat }), el("span", { class: "narrow-only role-sub", text: money(r.spent, cur) + " · " + (num(t.total) > 0 ? share(r.spent, t.total) : "–") + " · " + plural(r.months, "month") })),
+        el("td", {}, el("select", { "aria-label": "Role of " + r.cat, "data-key": "role-sel:" + r.cat, onchange: (e) => setRole(r.cat, e.target.value) }, SpendRoles.ROLES.map((x) => el("option", { value: x, text: SpendRoles.NAME[x], selected: x === r.role }))), el("div", { class: "narrow-only role-chip" }, r.mine ? btn("Back to the proposal", () => setRole(r.cat, null), "small quiet", "role-reset-n:" + r.cat) : el("span", { class: "chip neutral tiny", text: r.guess ? "guess" : "proposed" }))),
+        el("td", { class: "wide-only" }, r.mine ? el("span", { class: "btn-row tight" }, el("span", { class: "chip info tiny", text: "yours" }), btn("Back to the proposal", () => setRole(r.cat, null), "small quiet", "role-reset:" + r.cat)) : el("span", { class: "chip neutral tiny", title: r.guess ? "No rule matched the name: proposed flexible." : "Proposed from the word “" + r.rule + "”.", text: r.guess ? "guess" : "proposed" })),
+        el("td", { class: "r num wide-only", text: money(r.spent, cur) }),
+        el("td", { class: "r num wide-only", text: num(t.total) > 0 ? share(r.spent, t.total) : "–" }),
+        el("td", { class: "r num wide-only", text: String(r.months) })));
+      return fcard({ key: "spend-roles", title: "Your categories", sub: plural(t.rows.length, "category", "categories") + " · " + v.cur + ", the period" }, () => [
+        el("div", { class: "role-legend", "data-k": "role-legend" }, SpendRoles.ROLES.map((x) => el("span", { class: "role-pill", style: "--rc:" + ROLE_COLOR[x] }, el("b", { text: SpendRoles.NAME[x] + " · " + counts[x] }), el("span", { text: ROLE_SAY[x] })))),
+        st.roleMsg ? banner(st.roleMsg.kind, st.roleMsg.kind === "ok" ? "Saved" : "Not saved", el("span", { "data-k": "role-msg", text: st.roleMsg.text })) : null,
+        el("div", { class: "tbl-wrap", "data-k": "spend-roles-wrap" }, el("table", { class: "tbl roles" }, el("caption", { class: "sr-only", text: "Every category with its role" }), el("thead", {}, head), el("tbody", {}, body))),
+        note("Each role is proposed from the category's name" + (guessed ? " (" + plural(guessed, "name", "names") + " matched no rule: proposed flexible, marked guess)" : "") + ". Your choice is kept in the Spending book and its backup; a category you never chose follows the proposal. “Not spending” leaves a category out of every spending figure, here and in Cash flow."),
+      ]);
+    }
+
+    /** Fixed, essential and flexible stacked by month (by year past three years) and the hard-to-change share as a line. */
+    function costStackCard(v, sp) {
+      if (!v.months.length) return null;
+      const cur = v.cur;
+      const yearly = v.months.length > 36;
+      const groups = yearly ? [...new Set(sp.months.map((m) => m.month.slice(0, 4)))] : sp.months.map((m) => m.month);
+      const sumOf = (f) => groups.map((g) => sp.months.reduce((a, m) => a + (m.month.startsWith(g) ? num(m[f]) : 0), 0));
+      const series = SpendRoles.SPENDING.map((r) => {
+        const vals = sumOf(r);
+        return { id: r, name: SpendRoles.NAME[r], color: ROLE_COLOR[r], values: vals, texts: vals.map((x) => fmA(x, cur)) };
+      });
+      const tot = sumOf("total");
+      const hard = sp.months.map((m) => (num(m.total) > 0 ? (100 * (num(m.fixed) + num(m.essential))) / num(m.total) : NaN));
+      return fcard({ key: "spend-cost-stack", title: "Fixed, essential and flexible", sub: yearly ? "per year (more than three years)" : "per month" }, () => [
+        C.bars({ categories: yearly ? groups : groups.map(monthName), tickLabels: yearly ? null : groups.map(tick), series, mode: "stacked", legend: true, toggle: true, key: "spend-cost-stack", totalTexts: tot.map((x) => fmA(x, cur)), format: compact(cur), height: 230, ariaLabel: "Fixed, essential and flexible spending of each " + (yearly ? "year" : "month") + ", stacked, in " + cur }),
+        sp.months.length > 2 ? C.timeLines({ days: sp.months.map((m) => m.month + "-01"), series: [{ name: "Hard to change (fixed + essential)", color: ROLE_COLOR.fixed, values: hard, texts: hard.map((x) => (Number.isFinite(x) ? x.toFixed(0) + " %" : "–")) }], format: (x) => Math.round(x) + " %", zero: true, dateText: (d) => monthName(d.slice(0, 7)), key: "spend-hard", ariaLabel: "The share of each month's spending that is fixed or essential", height: 170 }) : null,
+      ]);
+    }
+    /** A float as money for the screen (the sums of a chart: rounded only for the eye). */
+    const fmA = (x, cur) => money(x.toFixed(6), cur);
+
+    /** Where you could cut (flexible) or what is hard to change (fixed and essential): the categories of the roles, largest first. */
+    function roleListCard(v, sp, which) {
+      const cur = v.cur;
+      const roles = which === "cut" ? ["flexible"] : ["fixed", "essential"];
+      const list = sp.cats.filter((c) => roles.indexOf(c.role) >= 0 && num(c.spent) > 0);
+      if (!list.length) return null;
+      const tr = trendOf(v);
+      const tmap = new Map(tr.ok ? tr.cats.map((c) => [c.cat, c]) : []);
+      const n = v.months.length || 1;
+      const sum = list.reduce((a, c) => a + num(c.spent), 0);
+      const items = list.slice(0, 12).map((c) => ({ label: c.cat, value: num(c.spent), text: money(c.spent, cur), tip: "Spent in the period", details: [["Share of the spending", share(c.spent, v.totals.spent)], ["Per month", fmA(num(c.spent) / n, cur)], ["Role", SpendRoles.NAME[c.role]]].concat(tmap.has(c.cat) && tmap.get(c.cat).pct !== null ? [["Year on year", (tmap.get(c.cat).pct >= 0 ? "+" : "−") + (100 * Math.abs(tmap.get(c.cat).pct)).toFixed(1) + " %"]] : []) }));
+      const head = el("tr", {}, ["Category", "Spent", "Share", "Per month"].concat(tr.ok ? ["Year on year"] : []).map((c, i) => el("th", { scope: "col", class: i ? "r" : "", text: c })));
+      const body = list.map((c) => el("tr", { "data-k": which + ":" + c.cat },
+        el("th", { scope: "row" }, el("span", { class: "role-dot", style: "--rc:" + ROLE_COLOR[c.role] }), el("span", { text: c.cat })),
+        el("td", { class: "r num", text: money(c.spent, cur) }), el("td", { class: "r num", text: share(c.spent, v.totals.spent) }), el("td", { class: "r num", text: fmA(num(c.spent) / n, cur) }),
+        tr.ok ? el("td", { class: "r num" }, tmap.has(c.cat) ? change(tmap.get(c.cat).pct, money(tmap.get(c.cat).now, cur)) : el("span", { class: "muted", text: "–" })) : null));
+      const moved = tr.ok ? list.map((c) => tmap.get(c.cat)).filter((x) => x && x.pct !== null).sort((a, b) => num(b.diff) - num(a.diff))[0] : null;
+      return fcard({ key: which === "cut" ? "spend-cut" : "spend-hard-list", title: which === "cut" ? "Where you could cut" : "Hard to change", sub: (which === "cut" ? "flexible" : "fixed and essential") + " · " + share(sum.toFixed(6), v.totals.spent) + " of spending" }, () => [
+        C.hbars({ items, color: which === "cut" ? ROLE_COLOR.flexible : ROLE_COLOR.fixed, colorNeg: "var(--c-gain)", format: compact(cur), ariaLabel: (which === "cut" ? "The flexible categories" : "The fixed and essential categories") + " of the period, largest first, in " + cur }),
+        el("div", { class: "tbl-wrap" }, el("table", { class: "tbl" }, el("caption", { class: "sr-only", text: which === "cut" ? "The flexible categories" : "The fixed and essential categories" }), el("thead", {}, head), el("tbody", {}, body))),
+        note((which === "cut" ? "The flexible categories, largest first: the money you spend by choice." : "Fixed and essential, largest first: the money that is hard to cut from one month to the next.") + (tr.ok ? " Year on year: the last 12 months up to " + monthName(tr.now.to) + " against the 12 before (up orange, down green)." + (moved && num(moved.diff) > 0 ? " The largest rise: " + moved.cat + ", " + money(moved.diff, cur, { plus: true }) + "." : "") : " The year-on-year change needs 24 months of spending.")),
+      ]);
+    }
+
+    /** Fixed, essential and flexible year by year, with the share in a coloured cell. */
+    function costYearsCard(v, sp) {
+      const ys = [...new Set(sp.months.map((m) => m.month.slice(0, 4)))].sort().reverse();
+      if (ys.length < 2) return null;
+      const cur = v.cur;
+      const rows = ys.map((y) => {
+        const ms = sp.months.filter((m) => m.month.startsWith(y));
+        const a = (f) => ms.reduce((t, m) => Dec.add(t, Dec.parse(m[f])), Dec.mk(0n, 6));
+        const t = a("total");
+        const f = a("fixed");
+        const e = a("essential");
+        const hard = Dec.isZero(t) ? null : num(Dec.str(Dec.add(f, e))) / num(Dec.str(t));
+        return [y, String(ms.length), money(Dec.str(f), cur), money(Dec.str(e), cur), money(Dec.str(a("flexible")), cur), el("span", { class: "hc tot " + (hard === null ? "hm-0" : "hm-s" + Math.min(5, Math.max(1, Math.ceil(hard * 5)))), text: pctTxt(hard, 0) }), money(Dec.str(t), cur)];
+      });
+      return fcard({ key: "spend-cost-years", title: "Year by year", sub: plural(ys.length, "year") }, () => [table(["Year", "Months", "Fixed", "Essential", "Flexible", "Hard to change", "Spent"], rows, "Fixed, essential and flexible by year", "drrrrrr"), note("The months are those of the period in each year; a year at the edge of the period may be short.")]);
+    }
+
+    /** The Bills tab (45.5). */
+    function billTiles(v, r) {
+      const cur = v.cur;
+      const avg = num(v.totals.avg);
+      const inf = r.inflation;
+      return el("div", { class: "kpis spend-kpis" },
+        kpi("Recurring bills", money(r.monthly, cur) + "/mo", plural(r.active, "active bill") + " · " + money(r.yearly, cur) + " a year", tip("Recurring bills", [["Per month", money(r.monthly, cur)], ["Per year", money(r.yearly, cur)], ["Active bills", String(r.active)]], "Found in your notes and labels: paid in at least 3 months, in a steady rhythm (monthly, every 2, 3, 6 or 12 months) at a steady price. Per month = the latest payment ÷ its rhythm."), "", "bkpi"),
+        kpi("Share of a month", avg > 0 ? pctTxt(num(r.monthly) / avg, 0) : "–", "of the average month's spending", tip("Share of a month", [["Recurring per month", money(r.monthly, cur)], ["Average month", money(v.totals.avg, cur)]], "The active bills per month against the average month of the period."), "", "bkpi"),
+        kpi("Bills' price change", inf ? (inf.rate >= 0 ? "+" : "−") + (100 * Math.abs(inf.rate)).toFixed(1) + " %" : "–", inf ? "over a year · " + plural(inf.n, "bill") + ", " + inf.changed.length + " changed" : "needs bills with a payment a year ago", tip("The bills' price change over a year", (inf ? inf.changed : []).slice(0, 6).map((c) => [c.name, (c.pct >= 0 ? "+" : "−") + (100 * Math.abs(c.pct)).toFixed(1) + " %"]), "Each active bill's latest price against its price 12 months before your last month, in the currency it is paid in (so the exchange rate does not move it), weighted by what it cost per month then."), inf && inf.rate > 0.0005 ? "chg-up-v" : "", "bkpi"));
+    }
+    const EVERY = (k) => (k === 1 ? "month" : k === 12 ? "year" : k + " months");
+    function billsCard(v, r) {
+      const cur = v.cur;
+      if (!r.bills.length) return fcard({ key: "spend-bills", title: "Recurring bills", sub: "none found yet" }, () => [note("No recurring bill found. A note or label that repeats word for word in at least three months, in a steady rhythm and at a steady price, shows up here (a shop you pay several times a month does not).")]);
+      const head = el("tr", {}, ["Bill", "Category", "Every", "Price", "Per month", "Since", "Status", "Last price change"].map((c, i) => el("th", { scope: "col", class: [3, 4].indexOf(i) >= 0 ? "r" : "", text: c })));
+      const body = r.bills.map((b) => {
+        const ch = b.changes[b.changes.length - 1];
+        return el("tr", { "data-k": "bill:" + b.key, tabindex: "0", "data-tip": tip(b.name, [["Payments", String(b.n)], ["First", monthName(b.first)], ["Last", monthName(b.last)], ["Per year", b.yearly === null ? "no " + cur + " rate" : money(b.yearly, cur)]].concat(b.changes.slice(-5).map((c) => [monthName(c.month), money(c.from, b.cur) + " → " + money(c.to, b.cur)])), b.otherCur ? plural(b.otherCur, "month") + " paid in another currency are left out." : "") },
+          el("th", { scope: "row", text: b.name }), el("td", { class: "muted", text: b.cat }), el("td", { text: EVERY(b.rhythm) }),
+          el("td", { class: "r num", text: money(b.price, b.cur) }), el("td", { class: "r num", text: b.monthly === null ? "–" : money(b.monthly, cur) }),
+          el("td", { class: "nowrap", text: monthName(b.first) }),
+          el("td", {}, el("span", { class: "chip tiny " + (b.active ? "ok" : "neutral"), text: b.active ? "active" : "ended " + monthName(b.last) })),
+          el("td", {}, ch ? el("span", {}, el("span", { class: "num", text: money(ch.from, b.cur) + " → " + money(ch.to, b.cur) + " " }), change(ch.pct), el("span", { class: "muted", text: " " + monthName(ch.month) })) : el("span", { class: "muted", text: "none" })));
+      });
+      return fcard({ key: "spend-bills", title: "Recurring bills", sub: plural(r.bills.length, "bill") + " · active first" }, () => [
+        el("div", { class: "tbl-wrap", "data-k": "spend-bills-wrap" }, el("table", { class: "tbl bills" }, el("caption", { class: "sr-only", text: "The recurring bills found in your notes and labels" }), el("thead", {}, head), el("tbody", {}, body))),
+        el("p", { class: "note only-narrow", text: "Slide sideways to see every column." }),
+        note("Prices are compared in the currency a bill is paid in. A price change is a step of more than 1.5 %. A bill is active while its last payment is at most one rhythm and a month before your last month."),
+      ]);
+    }
+    function billChangesCard(v, r) {
+      if (!r.changes.length) return null;
+      const list = r.changes.slice(0, 10);
+      return fcard({ key: "spend-bill-changes", title: "Latest price changes", sub: "newest first" }, () => [table(["Month", "Bill", "From → to", "Change"], list.map((c) => [monthName(c.month), c.name, money(c.from, c.cur) + " → " + money(c.to, c.cur), change(c.pct)]), "The latest price changes of the bills", "dlrr")]);
+    }
+
+    // ---------------------------------------------------------------- the tab bar
+
+    function tabBar() {
+      return el("nav", { class: "tabs ptabs", role: "tablist", "aria-label": "Spending", "data-k": "spend-tabs" }, TABS.map((t) => el("button", { type: "button", class: "tab", role: "tab", "aria-selected": String(st.tab === t[0]), "data-key": "stab:" + t[0], "data-k": "stab:" + t[0], text: t[1], onclick: () => goTab(t[0]) })));
+    }
+    const pair = (key, a, b) => (a && b ? el("div", { class: "grid2", "data-k": key }, a, b) : a || b || null);
 
     // ---------------------------------------------------------------- wallets and backup
 
@@ -31843,26 +32636,38 @@ const SpendUI = (function () {
     // ---------------------------------------------------------------- draw
 
     function render(root) {
-      seen.clear();
       const b = book();
       const has = SpendBook.count(b) > 0;
-      if (!has) {
-        root.appendChild(card("Your spending", null, note("Import your Spendee wallets to see where your money goes: by category, by month and by label, in euro, dollars or forints, with every entry behind each figure. Your files are read in this page and stay in this browser.")));
+      root.appendChild(tabBar());
+      if (st.tab === "data" || !has) {
+        if (!has) root.appendChild(card("Your spending", null, note("Import your Spendee wallets to see where your money goes: by category, by month and by label, fixed against flexible, your recurring bills, in euro, dollars or forints, with every entry behind each figure. Your files are read in this page and stay in this browser.")));
         root.appendChild(importCard());
+        const w = walletsCard();
+        if (w) root.appendChild(w);
         root.appendChild(backupCard());
         return;
       }
       const v = figures();
-      const at = root.childNodes.length;
-      root.appendChild(el("section", { class: "card", "data-k": "spend-top" }, el("div", { class: "card-head" }, el("h2", { text: "Your spending" }), el("span", { class: "sub", text: isDemo() ? "invented demo data" : "from your Spendee wallets" })), controls(v), missingBanner(v), tiles(v)));
-      for (const c of [paidCard(v), ringCard(v), monthCard(v), gridCard(v), largestCard(v), labelsCard(v)]) if (c) root.appendChild(c);
-      root.appendChild(rowsCard(v));
-      root.appendChild(importCard());
-      const w = walletsCard();
-      if (w) root.appendChild(w);
-      root.appendChild(backupCard());
-      // the bar goes right under "Your spending", once every card has said whether it is open
-      root.insertBefore(foldBar(), root.childNodes[at + 1] || null);
+      v0month = v.months[0] || "";
+      const head = { overview: "Your spending", cats: "Categories", costs: "Fixed & flexible", bills: "Bills", details: "Details", entries: "Entries" }[st.tab];
+      const sp = v.months.length ? splitOf(v) : null;
+      root.appendChild(el("section", { class: "card", "data-k": "spend-top" }, el("div", { class: "card-head" }, el("h2", { text: head }), el("span", { class: "sub", text: isDemo() ? "invented demo data" : "from your Spendee wallets" })), controls(v), missingBanner(v), skippedBanner(v),
+        st.tab === "overview" ? tiles(v) : null,
+        st.tab === "costs" && sp && sp.ok ? costTiles(v, sp) : null,
+        st.tab === "bills" ? billTiles(v, billsOf()) : null,
+        sp && !sp.ok ? banner("bad", "The roles do not add up", el("span", { text: "Fixed, essential and flexible do not add up to the spending of the period, so they are not shown. Please tell Claude in a chat." })) : null));
+      const add = (...cs) => { for (const c of cs) if (c) root.appendChild(c); };
+      if (st.tab === "overview") {
+        if (sp && sp.ok && v.months.length) root.appendChild(el("section", { class: "card", "data-k": "spend-roles-glance" }, el("div", { class: "card-head" }, el("h2", { text: "Fixed against flexible" }), el("span", { class: "sub", text: "per month of the period" })), costTiles(v, sp)));
+        // the ring has its legend beside it: it takes the whole width (in half of it the names broke letter by letter)
+        add(ringCard(v), monthCard(v), sp && sp.ok ? monthsTable(v, sp) : null);
+      } else if (st.tab === "cats") add(rolesCard(v));
+      else if (st.tab === "costs" && sp && sp.ok) add(costStackCard(v, sp), pair("spend-pair-2", roleListCard(v, sp, "cut"), roleListCard(v, sp, "hard")), costYearsCard(v, sp));
+      else if (st.tab === "bills") {
+        const r = billsOf();
+        add(billsCard(v, r), billChangesCard(v, r));
+      } else if (st.tab === "details") add(paidCard(v), gridCard(v), pair("spend-pair-3", largestCard(v), labelsCard(v)));
+      else if (st.tab === "entries") add(rowsCard(v));
       // the grid of months opens at its newest month (the right end); only when the months shown change, so that a scroll by hand stays
       requestAnimationFrame(() => {
         const w = document.querySelector('[data-k="sg-wrap"]');
@@ -31874,7 +32679,7 @@ const SpendUI = (function () {
       });
     }
 
-    return { render, state: st, money };
+    return { render, state: st, money, goTab };
   }
 
   return { create, money: (t, c, o) => money(t, c, o), compact };
@@ -33161,7 +33966,9 @@ const PokerUI = (function () {
  * This file only draws. The figures come from CashFlow (src/cash/flow.js) and the layout of the picture from CashSankey (src/cash/sankey.js);
  * the books are read through the host and never written. Text always goes in with textContent.
  *
- * host: { mode(), spendBook(), spendFx(), pokerBook(), pokerRates() (the Poker area's rate settings, 43.3), ledger() (the Investments ledger lines, or []), render(), goArea(a), folds }
+ * host: { mode(), spendBook(), spendFx(), pokerBook(), pokerRates() (the Poker area's rate settings, 43.3), ledger() (the Investments ledger lines, or []), render(), goArea(a), tabStore }
+ * Since 25 Nov 2026 (architecture 45.7) in tabs of its own, every card open: Overview (the tiles, the flow picture with Poker as one source, money
+ * in and out), Trends, Years, Details. The Spending categories that are not spending (45.2) are left out here as in the Spending area.
  */
 const CashUI = (function () {
   "use strict";
@@ -33214,29 +34021,37 @@ const CashUI = (function () {
   const cell = (text, cls) => ({ text, cls });
 
   /** The colour of a part of the picture: sources in greens and teal, the spending in the Spending area's own colours (they follow the category). */
-  const KIND_COLOR = { table: "var(--c-gain)", extra: "var(--ok)", earned: "var(--c-bm-4)", invInc: "var(--c-pie-5)", sold: "var(--c-austria)", savings: "var(--c-pie-other)", cost: "var(--c-real)", loss: "var(--c-more)", invested: "var(--c-bm-1)", kept: "var(--c-gain)" };
+  const KIND_COLOR = { poker: "var(--c-gain)", table: "var(--c-gain)", extra: "var(--ok)", earned: "var(--c-bm-4)", invInc: "var(--c-pie-5)", sold: "var(--c-austria)", savings: "var(--c-pie-other)", cost: "var(--c-real)", loss: "var(--c-more)", invested: "var(--c-bm-1)", kept: "var(--c-gain)" };
 
   // ---------------------------------------------------------------- the area
 
   function create(host) {
-    const folds = host.folds || Folds.create({ storage: null, key: "att-cash-folds-v1" });
-    const seen = new Map();
+    /** An open card (architecture 45.7). */
     function fcard(o, body) {
-      const open = folds.isOpen(o.key, o.dflt === true);
-      seen.set(o.key, open);
-      return Dom.foldCard({ key: o.key, title: o.title, sub: o.sub, glance: o.glance, open, onToggle: (want) => { folds.set(o.key, want); host.render(); } }, body);
+      return el("section", { class: "card", "data-k": o.key }, el("div", { class: "card-head" }, el("h2", { text: o.title }), o.sub ? el("span", { class: "sub", text: o.sub }) : null), typeof body === "function" ? body() : body);
     }
-    function foldBar() {
-      const keys = Array.from(seen.keys());
-      const open = keys.filter((k) => seen.get(k));
-      const all = (want) => () => { folds.setAll(keys, want); host.render(); };
-      return el("div", { class: "fold-bar", "data-k": "cash-fold-bar" },
-        el("span", { class: "fold-count", "data-k": "cash-fold-count", text: open.length + " of " + keys.length + " cards open" }),
-        el("button", { type: "button", class: "btn small", "data-key": "cash-fold-expand", disabled: open.length === keys.length, onclick: all(true), text: "Expand all" }),
-        el("button", { type: "button", class: "btn small", "data-key": "cash-fold-collapse", disabled: open.length === 0, onclick: all(false), text: "Collapse all" }));
+    const TABS = [["overview", "Overview"], ["trends", "Trends"], ["years", "Years"], ["details", "Details"]];
+    function goTab(t) {
+      st.tab = t;
+      try {
+        if (host.tabStore) host.tabStore.set(t);
+      } catch (e) {
+        /* a setting only */
+      }
+      host.render();
+      if (typeof window !== "undefined" && window.scrollTo) {
+        const bar = document.querySelector('[data-k="cash-tabs"]');
+        if (bar && bar.getBoundingClientRect().top < 0) window.scrollTo({ top: Math.max(0, window.scrollY + bar.getBoundingClientRect().top - 4) });
+      }
     }
 
-    const st = { cur: "EUR", period: "12m", only: true };
+    const st = { cur: "EUR", period: "12m", only: true, tab: "overview", allMonths: false };
+    try {
+      const t = host.tabStore ? host.tabStore.get() : "";
+      if (TABS.some((x) => x[0] === t)) st.tab = t;
+    } catch (e) {
+      /* the first tab */
+    }
     let memo = { key: null, m: null };
 
     /** Everything that does not depend on the period: the books read once per currency. */
@@ -33248,7 +34063,8 @@ const CashUI = (function () {
       const pr = host.pokerRates ? host.pokerRates() : undefined;
       const key = [sb, fx, pb, led, st.cur, pr];
       if (memo.key && memo.key.every((x, i) => x === key[i])) return memo.m;
-      const sv = Object.keys(sb.wallets || {}).length ? SpendView.build(sb, fx, { cur: st.cur }) : null;
+      // the categories that are not spending (architecture 45.2) are left out, as in the Spending area
+      const sv = Object.keys(sb.wallets || {}).length ? SpendView.build(sb, fx, { cur: st.cur, skip: SpendRoles.skipOf(sb) }) : null;
       const pk = PokerStats.rows(pb, st.cur, pr);
       const inv = CashFlow.invest(led, fx.convert, st.cur);
       const m = CashFlow.months({ spend: sv ? sv.monthly : [], spendSpan: sv ? sv.span : null, poker: pk.rows, invest: inv.months });
@@ -33266,7 +34082,7 @@ const CashUI = (function () {
       const b = host.spendBook() || SpendBook.empty();
       const fx = host.spendFx();
       if (slotMemo.b !== b || slotMemo.fx !== fx) {
-        const all = Object.keys(b.wallets || {}).length ? SpendView.build(b, fx, { cur: "EUR" }).cats.map((c) => c.cat) : [];
+        const all = Object.keys(b.wallets || {}).length ? SpendView.build(b, fx, { cur: "EUR", skip: SpendRoles.skipOf(b) }).cats.map((c) => c.cat) : [];
         const n = all.length > MAX_SLOTS ? MAX_SLOTS - 1 : MAX_SLOTS;
         slotMemo = { b, fx, map: new Map(all.slice(0, n).map((c, k) => [c, k])) };
       }
@@ -33300,7 +34116,7 @@ const CashUI = (function () {
       const r = range(m);
       const p = CashFlow.period(m, { from: r.from, to: r.to, onlySpend: st.only && !!m.has.spend });
       let pv = null;
-      if (m.sv && p.n) pv = SpendView.build(host.spendBook(), host.spendFx(), { cur: st.cur, from: p.from, to: p.to });
+      if (m.sv && p.n) pv = SpendView.build(host.spendBook(), host.spendFx(), { cur: st.cur, from: p.from, to: p.to, skip: SpendRoles.skipOf(host.spendBook()) });
       const pp = CashFlow.parts(p.totals, pv ? pv.cats : [], pv ? pv.incomeCats : []);
       const g = CashFlow.group(pp, new Set(slotMap().keys()));
       return { m, p, pv, parts: g, cur: st.cur };
@@ -33382,17 +34198,17 @@ const CashUI = (function () {
           const part = byId.get(ln.id);
           const gid = "skg-" + k;
           const grad = s("linearGradient", { id: gid, x1: "0", x2: "1", y1: "0", y2: "0" }, defs);
-          const a = ln.side === "left" ? colorOf(part) : KIND_COLOR.table;
-          const b = ln.side === "left" ? KIND_COLOR.table : colorOf(part);
+          const a = ln.side === "left" ? colorOf(part) : KIND_COLOR.poker;
+          const b = ln.side === "left" ? KIND_COLOR.poker : colorOf(part);
           s("stop", { offset: "0%", "stop-color": a, "stop-opacity": "0.55" }, grad);
           s("stop", { offset: "100%", "stop-color": b, "stop-opacity": "0.42" }, grad);
-          s("path", { d: ln.path, fill: "url(#" + gid + ")", class: "sk-link", "data-id": ln.id, tabindex: "0", "data-tip": tip(part.name, [["Amount", money(part.value, cur)], ["Share of the flow", share(part.value)]], ln.side === "left" ? "Money that came in." : "Where the money went.") }, gLinks);
+          s("path", { d: ln.path, fill: "url(#" + gid + ")", class: "sk-link", "data-id": ln.id, tabindex: "0", "data-tip": tip(part.name, [["Amount", money(part.value, cur)], ["Share of the flow", share(part.value)]].concat(part.table !== undefined ? [["Table result", money(part.table, cur, { plus: true })], ["Rakeback and promotions", money(part.extra, cur, { plus: true })]] : []), part.table !== undefined ? "The table result and the rakeback and promotions as one: your poker income before its costs." : ln.side === "left" ? "Money that came in." : "Where the money went.") }, gLinks);
         });
         const gNodes = s("g", { class: "sk-nodes" }, svg);
         const nodeRect = (nd, color, part) => s("rect", { x: nd.x0, y: nd.y0, width: nd.x1 - nd.x0, height: Math.max(1.5, nd.y1 - nd.y0), rx: 3, fill: color, class: "sk-node", "data-id": nd.id, "data-v": part ? part.value : pp.total }, gNodes);
         L.left.forEach((nd) => nodeRect(nd, colorOf(byId.get(nd.id)), byId.get(nd.id)));
         L.right.forEach((nd) => nodeRect(nd, colorOf(byId.get(nd.id)), byId.get(nd.id)));
-        nodeRect(L.mid, KIND_COLOR.table, null);
+        nodeRect(L.mid, KIND_COLOR.poker, null);
         // labels: a pill with the name and the amount, beside its node (two lines on a phone), pushed apart where nodes are close
         const gLab = s("g", { class: "sk-labels" }, svg);
         const px = narrow ? 11 : 12.5;
@@ -33450,7 +34266,7 @@ const CashUI = (function () {
           el("span", { class: "label", text: "Savings rate" }), el("span", { class: "value num " + (rate === null ? "" : rate < 0 ? "neg" : ""), "data-k": "cash-rate-v", text: pct(rate, 2) })),
         pp.ok ? sankey(v) : banner("bad", "The picture is not drawn", el("span", { text: "Because " + pp.why + (pp.gap ? " (off by " + pp.gap + " " + v.cur + ")" : "") + ". The tiles below are right; tell us about it." })),
         el("div", { class: "kpis spend-kpis cash-kpis", "data-k": "cash-kpis" },
-          kpi("Income", big(t.income, cur), t.p ? "poker, Spendee, interest" : "Spendee and interest", tip("Income", [["Table result", money(t.table, cur, { plus: true })], ["Rakeback and promotions", money(t.extra, cur, { plus: true })], ["Spendee income", money(t.earned, cur, { plus: true })], ["Interest and dividends", money(t.invInc, cur, { plus: true })], ["Income", money(t.income, cur, { plus: true })]], "Each part as its own area shows it, in the currency chosen.")),
+          kpi("Income", big(t.income, cur), t.p ? "poker, Spendee, interest" : "Spendee and interest", tip("Income", [["Poker (table + rakeback)", money(Dec.str(Dec.add(Dec.parse(t.table), Dec.parse(t.extra))), cur, { plus: true })], ["of it table result", money(t.table, cur, { plus: true })], ["of it rakeback and promotions", money(t.extra, cur, { plus: true })], ["Spendee income", money(t.earned, cur, { plus: true })], ["Interest and dividends", money(t.invInc, cur, { plus: true })], ["Income", money(t.income, cur, { plus: true })]], "Each part as its own area shows it, in the currency chosen.")),
           kpi("Spent", big(t.spent, cur), "your Spendee expenses", tip("Spent", [["Spent", money(t.spent, cur)], ["Poker costs (apart)", money(t.cost, cur)]], "Every expense of the Spending book in these months, converted as the Spending area does it.")),
           kpi("Saved", big(t.saved, cur, { plus: true }), "net income − spent", tip("Saved", [["Net income", money(t.net, cur)], ["Spent", money(t.spent, cur)], ["Saved", money(t.saved, cur, { plus: true })]], "Net income = income − the poker costs."), tone(num(t.saved))),
           kpi("Savings rate", pct(rate, 1), "saved ÷ net income", tip("Savings rate", [["Savings rate", pct(rate, 2)]], "Not shown when the net income is not above zero."), rate !== null && rate < 0 ? "neg" : rate > 0 ? "pos" : ""),
@@ -33464,26 +34280,6 @@ const CashUI = (function () {
     }
 
     // ---------------------------------------------------------------- month by month
-
-    function monthsCard(v) {
-      const rs = v.p.months;
-      if (rs.length < 2) return null;
-      const cur = v.cur;
-      const yearly = rs.length > 36;
-      const groups = yearly ? [...new Set(rs.map((r) => r.month.slice(0, 4)))] : rs.map((r) => r.month);
-      const sumOf = (f) => groups.map((g) => rs.reduce((a, r) => a + (r.month.startsWith(g) ? num(r[f]) : 0), 0));
-      const net = sumOf("net");
-      const spent = sumOf("spent");
-      const saved = sumOf("saved");
-      const cats = yearly ? groups : groups.map(monthName);
-      const ticks = yearly ? null : rs.map((r, k) => tick(r.month, k, rs.length));
-      return fcard({ key: "cash-months", title: "Month by month", sub: yearly ? "per year (more than three years)" : "net income and spending", glance: "Saved in " + saved.filter((x) => x > 0).length + " of " + groups.length + (yearly ? " years" : " months") }, () => [
-        C.bars({ categories: cats, tickLabels: ticks, series: [{ id: "net", name: "Net income", color: "var(--c-gain)", values: net, texts: net.map((x) => fm(x, cur, { plus: true })) }, { id: "spent", name: "Spent", color: "var(--c-real)", values: spent, texts: spent.map((x) => fm(x, cur)) }], mode: "grouped", legend: true, toggle: true, key: "cash-months", format: compact(cur), height: 220, ariaLabel: "Net income and spending of each " + (yearly ? "year" : "month") + ", in " + cur }),
-        C.bars({ categories: cats, tickLabels: ticks, series: [{ id: "saved", name: "Saved", values: saved, texts: saved.map((x) => fm(x, cur, { plus: true })) }], mode: "split", colorPos: "var(--c-gain)", colorNeg: "var(--c-more)", splitLegend: [{ name: "Saved", color: "var(--c-gain)" }, { name: "Spent more than earned", color: "var(--c-more)" }], format: compact(cur), height: 170, ariaLabel: "What was saved in each " + (yearly ? "year" : "month") + ", in " + cur }),
-        note("Spending is orange, not red: red means only a loss, here a " + (yearly ? "year" : "month") + " that spent more than it earned."),
-        el("details", { class: "fold" }, el("summary", { text: "The figures" }), table(["Month", "Income", "Poker costs", "Spent", "Saved", "Rate", "Invested", "Kept"], rs.slice().reverse().map((r) => [monthName(r.month), cell(money(r.income, cur, { plus: true }), "r num"), cell(money(r.cost, cur), "r num"), cell(money(r.spent, cur), "r num"), cell(money(r.saved, cur, { plus: true }), "r num " + tone(num(r.saved))), cell(pct(r.rate, 0), "r num"), cell(money(r.invested, cur, { plus: true }), "r num"), cell(money(r.kept, cur, { plus: true }), "r num")]), "Every month", "drrrrrrr", "cash-months-table")),
-      ]);
-    }
 
     function rateCard(v) {
       const rs = v.p.months;
@@ -33535,8 +34331,9 @@ const CashUI = (function () {
       const yearly = rs.length > 36;
       const groups = yearly ? [...new Set(rs.map((r) => r.month.slice(0, 4)))] : rs.map((r) => r.month);
       const sumOf = (f) => groups.map((g) => rs.reduce((a, r) => a + (r.month.startsWith(g) ? num(r[f]) : 0), 0));
-      const parts = [["table", "Table result", "var(--c-gain)"], ["extra", "Rakeback and promotions", "var(--ok)"], ["earned", "Spendee income", "var(--c-bm-4)"], ["invInc", "Interest and dividends", "var(--c-pie-5)"]];
-      const raw = parts.map((p) => sumOf(p[0]));
+      // poker is one source, table result + rakeback and promotions (architecture 45.6, his wish of 44.1)
+      const parts = [["poker", "Poker", "var(--c-gain)"], ["earned", "Spendee income", "var(--c-bm-4)"], ["invInc", "Interest and dividends", "var(--c-pie-5)"]];
+      const raw = parts.map((p) => (p[0] === "poker" ? sumOf("table").map((x, i) => x + sumOf("extra")[i]) : sumOf(p[0])));
       // the stack holds the parts above zero; a part below zero (a losing table month) is named in the hover box and is in the income below
       const series = parts.map((p, j) => ({ id: p[0], name: p[1], color: p[2], values: raw[j].map((x) => Math.max(0, x)), texts: raw[j].map((x) => fm(x, cur, { plus: true })) })).filter((x, j) => raw[j].some((y) => y !== 0));
       if (!series.length) return null;
@@ -33548,7 +34345,7 @@ const CashUI = (function () {
       return fcard({ key: "cash-sources", title: "Income by source", sub: yearly ? "per year" : "per month", glance: series.map((x, j) => x.name + " " + fm(raw[parts.findIndex((p) => p[0] === x.id)].reduce((a, b) => a + b, 0), cur, { plus: true })).slice(0, 3).join(" · ") }, () => [
         C.bars({ categories: cats, tickLabels: ticks, series, mode: "stacked", legend: true, toggle: true, key: "cash-sources", skipZero: true, details, format: compact(cur), height: 220, ariaLabel: "The income of each " + (yearly ? "year" : "month") + " by source, the parts above zero stacked, in " + cur }),
         below ? C.bars({ categories: cats, tickLabels: ticks, series: [{ id: "inc", name: "Income", values: totals, texts: totals.map((x) => fm(x, cur, { plus: true })) }], mode: "split", colorPos: "var(--c-gain)", colorNeg: "var(--c-more)", splitLegend: [{ name: "Income", color: "var(--c-gain)" }, { name: "Below zero", color: "var(--c-more)" }], format: compact(cur), height: 150, ariaLabel: "The income of each " + (yearly ? "year" : "month") + " with every part, in " + cur }) : null,
-        note(below ? "The stack shows the parts above zero. A part below zero (a losing table month) is named in its hover box; the bars under the stack are the income with every part, a loss in red." : "Every part of the income, stacked."),
+        note(below ? "The stack shows the parts above zero. A part below zero (a month that lost at poker) is named in its hover box; the bars under the stack are the income with every part, a loss in red." : "Every part of the income, stacked."),
       ]);
     }
 
@@ -33603,28 +34400,177 @@ const CashUI = (function () {
       ]);
     }
 
+    // ---------------------------------------------------------------- the new look (architecture 45.6 and 45.7)
+
+    /** The series of the pictures: CashFlow.series of the period's months, as numbers for the charts. */
+    function seriesOf(v) {
+      return CashFlow.series(v.p.months);
+    }
+
+    /** Per month, or per year past three years: the income above zero and the spending below, stacked, with the net as a white line. */
+    function inOutCard(v) {
+      const rs = seriesOf(v);
+      if (rs.length < 2) return null;
+      const cur = v.cur;
+      const yearly = rs.length > 36;
+      const groups = yearly ? [...new Set(rs.map((r) => r.month.slice(0, 4)))] : rs.map((r) => r.month);
+      const sumOf = (f) => groups.map((g) => rs.reduce((a, r) => a + (r.month.startsWith(g) ? num(r[f]) : 0), 0));
+      const pk = sumOf("poker");
+      const other = sumOf("other");
+      const cost = sumOf("cost");
+      const spent = sumOf("spent");
+      const net = sumOf("net");
+      const series = [
+        { id: "poker", name: "Poker", color: "var(--c-gain)", values: pk.map((x) => Math.max(0, x)), texts: pk.map((x) => fm(x, cur, { plus: true })) },
+        { id: "other", name: "Other income", color: "var(--c-bm-4)", values: other.map((x) => Math.max(0, x)), texts: other.map((x) => fm(x, cur, { plus: true })) },
+        { id: "lost", name: "Lost at poker", color: "var(--c-more)", values: pk.map((x) => Math.min(0, x)), texts: pk.map((x) => (x < 0 ? fm(x, cur) : "–")) },
+        { id: "cost", name: "Poker costs", color: "var(--c-sec-13)", values: cost.map((x) => Math.min(0, x)), texts: cost.map((x) => fm(x, cur)) },
+        { id: "spent", name: "Spending", color: "var(--c-real)", values: spent.map((x) => -Math.max(0, x)), texts: spent.map((x) => fm(-x, cur)) },
+      ].filter((x) => x.values.some((y) => y !== 0));
+      const cats = yearly ? groups : groups.map(monthName);
+      const ticks = yearly ? null : rs.map((r, k) => tick(r.month, k, rs.length));
+      const won = net.filter((x) => x > 0).length;
+      return fcard({ key: "cash-inout", title: "Money in and out", sub: (yearly ? "per year" : "per month") + " · net above zero in " + won + " of " + groups.length }, () => [
+        C.bars({ categories: cats, tickLabels: ticks, series, mode: "stacked", diverge: true, legend: true, key: "cash-inout", skipZero: true, netLine: { name: "Net (saved)", values: net, texts: net.map((x) => fm(x, cur, { plus: true })), color: "var(--c-put)" }, format: compact(cur), height: 260, ariaLabel: "The income above zero and the spending and costs below zero of each " + (yearly ? "year" : "month") + ", with the net as a line, in " + cur }),
+        note("Above zero what came in (poker = table result + rakeback and promotions, and your other income), below zero what went out (spending in orange, the poker costs in lavender, a month that lost at poker in red). The white line is the net: what was saved."),
+      ]);
+    }
+
+    /** The running total of the net, and the rolling 12 months of the net (only where 12 months follow each other). */
+    function cumNetCard(v) {
+      const rs = seriesOf(v);
+      if (rs.length < 2) return null;
+      const cur = v.cur;
+      const cum = rs.map((r) => num(r.cum));
+      return fcard({ key: "cash-cumnet", title: "Net cash flow added up", sub: "since " + monthName(rs[0].month) }, () => [
+        C.timeLines({ days: rs.map((r) => r.month + "-01"), series: [{ name: "Net, added up", color: "var(--c-gain)", values: cum, texts: cum.map((x) => fm(x, cur, { plus: true })) }], format: compact(cur), zero: true, dateText: (d) => monthName(d.slice(0, 7)), key: "cash-cumnet", rows: (i) => [["This month", money(rs[i].net, cur, { plus: true }), tone(num(rs[i].net))]], ariaLabel: "The net cash flow added up month by month, in " + cur, height: 210 }),
+      ]);
+    }
+    function rollNetCard(v) {
+      // the windows may reach back before the period: the series of every counted month, the points of the period's months
+      const inP = new Set(v.p.months.map((r) => r.month));
+      const pts = CashFlow.series(counted(v.m)).filter((r) => r.roll !== null && inP.has(r.month));
+      const cur = v.cur;
+      return fcard({ key: "cash-rollnet", title: "Rolling 12-month net", sub: pts.length ? "the last 12 months at each month" : "needs 12 months in a row" }, () =>
+        pts.length >= 2
+          ? [C.timeLines({ days: pts.map((r) => r.month + "-01"), series: [{ name: "Net of the last 12 months", color: "var(--c-put)", values: pts.map((r) => num(r.roll)), texts: pts.map((r) => money(r.roll, cur, { plus: true })) }], format: compact(cur), zero: true, dateText: (d) => monthName(d.slice(0, 7)), key: "cash-rollnet", ariaLabel: "The net cash flow of the last twelve months at each month, in " + cur, height: 210 })]
+          : [note("The rolling net needs 12 counted months in a row before a month of the period.")]);
+    }
+
+    /** Spending by month, stacked by its largest categories (the Spending area's colours), and where the money goes. */
+    function spendStackCard(v) {
+      const pv = v.pv;
+      if (!pv || pv.months.length < 2 || !pv.cats.length) return null;
+      const cur = v.cur;
+      const slot = slotMap();
+      const top = pv.cats.filter((c) => slot.has(c.cat)).sort((a, b) => slot.get(a.cat) - slot.get(b.cat));
+      const restIdx = pv.cats.map((c, i) => (slot.has(c.cat) ? -1 : i)).filter((i) => i >= 0);
+      const yearly = pv.months.length > 36;
+      const groups = yearly ? [...new Set(pv.months.map((m) => m.slice(0, 4)))] : pv.months;
+      const at = (i) => groups.map((g) => pv.monthly.reduce((a, m) => a + (m.month.startsWith(g) ? num(m.byCat[i]) : 0), 0));
+      const series = top.map((c) => {
+        const vals = at(pv.cats.indexOf(c));
+        return { id: "c:" + c.cat, name: c.cat, color: "var(--c-sec-" + (slot.get(c.cat) + 1) + ")", values: vals, texts: vals.map((x) => fm(x, cur)) };
+      });
+      if (restIdx.length) {
+        const vals = groups.map((g, k) => restIdx.reduce((a, i) => a + at(i)[k], 0));
+        series.push({ id: "other", name: "Other (" + restIdx.length + ")", color: "var(--c-pie-other)", values: vals, texts: vals.map((x) => fm(x, cur)) });
+      }
+      const tot = groups.map((g) => pv.monthly.reduce((a, m) => a + (m.month.startsWith(g) ? num(m.spent) : 0), 0));
+      return fcard({ key: "cash-spendstack", title: "Spending by month", sub: "by category" + (yearly ? ", per year" : "") }, () => [
+        C.bars({ categories: yearly ? groups : groups.map(monthName), tickLabels: yearly ? null : pv.months.map((m, k) => tick(m, k, pv.months.length)), series, mode: "stacked", legend: true, toggle: true, key: "cash-spendstack", skipZero: true, totalTexts: tot.map((x) => fm(x, cur)), format: compact(cur), height: 240, ariaLabel: "The spending of each " + (yearly ? "year" : "month") + " by category, stacked, in " + cur }),
+      ]);
+    }
+    function whereCard(v) {
+      const pv = v.pv;
+      if (!pv || !pv.cats.length) return null;
+      const cur = v.cur;
+      const slot = slotMap();
+      const list = pv.cats.slice(0, 12);
+      const rest = pv.cats.slice(12).reduce((a, c) => a + num(c.spent), 0);
+      const total = num(pv.totals.spent);
+      const n = Math.max(1, pv.months.length);
+      const items = list.map((c) => ({ label: c.cat, value: num(c.spent), text: money(c.spent, cur), tip: "Spent", details: [["Share of the spending", pct(total > 0 ? num(c.spent) / total : null, 1)], ["Per month", fm(num(c.spent) / n, cur)]] }));
+      if (rest > 0) items.push({ label: "All other (" + (pv.cats.length - 12) + ")", value: rest, text: fm(rest, cur), tip: "Spent" });
+      return fcard({ key: "cash-where", title: "Where the money goes", sub: "spent in the period, " + cur }, () => [C.hbars({ items, color: "var(--c-real)", colorNeg: "var(--c-gain)", format: compact(cur), ariaLabel: "The spending of the period by category, largest first, in " + cur }), note("Your Spendee categories, largest first" + (slot.size ? "; the colours of the bars by month follow the Spending area." : "."))]);
+    }
+
+    /** The months, newest first, the net in a coloured cell (green saved, red spent more than came in), a total row. */
+    function monthsTable(v) {
+      const rs = seriesOf(v);
+      if (!rs.length) return null;
+      const cur = v.cur;
+      const abs = rs.map((r) => Math.abs(num(r.net))).sort((a, b) => a - b);
+      const sc = Math.max(1e-9, abs[Math.min(abs.length - 1, Math.floor(abs.length * 0.9))] || 1);
+      const hc = (x) => (Math.abs(x) < 1e-9 ? "hm-0" : (x > 0 ? "hm-p" : "hm-n") + Math.min(5, Math.max(1, Math.ceil((Math.abs(x) / sc) * 5))));
+      const list = rs.slice().reverse();
+      const SHOW = 24;
+      const shown = st.allMonths ? list : list.slice(0, SHOW);
+      const pr = new Map(v.p.months.map((r) => [r.month, r]));
+      const head = el("tr", {}, ["Month", "Poker", "Other income", "Poker costs", "Spent", "Net", "Rate"].map((c, i) => el("th", { scope: "col", class: i ? "r" : "", text: c })));
+      const body = shown.map((r) => el("tr", { "data-k": "cmt:" + r.month },
+        el("th", { scope: "row", text: monthName(r.month) }),
+        el("td", { class: "r num " + tone(num(r.poker)), text: money(r.poker, cur, { plus: true }) }), el("td", { class: "r num", text: money(r.other, cur) }), el("td", { class: "r num", text: money(r.cost, cur) }), el("td", { class: "r num", text: money(r.spent, cur) }),
+        el("td", { class: "r num tc" }, el("span", { class: "hc tot " + hc(num(r.net)), "data-k": "cmi:" + r.month, text: money(r.net, cur, { plus: true }) })),
+        el("td", { class: "r num", text: pct(pr.get(r.month) ? pr.get(r.month).rate : null, 0) })));
+      const t = v.p.totals;
+      const foot = el("tr", { class: "tot-row" }, el("th", { scope: "row", text: "Total" }),
+        el("td", { class: "r num " + tone(num(t.table) + num(t.extra)), text: money(Dec.str(Dec.add(Dec.parse(t.table), Dec.parse(t.extra))), cur, { plus: true }) }), el("td", { class: "r num", text: money(Dec.str(Dec.add(Dec.parse(t.earned), Dec.parse(t.invInc))), cur) }), el("td", { class: "r num", text: money(t.cost, cur) }), el("td", { class: "r num", text: money(t.spent, cur) }),
+        el("td", { class: "r num tc" }, el("span", { class: "hc tot " + hc(num(t.saved) / Math.max(1, rs.length / 2)), "data-k": "cmi:total", text: money(t.saved, cur, { plus: true }) })), el("td", { class: "r num", text: pct(t.rate, 0) }));
+      return fcard({ key: "cash-mtable", title: "Months", sub: plural(rs.length, "month") + " · newest first" }, () => [
+        el("div", { class: "tbl-wrap", "data-k": "cash-mtable-wrap" }, el("table", { class: "tbl mtable" }, el("caption", { class: "sr-only", text: "Every month of the period: poker, other income, poker costs, spent, net and the savings rate" }), el("thead", {}, head), el("tbody", {}, body), el("tfoot", {}, foot))),
+        list.length > SHOW ? el("div", { class: "btn-row" }, btn(st.allMonths ? "Show the newest " + SHOW + " months" : "Show all " + list.length + " months", () => { st.allMonths = !st.allMonths; host.render(); }, "small", "cmt-more")) : null,
+        note("The net cell is green when the month saved and red when it spent more than came in, stronger the larger it is. Poker = table result + rakeback and promotions."),
+      ]);
+    }
+
+    /** The tiles of the Overview: the big figures first (the prototype's set, with ours). */
+    function tilesTop(v) {
+      const t = v.p.totals;
+      const cur = v.cur;
+      const kpi = (label, value, sub, tipObj, cls) => el("div", { class: "kpi", tabindex: "0", "data-tip": tipObj, "data-k": "tkpi:" + label }, el("span", { class: "label", text: label }), el("span", { class: "value " + (cls || ""), "data-k": "tkv:" + label, text: value }), sub ? el("span", { class: "subline", text: sub }) : null);
+      const pk = Dec.add(Dec.parse(t.table), Dec.parse(t.extra));
+      const pkNet = Dec.add(pk, Dec.parse(t.cost));
+      const other = Dec.add(Dec.parse(t.earned), Dec.parse(t.invInc));
+      const covers = num(t.spent) > 0 && t.p ? num(Dec.str(pkNet)) / num(t.spent) : null;
+      const n = Math.max(1, v.p.n);
+      const rate = t.rate;
+      return el("div", { class: "kpis spend-kpis cash-kpis cash-top-kpis", "data-k": "cash-top-kpis" },
+        kpi("Net cash flow", big(t.saved, cur, { plus: true }), "income − costs − spending", tip("Net cash flow", [["Poker", money(Dec.str(pk), cur, { plus: true })], ["Other income", money(Dec.str(other), cur, { plus: true })], ["Poker costs", money(t.cost, cur)], ["Spent", money(t.spent, cur)], ["Net", money(t.saved, cur, { plus: true })], ["Average month", fm(num(t.saved) / n, cur, { plus: true })]], "What was saved: the same figure as Saved."), tone(num(t.saved))),
+        t.p ? kpi("Poker", big(Dec.str(pk), cur, { plus: true }), "table + rakeback and promotions", tip("Poker", [["Table result", money(t.table, cur, { plus: true })], ["Rakeback and promotions", money(t.extra, cur, { plus: true })], ["Poker", money(Dec.str(pk), cur, { plus: true })], ["Costs (apart)", money(t.cost, cur)]], "One source in the picture, as you wished: in this poker climate rakeback is income like the table result. The costs stay a use of their own."), tone(num(Dec.str(pk)))) : null,
+        kpi("Other income", big(Dec.str(other), cur), "Spendee income, interest, dividends", tip("Other income", [["Spendee income", money(t.earned, cur)], ["Interest and dividends", money(t.invInc, cur)]], "Your Spendee wallets hold spending only, so this is mostly interest and dividends from the ledger of your investments.")),
+        kpi("Spending", big(t.spent, cur), fm(num(t.spent) / n, cur) + " a month", tip("Spending", [["Spent", money(t.spent, cur)], ["Per month", fm(num(t.spent) / n, cur)]], "Every expense of the Spending book in these months; the categories that are not spending are left out.")),
+        kpi("Savings rate", pct(rate, 1), "saved ÷ net income", tip("Savings rate", [["Net income", money(t.net, cur)], ["Saved", money(t.saved, cur, { plus: true })], ["Savings rate", pct(rate, 2)]], "Not shown when the net income is not above zero."), rate !== null && rate < 0 ? "neg" : rate > 0 ? "pos" : ""),
+        t.p ? kpi("Poker covers spending", pct(covers, 0), "poker after costs ÷ spending", tip("Poker covers spending", [["Poker after costs", money(Dec.str(pkNet), cur, { plus: true })], ["Spent", money(t.spent, cur)]], "Above 100 %: poker alone paid for the household's spending in the period."), covers !== null && covers >= 1 ? "pos" : "") : null);
+    }
+
+    function tabBar() {
+      return el("nav", { class: "tabs ptabs", role: "tablist", "aria-label": "Cash flow", "data-k": "cash-tabs" }, TABS.map((t) => el("button", { type: "button", class: "tab", role: "tab", "aria-selected": String(st.tab === t[0]), "data-key": "ctab:" + t[0], "data-k": "ctab:" + t[0], text: t[1], onclick: () => goTab(t[0]) })));
+    }
+    const pair = (key, a, b) => (a && b ? el("div", { class: "grid2", "data-k": key }, a, b) : a || b || null);
+
     // ---------------------------------------------------------------- draw
 
     function render(root) {
-      seen.clear();
       const m = model();
+      root.appendChild(tabBar());
       if (!m.months.length) {
         root.appendChild(card("Cash flow", "made from your other parts", note("Cash flow has no data of its own: it shows where the money came from and where it went, from your Spending book, your Poker book and the money put into or taken out of your investments. Import your Spendee wallets in Spending or your poker workbooks in Poker first."),
           el("div", { class: "btn-row" }, btn("Open Spending", () => host.goArea("spend"), "", "cash-go-spend"), btn("Open Poker", () => host.goArea("poker"), "", "cash-go-poker"))));
         return;
       }
       const v = figures();
-      const at = root.childNodes.length;
-      root.appendChild(el("section", { class: "card", "data-k": "cash-top" }, el("div", { class: "card-head" }, el("h2", { text: "Your cash flow" }), el("span", { class: "sub", text: host.mode() === "demo" ? "invented demo data" : "read from your other parts, never stored" })), controls(v), missingBanners(v)));
-      if (v.p.n) {
-        for (const c of [flowCard(v), monthsCard(v), rateCard(v), cumCard(v), sourcesCard(v), yearsCard(v), investCard(v)]) if (c) root.appendChild(c);
-      } else root.appendChild(card("No months in this choice", null, note("Choose another period, or “Every month”.")));
-      const cv = coverCard(v);
-      if (cv) root.appendChild(cv);
-      root.insertBefore(foldBar(), root.childNodes[at + 1] || null);
+      const head = { overview: "Your cash flow", trends: "Trends", years: "Years", details: "Details" }[st.tab];
+      root.appendChild(el("section", { class: "card", "data-k": "cash-top" }, el("div", { class: "card-head" }, el("h2", { text: head }), el("span", { class: "sub", text: host.mode() === "demo" ? "invented demo data" : "read from your other parts, never stored" })), controls(v), missingBanners(v), st.tab === "overview" && v.p.n ? tilesTop(v) : null));
+      const add = (...cs) => { for (const c of cs) if (c) root.appendChild(c); };
+      if (!v.p.n) add(card("No months in this choice", null, note("Choose another period, or “Every month”.")));
+      else if (st.tab === "overview") add(flowCard(v), inOutCard(v));
+      else if (st.tab === "trends") add(pair("cash-pair-1", cumNetCard(v), rollNetCard(v)), pair("cash-pair-2", rateCard(v), cumCard(v)), pair("cash-pair-3", spendStackCard(v), whereCard(v)), sourcesCard(v));
+      else if (st.tab === "years") add(yearsCard(v), monthsTable(v));
+      if (st.tab === "details") add(v.p.n ? investCard(v) : null, coverCard(v));
     }
 
-    return { render, state: st, figures };
+    return { render, state: st, figures, goTab };
   }
 
   return { create };
@@ -35248,7 +36194,8 @@ const PackUI = (function () {
     download: spendDownload,
     render: () => render(),
     goInvestData: () => goTab("data"),
-    folds: Folds.create({ storage: foldStorage, key: "att-spend-folds-v1" }), // which Spending cards are open (architecture 38.11), apart from the Holdings tab's
+    // the open tab of the Spending part (architecture 45.7): a setting of this browser, like Poker's, in no backup
+    tabStore: { get: () => (foldStorage && foldStorage.getItem("att-spend-tab-v1")) || "", set: (t) => { if (foldStorage) foldStorage.setItem("att-spend-tab-v1", String(t)); } },
   });
 
   function spendSaveText() {
@@ -35375,7 +36322,8 @@ const PackUI = (function () {
     ledger: () => (ui.mode === "demo" ? cashDemoLedger || (cashDemoLedger = CashFlow.demoLedger()) : conv && conv.tables && Array.isArray(conv.tables.ledger) ? conv.tables.ledger : []),
     render: () => render(),
     goArea: (a) => goArea(a),
-    folds: Folds.create({ storage: foldStorage, key: "att-cash-folds-v1" }), // which Cash flow cards are open, apart from the other parts'
+    // the open tab of the Cash flow part (architecture 45.7)
+    tabStore: { get: () => (foldStorage && foldStorage.getItem("att-cash-tab-v1")) || "", set: (t) => { if (foldStorage) foldStorage.setItem("att-cash-tab-v1", String(t)); } },
   });
 
   /** A part that has no screen of its own yet (none since Cash flow was built, architecture 41). */
