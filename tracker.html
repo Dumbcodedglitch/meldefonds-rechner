@@ -19355,6 +19355,148 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
   return { VERSION, MAX_KEYS, MAX_KEY_LENGTH, create };
 });
 
+/* ---- src/app/allbackup.js ---- */
+/*
+ * AllBackup: one file that holds every book of the tracker, and the warning when the last such file is old and something changed
+ * since (architecture 47.3).
+ *
+ * The file carries each book as the text of that book's OWN backup (Investments, Spending, Poker, filed tax years), so each book is
+ * restored later by its own reader with its own checks. A hash over the whole content refuses a file that was cut short or edited.
+ * Pure functions, no browser APIs, no clock (the page passes the time). Not on the tax side: it never reads or changes a figure.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("../lib/hash.js"));
+  else root.AllBackup = factory(root.Hash);
+})(typeof self !== "undefined" ? self : this, function (Hash) {
+  "use strict";
+
+  const VERSION = "allbackup-0.1.0";
+  const KIND = "austria-tracker-all-backup";
+  const FORMAT = 1;
+  const BOOKS = ["invest", "spend", "poker", "filed"];
+  const NAMES = { invest: "Investments", spend: "Spending", poker: "Poker", filed: "Filed tax years" };
+  const DUE_DAYS = 7;
+  const DAY_MS = 86400000;
+
+  const isObj = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
+  const hashOf = (parts, missing) => Hash.sha256Hex(Hash.canonical({ parts, missing }));
+
+  /** The name of the file for a given day (YYYY-MM-DD). */
+  const fileName = (day) => "austria-tracker-everything-" + String(day).slice(0, 10) + ".json";
+
+  /**
+   * The text of the file. parts: { invest, spend, poker, filed } → the backup text of that book, or null when the book could not be
+   * read (it is then left out and named in `missing`). Returns { ok, text, missing } or { ok: false, error }.
+   */
+  function make(parts, savedAt) {
+    if (!isObj(parts)) return { ok: false, error: "Nothing to back up." };
+    const out = {};
+    const missing = [];
+    for (const b of BOOKS) {
+      const t = parts[b];
+      if (typeof t === "string" && t.length) out[b] = t;
+      else missing.push(b);
+    }
+    if (!Object.keys(out).length) return { ok: false, error: "None of the four books could be read, so there is nothing to back up." };
+    const file = { kind: KIND, format: FORMAT, savedAt: String(savedAt || ""), parts: out, missing, contentHash: hashOf(out, missing) };
+    return { ok: true, text: JSON.stringify(file), missing };
+  }
+
+  /** True when the text looks like an everything file (for the single-book restores, which then point to the right card). */
+  function isAll(text) {
+    if (typeof text !== "string") return false;
+    const head = text.replace(/^﻿/, "").slice(0, 200);
+    if (head.indexOf(KIND) < 0) return false;
+    try {
+      const p = JSON.parse(text.replace(/^﻿/, ""));
+      return isObj(p) && p.kind === KIND;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /** The words a single-book restore shows for an everything file. */
+  const singleMessage = (bookName) =>
+    "This file holds every book of the tracker. Restore it with “Restore everything” on the Data tab of Investments (card “Back up everything”); the " + bookName + " was not changed.";
+
+  /** Reads the file. Returns { ok, savedAt, parts, missing } (parts: book → its backup text) or { ok: false, error }. */
+  function parse(text) {
+    if (typeof text !== "string" || !text.trim()) return { ok: false, error: "The file is empty." };
+    let p;
+    try {
+      p = JSON.parse(text.replace(/^﻿/, ""));
+    } catch (e) {
+      return { ok: false, error: "This is not an everything backup of this tracker (it is not readable as JSON). It may have been cut short when it was saved or copied." };
+    }
+    if (!isObj(p) || p.kind !== KIND) {
+      if (isObj(p) && (p.kind === "austria-tax-tracker-backup" || p.kind === "austria-tracker-backup")) return { ok: false, error: "This is a backup of one book only. Restore it in that book's own place (Investments: Data tab, step 9; Spending and Poker: their Data tab; filed tax years: the Tax tab). Nothing was changed." };
+      return { ok: false, error: "This is not an everything backup of this tracker." };
+    }
+    if (typeof p.format !== "number" || p.format > FORMAT) return { ok: false, error: "This backup was made by a newer version of the tracker. Open the newer version of the page." };
+    if (p.format < 1 || Math.floor(p.format) !== p.format) return { ok: false, error: "The format of this backup is not known." };
+    if (!isObj(p.parts) || !Array.isArray(p.missing)) return { ok: false, error: "The backup has no books in it." };
+    const parts = {};
+    for (const k of Object.keys(p.parts)) {
+      if (BOOKS.indexOf(k) < 0) return { ok: false, error: "The backup holds a book this page does not know (" + String(k).slice(0, 20) + "). Open the newer version of the page." };
+      if (typeof p.parts[k] !== "string" || !p.parts[k].length) return { ok: false, error: "The " + NAMES[k] + " book in the backup is empty or damaged." };
+      parts[k] = p.parts[k];
+    }
+    for (const m of p.missing) if (BOOKS.indexOf(m) < 0 || parts[m] !== undefined) return { ok: false, error: "The list of books left out of this backup is damaged." };
+    if (!Object.keys(parts).length) return { ok: false, error: "The backup has no books in it." };
+    if (BOOKS.some((b) => parts[b] === undefined && p.missing.indexOf(b) < 0)) return { ok: false, error: "A book is neither in this backup nor named as left out, so the file is damaged." };
+    let h = "";
+    try {
+      h = hashOf(parts, p.missing);
+    } catch (e) {
+      return { ok: false, error: "The data inside the backup could not be checked." };
+    }
+    if (h !== p.contentHash) return { ok: false, error: "The check code of this backup does not match its data. The file was changed or damaged, so nothing is restored." };
+    return { ok: true, savedAt: typeof p.savedAt === "string" ? p.savedAt : "", parts, missing: p.missing.slice() };
+  }
+
+  /** The fingerprint of a book (any JSON-like value; null for none). */
+  const fingerprint = (book) => (book === null || book === undefined ? "" : Hash.hashOf(book));
+
+  /** Whole days from the ISO time a to the ISO time b (by the UTC calendar day), or null when either is not a time. */
+  function daysBetween(a, b) {
+    const ta = Date.parse(String(a || "").slice(0, 10) + "T00:00:00Z");
+    const tb = Date.parse(String(b || "").slice(0, 10) + "T00:00:00Z");
+    if (!Number.isFinite(ta) || !Number.isFinite(tb)) return null;
+    return Math.round((tb - ta) / DAY_MS);
+  }
+
+  /** Reads the stored record of the last full backup (any value); { at, name, fps } or null. */
+  function readRecord(raw) {
+    if (!isObj(raw) || typeof raw.at !== "string" || !isObj(raw.fps)) return null;
+    if (!Number.isFinite(Date.parse(raw.at))) return null;
+    const fps = {};
+    for (const b of BOOKS) if (typeof raw.fps[b] === "string") fps[b] = raw.fps[b];
+    return { at: raw.at, name: typeof raw.name === "string" ? raw.name.slice(0, 120) : "", fps };
+  }
+
+  /**
+   * Whether the warning is due. now: ISO time; rec: the record (or null); fps: book → its fingerprint now ("" for none);
+   * hasData: does any book hold data. Returns { due, kind ("none" | "never" | "changed" | "fresh" | "same"), days, changed: [book],
+   * title, text }.
+   */
+  function status(o) {
+    const rec = readRecord(o && o.rec);
+    const fps = (o && o.fps) || {};
+    if (!(o && o.hasData)) return { due: false, kind: "none", days: null, changed: [], title: "", text: "" };
+    if (!rec) return { due: true, kind: "never", days: null, changed: [], title: "No full backup yet", text: "Your data lives in this browser only. One file with every book is the safe copy: keep it somewhere private, not on GitHub." };
+    const days = daysBetween(rec.at, o.now);
+    const changed = BOOKS.filter((b) => (fps[b] || "") !== (rec.fps[b] || ""));
+    const ago = days === null ? "" : days <= 0 ? "today" : days === 1 ? "yesterday" : days + " days ago";
+    if (!changed.length) return { due: false, kind: "same", days, changed, title: "", text: "Last full backup " + ago + " · nothing changed since" };
+    const what = changed.map((b) => NAMES[b]).join(", ");
+    if (days === null || days >= DUE_DAYS)
+      return { due: true, kind: "changed", days, changed, title: "Last full backup " + (ago || "a while ago"), text: "Changed since: " + what + ". Your data lives in this browser only; a new file keeps the changes safe." };
+    return { due: false, kind: "fresh", days, changed, title: "", text: "Last full backup " + ago + " · changed since: " + what };
+  }
+
+  return { VERSION, KIND, FORMAT, BOOKS, NAMES, DUE_DAYS, fileName, make, isAll, singleMessage, parse, fingerprint, daysBetween, readRecord, status };
+});
+
 /* ---- src/spend/spendee.js ---- */
 /*
  * Spendee: reads one CSV export of the Spendee app (architecture section 38.4.1).
@@ -20056,6 +20198,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     } catch (e) {
       return { ok: false, error: "This is not a backup file of this tracker (it is not readable as JSON)." };
     }
+    if (isObj(p) && p.kind === "austria-tracker-all-backup") return { ok: false, error: "This file holds every book of the tracker. Restore it with “Restore everything” on the Data tab of Investments (card “Back up everything”); the Spending book was not changed." }; // architecture 47.3
     if (isObj(p) && p.kind === "austria-tax-tracker-backup") return { ok: false, error: "This is a backup of the Investments book. Restore it on the Data tab of Investments (step 9); the Spending book was not changed." };
     if (!isObj(p) || p.kind !== BACKUP_KIND) return { ok: false, error: "This is not a backup file of this tracker." };
     if (p.book !== BOOK) return { ok: false, error: "This is a backup of the " + String(p.book).slice(0, 20) + " book, not of the Spending book. Nothing was changed." };
@@ -20069,6 +20212,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
   function otherBookMessage(text) {
     try {
       const p = JSON.parse(String(text).replace(/^﻿/, ""));
+      if (isObj(p) && p.kind === "austria-tracker-all-backup") return "This file holds every book of the tracker. Restore it with “Restore everything” in the card “Back up everything” at the top of this tab; nothing was changed.";
       if (isObj(p) && p.kind === BACKUP_KIND && typeof p.book === "string") return "This is a backup of the " + p.book.slice(0, 20) + " book. Restore it in that part of the page (the strip at the top); the Investments data was not changed.";
     } catch (e) {
       /* not JSON: the Investments restore says so itself */
@@ -22556,6 +22700,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     } catch (e) {
       return { ok: false, error: "This is not a backup file of this tracker (it is not readable as JSON)." };
     }
+    if (isObj(p) && p.kind === "austria-tracker-all-backup") return { ok: false, error: "This file holds every book of the tracker. Restore it with “Restore everything” on the Data tab of Investments (card “Back up everything”); the Poker book was not changed." }; // architecture 47.3
     if (isObj(p) && p.kind === "austria-tax-tracker-backup") return { ok: false, error: "This is a backup of the Investments book. Restore it on the Data tab of Investments (step 9); the Poker book was not changed." };
     if (!isObj(p) || p.kind !== BACKUP_KIND) return { ok: false, error: "This is not a backup file of this tracker." };
     if (p.book !== BOOK) return { ok: false, error: "This is a backup of the " + String(p.book).slice(0, 20) + " book, not of the Poker book. Nothing was changed." };
@@ -26452,6 +26597,7 @@ main .rp { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0,
     } catch (e) {
       return { ok: false, error: "This is not a backup file of this tracker (it is not readable as JSON)." };
     }
+    if (isObj(p) && p.kind === "austria-tracker-all-backup") return { ok: false, error: "This file holds every book of the tracker. Restore it with “Restore everything” on the Data tab of Investments (card “Back up everything”); the filed tax years was not changed." }; // architecture 47.3
     if (isObj(p) && p.kind === "austria-tax-tracker-backup") return { ok: false, error: "This is a backup of the Investments book. Restore it on the Data tab of Investments (step 9); the filed tax years were not changed." };
     if (!isObj(p) || p.kind !== BACKUP_KIND) return { ok: false, error: "This is not a backup file of this tracker." };
     if (p.book !== BOOK) return { ok: false, error: "This is a backup of the " + String(p.book).slice(0, 20) + " book, not of the filed tax years. Nothing was changed." };
@@ -36820,13 +36966,6 @@ const PackUI = (function () {
       el("div", { class: "btn-row" }, btn("Open the Data tab", () => goTab("data"), "primary", "open-data"), btn("Show provisional numbers anyway", () => { ui.provisional = true; render(true); }, "", "show-prov")));
   }
 
-  function backupNudge(root) {
-    if (ui.mode !== "mine") return;
-    const b = backupInfo();
-    if (!b.hasData || (b.lastAt && !b.stale)) return;
-    root.appendChild(el("div", { class: "banner info" }, el("strong", { text: b.lastAt ? "Your data changed since the last backup" : "No backup file yet" }), el("span", { text: "Your data lives in this browser only. A backup file is the safe copy." }), el("div", {}, btn("Make a backup", () => { dataUI.state.open.backup = true; goTab("data"); }, "", "nudge-backup"))));
-  }
-
   // ---------------------------------------------------------------- Overview
 
   // ---------------------------------------------------------------- Overview: the tax that was actually paid (27.1)
@@ -36850,7 +36989,6 @@ const PackUI = (function () {
     add(root, demoBanner());
     add(root, autoUI.notice());
     add(root, ecbUI.notice());
-    backupNudge(root);
     root.appendChild(notIncludedStrip());
     if (R.selection && !R.selection.ok) root.appendChild(selectionProblem());
 
@@ -37381,6 +37519,7 @@ const PackUI = (function () {
       root.appendChild(card("Your own data", null, el("p", { class: "note", text: "You are looking at the demo. Your own transactions, ISINs, rates and prices are loaded, checked and backed up on this tab when you are on “My data”." }), el("div", { class: "btn-row" }, btn("Go to my data", () => { ui.mode = "mine"; rebuild(); render(true); }, "primary", "go-mine"))));
     } else {
       if (ui.loadProblems && ui.loadProblems.length) root.appendChild(el("div", { class: "banner" }, el("strong", { text: "Something in the saved data was not usable" }), el("ul", { class: "list" }, ui.loadProblems.map((t) => listItem("warn", t)))));
+      root.appendChild(allCard());
       if (conv) dataUI.render(root);
     }
     aboutCards(root);
@@ -37730,6 +37869,188 @@ const PackUI = (function () {
     render();
   }
 
+  // ---------------------------------------------------------------- back up everything (architecture 47.3)
+  // One file with the four books, each as the text of its own backup; the warning when the last such file is old and a book changed.
+
+  const ALLB_KEY = "att-allbackup-v1";
+  const allb = { msg: null, preview: null, busy: false, memo: new Map() };
+  const allReady = () => ui.loaded && spend.loaded && poker.loaded && filed.loaded;
+  function readAllRec() {
+    try {
+      return AllBackup.readRecord(JSON.parse(localStorage.getItem(ALLB_KEY) || "null"));
+    } catch (e) {
+      return null;
+    }
+  }
+  function writeAllRec(rec) {
+    try {
+      localStorage.setItem(ALLB_KEY, JSON.stringify(rec));
+    } catch (e) {
+      /* ignore: the warning then simply stays */
+    }
+  }
+  /** The fingerprint of a book, worked out once per stored object (a book is replaced, never changed in place). */
+  function bookFp(b) {
+    if (!b) return "";
+    if (!allb.memo.has(b)) {
+      if (allb.memo.size > 12) allb.memo.clear();
+      let f = "";
+      try {
+        f = AllBackup.fingerprint(b);
+      } catch (e) {
+        f = "?";
+      }
+      allb.memo.set(b, f);
+    }
+    return allb.memo.get(b);
+  }
+  const allFps = () => ({ invest: fpOf(doc), spend: bookFp(spend.book), poker: bookFp(poker.book), filed: bookFp(filed.book) });
+  const allHasData = () => hasData() || SpendBook.count(spend.book) > 0 || PokerBook.count(poker.book).months > 0 || Filed.count(filed.book) > 0;
+  const allStatus = () => AllBackup.status({ now: new Date().toISOString(), rec: readAllRec(), fps: allFps(), hasData: allHasData() });
+
+  async function makeAll() {
+    if (ui.mode === "demo" || allb.busy) return;
+    if (!allReady()) {
+      allb.msg = { kind: "bad", text: "The page is still reading what this browser has saved. Try again in a moment." };
+      return render();
+    }
+    allb.busy = true;
+    allb.preview = null;
+    const now = new Date().toISOString();
+    const made = AllBackup.make({
+      invest: Store.toBackup(doc, now),
+      spend: spend.problem ? null : SpendBook.toBackup(spend.book, now),
+      poker: poker.problem ? null : PokerBook.toBackup(poker.book, now),
+      filed: filed.problem ? null : Filed.toBackup(filed.book, now),
+    }, now);
+    if (!made.ok) {
+      allb.busy = false;
+      allb.msg = { kind: "bad", text: made.error };
+      return render();
+    }
+    const name = AllBackup.fileName(todayIso());
+    const left = made.missing.map((b) => AllBackup.NAMES[b]).join(", ");
+    const dl = await getDownloads();
+    if (!dl) {
+      allb.busy = false;
+      allb.msg = { kind: "bad", text: "This page cannot hand a file to your device here. Open the page from your own website and press “Back up everything” there." };
+      return render();
+    }
+    try {
+      await dl.save({ filename: name, data: made.text, type: "application/json" });
+      writeAllRec({ at: now, name, fps: allFps() });
+      allb.msg = { kind: made.missing.length ? "bad" : "ok", text: "The file " + name + " with " + (made.missing.length ? "every book except " + left + " (its saved data could not be read here)" : "all four books") + " was handed to your device. Keep it somewhere private, never on GitHub. To be sure it works, choose it under “Restore everything”: you see a preview first, nothing changes until you confirm." };
+    } catch (e) {
+      allb.msg = { kind: "bad", text: e && e.code === "declined" ? "The file was not saved because you declined. Nothing was changed." : "The file could not be saved (" + (e && e.code ? e.code : "unknown reason") + ")." };
+    }
+    allb.busy = false;
+    render();
+  }
+
+  /** A short line of what a book holds, for the preview. */
+  function allSummary(b, x) {
+    if (b === "invest") {
+      const d = x.doc;
+      return (d.files.ps ? "a transaction file" : "no transaction file") + " · " + plural(d.manual.length, "typed-in entry", "typed-in entries") + " · " + plural(Object.keys(d.securities).length, "security", "securities") + " · " + plural(d.files.oekb.length, "OeKB file");
+    }
+    if (b === "spend") return plural(Object.keys(x.book.wallets).length, "wallet") + " · " + plural(SpendBook.count(x.book), "row");
+    if (b === "poker") return plural(PokerBook.count(x.book).months, "month");
+    return plural(Filed.count(x.book), "filed tax year");
+  }
+
+  async function pickAll(file) {
+    allb.preview = null;
+    allb.msg = null;
+    if (!file) return render();
+    let text = null;
+    try {
+      text = await file.text();
+    } catch (e) {
+      text = null;
+    }
+    const r = text === null ? { ok: false, error: "The file could not be read." } : AllBackup.parse(text);
+    if (!r.ok) {
+      allb.msg = { kind: "bad", text: r.error };
+      return render();
+    }
+    const read = {};
+    const readers = { invest: (t) => Store.parseBackup(t), spend: SpendBook.fromBackup, poker: PokerBook.fromBackup, filed: Filed.fromBackup };
+    for (const b of AllBackup.BOOKS) {
+      if (r.parts[b] === undefined) continue;
+      const x = readers[b](r.parts[b]);
+      if (!x.ok) {
+        allb.msg = { kind: "bad", text: "The " + AllBackup.NAMES[b] + " book in this file cannot be restored: " + x.error + " Nothing was changed." };
+        return render();
+      }
+      read[b] = x;
+    }
+    allb.preview = { name: String(file.name || "").slice(0, 120), savedAt: r.savedAt, read, missing: r.missing };
+    render();
+  }
+
+  async function restoreAll() {
+    const pv = allb.preview;
+    if (!pv || allb.busy) return;
+    allb.busy = true;
+    const bad = [];
+    if (pv.read.spend) {
+      const x = await spendSave(pv.read.spend.book);
+      if (!x.ok) bad.push("Spending (" + x.text + ")");
+    }
+    if (pv.read.poker) {
+      const x = await pokerSave(pv.read.poker.book);
+      if (!x.ok) bad.push("Poker (" + x.text + ")");
+    }
+    if (pv.read.filed) {
+      const x = await filedSave(pv.read.filed.book);
+      if (!x.ok) bad.push("Filed tax years (" + x.text + ")");
+    }
+    if (pv.read.invest) {
+      await restoreDoc(pv.read.invest.doc, { savedAt: pv.read.invest.savedAt, name: pv.name });
+      if (!(ui.lastSave && ui.lastSave.ok)) bad.push("Investments");
+    }
+    allb.busy = false;
+    allb.preview = null;
+    if (!bad.length) writeAllRec({ at: pv.savedAt && Number.isFinite(Date.parse(pv.savedAt)) ? pv.savedAt : new Date().toISOString(), name: pv.name, fps: allFps() });
+    const kept = pv.missing.map((b) => AllBackup.NAMES[b]).join(", ");
+    allb.msg = bad.length
+      ? { kind: "bad", text: "This browser did not save: " + bad.join("; ") + ". What is on screen came from the file; make a new backup before you close the page." }
+      : { kind: "ok", text: "Restored from " + (pv.name || "the file") + " and saved in this browser." + (kept ? " Not in the file, so kept as it was: " + kept + "." : "") };
+    render(true);
+  }
+
+  /** The message of the last action, or the warning when a backup is due, at the top of every part. */
+  function allBanner(root) {
+    if (ui.mode !== "mine" || !allReady()) return;
+    if (allb.msg) {
+      root.appendChild(el("div", { class: "banner " + allb.msg.kind, "data-k": "allb-msg", role: "status" }, el("strong", { text: allb.msg.kind === "ok" ? "Done" : "Please note" }), el("span", { text: allb.msg.text }), el("div", { class: "btn-row" }, btn("OK", () => { allb.msg = null; render(); }, "small quiet", "allb-msg-ok"))));
+      return;
+    }
+    const s = allStatus();
+    if (!s.due) return;
+    root.appendChild(el("div", { class: "banner info", "data-k": "allb-due" }, el("strong", { text: s.title }), el("span", { text: s.text }), el("div", { class: "btn-row" }, btn("Back up everything", () => makeAll(), "primary", "allb-make-banner"))));
+  }
+
+  /** The card on the Data tab of Investments: make the file, restore from it. */
+  function allCard() {
+    const s = allReady() ? allStatus() : null;
+    const pv = allb.preview;
+    const kids = [
+      el("p", { class: "note", text: "One file with all four books: Investments, Spending, Poker and the filed tax years. Your data lives in this browser only, so this file is the safe copy. Keep it somewhere private, never on GitHub. The backups of single books further down still work." }),
+      s && s.text ? el("p", { class: "note", "data-k": "allb-last", text: s.kind === "never" ? "No full backup made in this browser yet." : s.text }) : null,
+      el("div", { class: "btn-row" }, btn("Back up everything", () => makeAll(), "primary", "allb-make")),
+      el("div", { class: "field wide" }, el("label", { for: "allb-file", text: "Restore everything from a file" }), el("input", { id: "allb-file", type: "file", accept: ".json,application/json", "data-key": "allb-file", onchange: (e) => pickAll(e.target.files && e.target.files[0]) })),
+    ];
+    if (pv) {
+      kids.push(el("div", { class: "banner", "data-k": "allb-preview" },
+        el("strong", { text: "Check before you restore: " + (pv.name || "the file") + (pv.savedAt ? ", made " + pv.savedAt.slice(0, 10) : "") }),
+        el("ul", { class: "list" }, AllBackup.BOOKS.map((b) => listItem(pv.read[b] ? "info" : "warn", AllBackup.NAMES[b] + ": " + (pv.read[b] ? allSummary(b, pv.read[b]) : "not in the file, kept as it is")))),
+        el("span", { text: "This replaces what this browser holds now in every book listed. If you are not sure, press “Back up everything” first." }),
+        el("div", { class: "btn-row" }, btn("Restore everything", () => restoreAll(), "primary", "allb-restore"), btn("Cancel", () => { allb.preview = null; render(); }, "", "allb-cancel"))));
+    }
+    return card("Back up everything", s && s.due ? "due" : null, ...kids.filter(Boolean));
+  }
+
   // ---------------------------------------------------------------- shell
 
   let lastTabPainted = "";
@@ -37772,6 +38093,7 @@ const PackUI = (function () {
       const s = ui.area === "spend" ? spendSaveText() : ui.area === "poker" ? pokerSaveText() : ui.area === "cash" ? { kind: "neutral", text: "Reads the other parts · nothing is saved here" } : saveText();
       Dom.paint(status, (tmp) => {
         tmp.appendChild(el("span", { class: "chip " + s.kind, "data-k": "save", text: s.text }));
+        if (ui.mode !== "demo") tmp.appendChild(btn("Back up everything", () => makeAll(), "small quiet", "allb-make-top"));
         tmp.appendChild(ui.mode === "demo" ? btn("Back to my data", () => { ui.mode = "mine"; rebuild(); render(true); }, "small", "mode-mine") : btn("Demo data", () => { ui.mode = "demo"; rebuild(); render(true); }, "small quiet", "mode-demo"));
       });
     }
@@ -37786,6 +38108,7 @@ const PackUI = (function () {
   }
 
   function buildView(root) {
+    allBanner(root);
     if (ui.area === "spend") {
       if (ui.mode === "mine" && !spend.loaded) return root.appendChild(card("Loading your spending …", null, el("p", { class: "note", text: "Reading what this browser has saved." })));
       if (ui.mode === "mine" && spend.problem) root.appendChild(card("The Spending book could not be read", null, el("ul", { class: "list" }, listItem("bad", spend.problem)), el("p", { class: "note", text: "Nothing was changed. Restore the Spending book from its backup file below, or delete it there and import your Spendee files again." })));
@@ -37882,6 +38205,7 @@ const PackUI = (function () {
     saveInfo,
     makeBackup,
     parseBackup: (text) => {
+      if (AllBackup.isAll(text)) return { ok: false, error: AllBackup.singleMessage("Investments data") };
       const other = SpendBook.otherBookMessage(text); // a backup of the Spending book (or a later book) is never read as the Investments data
       return other ? { ok: false, error: other } : Store.parseBackup(text);
     },
